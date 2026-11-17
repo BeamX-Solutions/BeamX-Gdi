@@ -6,10 +6,10 @@ Shared server helpers every feature leans on: the Zod checked env module, rate l
 
 ## Key files
 
-| File | Owns |
-|---|---|
-| `env.ts` | The only place env vars are read; Zod schema for every var |
-| `ai-cost.ts` | Price table used to turn AI `usage` tokens into dollars |
+| File         | Owns                                                       |
+| ------------ | ---------------------------------------------------------- |
+| `env.ts`     | The only place env vars are read; Zod schema for every var |
+| `ai-cost.ts` | Price table used to turn AI `usage` tokens into dollars    |
 
 ## Conventions
 
