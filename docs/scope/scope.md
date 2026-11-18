@@ -59,7 +59,7 @@ spec [0002](../specs/0002-data-model/index.md) · code in `src/db`, `src/auth`, 
   - [x] Thin thread end to end: schema and first migration, scripts, happy path test on a real Neon branch (AC-1, AC-3, AC-9, AC-11, AC-12)
   - [x] Thicken the query layer: conversations, messages, runs with pause and resume, reports, usage, plus their tests (AC-2, AC-3, AC-4, AC-5, AC-8, AC-9, AC-10)
   - [x] Guest link, deletion, CI: link batch in `onLinkAccount`, cascade tests, Neon branch per CI run (AC-6, AC-7, AC-11)
-- [ ] Verify it: `/check verify data model`
+- [x] Verify it: `/check verify data model`
 
 ### 4. Design system & UI foundation · needs a decision
 The look and the building blocks of a modern AI chat workspace: the chat thread, the composer, inline answer cards (tap to answer), a report panel beside the chat, and loading and streaming states. It should feel like BeamX.
