@@ -36,6 +36,23 @@ export const get = async (
   return row ? ok(row) : err({ code: "not_found" });
 };
 
+/**
+ * Server only (`onFinish`, the report step). Reads the conversation's current owner at
+ * write time, so a stream that started as a guest and finishes after sign up writes to
+ * the linked account (spec 0002, "Writes after a link"). Never pass the session id
+ * captured when the stream started: after a link that guest no longer exists.
+ */
+export const ownerOf = async (
+  conversationId: string,
+): Promise<Result<string, ConversationError>> => {
+  const rows = await db
+    .select({ userId: conversation.userId })
+    .from(conversation)
+    .where(eq(conversation.id, conversationId));
+  const row = rows[0];
+  return row ? ok(row.userId) : err({ code: "not_found" });
+};
+
 const encodeListCursor = (c: { lastMessageAt: string; id: string }) =>
   Buffer.from(JSON.stringify([c.lastMessageAt, c.id])).toString("base64url");
 

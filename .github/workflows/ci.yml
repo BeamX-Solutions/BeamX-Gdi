@@ -26,8 +26,19 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm format:check
-      # Vitest arrives with /test; this step is skipped until a test script exists.
-      - run: pnpm run --if-present test
+      # Schema drift (spec 0002, AC-11). `db:check` only checks the migrations folder, so
+      # regenerate from the schema: any new or changed migration file means someone edited
+      # the schema without running `pnpm db:generate`. Needs no database.
+      - name: Fail on schema drift
+        run: |
+          pnpm db:generate
+          if [ -n "$(git status --porcelain src/db/migrations)" ]; then
+            git status --porcelain src/db/migrations
+            echo "::error::The schema and the committed migrations differ. Run pnpm db:generate and commit the new migration."
+            exit 1
+          fi
+      # Unit tests (Vitest `unit` project). Integration tests run in the database job.
+      - run: pnpm test
       - run: pnpm build
 
   # Database integration tests on a throwaway Neon branch (spec 0002, AC-11).
@@ -70,7 +81,8 @@ jobs:
           echo "DATABASE_URL_UNPOOLED=${{ steps.branch.outputs.db_url }}" >> "$GITHUB_ENV"
           echo "BETTER_AUTH_SECRET=$(openssl rand -base64 32)" >> "$GITHUB_ENV"
           echo "NEXT_PUBLIC_APP_URL=http://localhost:3000" >> "$GITHUB_ENV"
-      # Fails when the schema and the committed migrations drift apart.
+      # Migrations folder consistency (snapshot versions, collisions, journal order).
+      # Drift between the schema and the migrations is caught in the check job.
       - run: pnpm db:check
       - run: pnpm db:migrate
       - run: pnpm test:integration

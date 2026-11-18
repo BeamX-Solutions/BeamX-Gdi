@@ -98,4 +98,22 @@ describe("report lifecycle (AC-5)", () => {
       error: { code: "already_ready" },
     });
   });
+
+  it("markFailed never throws on a bad error shape: it stores a fixed unknown error", async () => {
+    const { u, runId } = await completedRun();
+    unwrap(await reports.claim(u, runId));
+    const failed = unwrap(
+      await reports.markFailed(runId, 1, {
+        kind: "timeout",
+        message: "x".repeat(301),
+      }),
+    );
+    expect(failed.status).toBe("failed");
+    expect(failed.error).toEqual({
+      kind: "unknown",
+      message: "Report generation failed.",
+    });
+    // The retry stays available.
+    expect(unwrap(await reports.claim(u, runId)).attempts).toBe(2);
+  });
 });

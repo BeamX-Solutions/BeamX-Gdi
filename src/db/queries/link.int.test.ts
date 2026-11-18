@@ -2,7 +2,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { eq, sql } from "drizzle-orm";
 import { db } from "../client";
 import { newId } from "../id";
-import { aiUsage, conversation, user } from "../schema";
+import { aiUsage, user } from "../schema";
 import { linkGuestAccount } from "@/auth/link";
 import * as conversations from "./conversations";
 import * as messages from "./messages";
@@ -117,16 +117,15 @@ describe("guest to account (AC-6)", () => {
   it("a usage record or message finishing after the link lands on the right owner", async () => {
     const guest = await t.guest();
     const account = await t.guest();
-    const { conv } = await runWithAnswers(guest);
+    const { conv, run } = await runWithAnswers(guest);
     await linkGuest(guest, account);
+    // Better Auth deletes the anonymous user once the hook returns.
+    await deleteAccount(guest);
 
-    // onFinish resolves the owner from the conversation row at write time.
-    const [row] = await db
-      .select({ userId: conversation.userId })
-      .from(conversation)
-      .where(eq(conversation.id, conv.id));
-    const owner = row?.userId ?? "";
+    // onFinish and the report step resolve the owner at write time, not from the session.
+    const owner = unwrap(await conversations.ownerOf(conv.id));
     expect(owner).toBe(account);
+    expect(unwrap(await runs.ownerOf(run.id))).toBe(account);
     unwrap(
       await messages.append(owner, conv.id, [
         { id: newId(), role: "assistant", parts: [] },
@@ -138,6 +137,28 @@ describe("guest to account (AC-6)", () => {
       .from(aiUsage)
       .where(eq(aiUsage.callKey, key));
     expect(saved?.userId).toBe(account);
+  });
+
+  it("the stale guest id is the wrong owner after a link, which is why ownerOf exists", async () => {
+    const guest = await t.guest();
+    const account = await t.guest();
+    const { conv } = await runWithAnswers(guest);
+    await linkGuest(guest, account);
+    await deleteAccount(guest);
+
+    expect(
+      await messages.append(guest, conv.id, [
+        { id: newId(), role: "assistant", parts: [] },
+      ]),
+    ).toEqual({ ok: false, error: { code: "not_found" } });
+    expect(await conversations.ownerOf(newId())).toEqual({
+      ok: false,
+      error: { code: "not_found" },
+    });
+    expect(await runs.ownerOf(newId())).toEqual({
+      ok: false,
+      error: { code: "not_found" },
+    });
   });
 });
 

@@ -2,6 +2,7 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../client";
 import { conversation, report, toolRun } from "../schema";
+import { logEvent } from "@/lib/log";
 import { err, ok, type Result } from "@/lib/result";
 
 type ReportRow = typeof report.$inferSelect;
@@ -104,13 +105,25 @@ export const markReady = async (
   return row ? ok(row) : err({ code: "stale_attempt" });
 };
 
-/** Server only. Same guard as `markReady`. */
+/** Stored when the caller's error does not fit `reportErrorSchema`. */
+const FALLBACK_ERROR: ReportError = {
+  kind: "unknown",
+  message: "Report generation failed.",
+};
+
+/**
+ * Server only. Same guard as `markReady`. Runs on the failure path, so it never throws
+ * on a bad error shape: it stores a fixed `unknown` error instead, so the report still
+ * leaves `generating` and the retry stays available.
+ */
 export const markFailed = async (
   runId: string,
   attempt: number,
   error: ReportError,
 ): Promise<Result<ReportRow, WriteError>> => {
-  const safe = reportErrorSchema.parse(error);
+  const parsed = reportErrorSchema.safeParse(error);
+  if (!parsed.success) logEvent("report_error_invalid", { runId, attempt });
+  const safe = parsed.success ? parsed.data : FALLBACK_ERROR;
   const rows = await db
     .update(report)
     .set({ status: "failed", error: safe, updatedAt: sql`now()` })

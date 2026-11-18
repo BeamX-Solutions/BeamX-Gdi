@@ -379,6 +379,21 @@ export const get = async (
   });
 };
 
+/**
+ * Server only (the report step). Reads the run's current owner at write time, the run
+ * twin of `conversations.ownerOf` (spec 0002, "Writes after a link").
+ */
+export const ownerOf = async (
+  runId: string,
+): Promise<Result<string, GetRunError>> => {
+  const rows = await db
+    .select({ userId: toolRun.userId })
+    .from(toolRun)
+    .where(eq(toolRun.id, runId));
+  const row = rows[0];
+  return row ? ok(row.userId) : err({ code: "not_found" });
+};
+
 /** The chat's active run with its answers (or null), plus its paused runs. */
 export const getActive = async (userId: string, conversationId: string) => {
   const [live, answers] = await db.batch([
