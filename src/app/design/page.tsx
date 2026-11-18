@@ -17,6 +17,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ChatGallery } from "@/components/workspace/chat-gallery";
 import { ThemeToggle } from "@/components/workspace/theme-toggle";
 import { env } from "@/lib/env";
 
@@ -240,6 +241,10 @@ export default function DesignPage() {
         <Button asChild className="self-start">
           <Link href="/design/shell">Open the shell demo</Link>
         </Button>
+      </Section>
+
+      <Section id="chat" title="Chat thread, composer, and answer cards">
+        <ChatGallery />
       </Section>
 
       <Section id="surfaces" title="Card and skeleton">

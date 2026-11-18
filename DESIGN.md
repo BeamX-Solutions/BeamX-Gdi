@@ -99,4 +99,64 @@ Tailwind defaults. The split view (rail, chat, report panel) starts at `lg` (102
 
 ## Components
 
-Sections per shared component (props, states, usage rules) are added as each one lands. Built so far: the shadcn primitives `button`, `card`, `badge`, `dropdown-menu`, `skeleton` with 44px touch sizes, and `ThemeToggle`.
+Sections per shared component (props, states, usage rules) are added as each one lands. Built so far: the shadcn primitives `button`, `card`, `badge`, `dropdown-menu`, `skeleton`, `checkbox`, `collapsible`, `input`, `textarea`, and `progress` with 44px touch sizes, `ThemeToggle`, and the chat parts below. The workspace shell and report parts get their sections in the next milestones.
+
+### AI Elements
+
+Added from the registry (`https://elements.ai-sdk.dev`, `ai-elements` CLI 1.9.1, installed 2026-11-18): `conversation`, `message`, `shimmer`, `suggestion`. They are restyled with our tokens only, and kept small on purpose:
+
+- `loader` does not exist in the registry. A status line uses `Shimmer`; a spinner is not needed yet.
+- `prompt-input` (1,400 lines of attachments, model picking, and speech) is not used. `Composer` is built directly on the textarea and button primitives, since the spec strips those parts anyway.
+- `shimmer` is pure CSS (`.shimmer` in `globals.css`) instead of the `motion` library, so the one reduced motion rule turns it off. No animation library ships.
+- `conversation` drops `role="log"` (an implicit live region that would read every token), adds a focusable scroll area, scrolls instantly, and uses a "Jump to latest" button. Download is removed.
+- `message` drops branching and the `ai` package types; `MessageResponse` has no code, diagram, math, or CJK plugins and no copy or download controls. Links open in a new tab with `rel="noopener noreferrer"`. Raw HTML is never rendered.
+- Registry updates must be merged by hand. BeamX behavior lives in `src/components/workspace/` wrappers where possible.
+
+### Thread
+
+`Thread({ messages, status, children, label? })`. `messages` are `{ id, role, markdown, streaming }`. Assistant text renders as streaming markdown on the muted surface; the user's text is plain on `--primary`. Cards, the "View report" card, and error cards go in `children`, after the last message.
+
+States: empty, streaming (the message has `aria-busy`), idle, scrolled up (shows "Jump to latest"). It sticks to the bottom while text streams, unless the reader scrolled up.
+
+Live region: the Thread owns the only `aria-live="polite"` region. A finished assistant reply is announced once, in full, when `streaming` turns false; each new status text is announced when it changes. Replies never announce token by token. Do not add another live region inside the thread.
+
+### StatusLine
+
+`StatusLine({ text })`. Plain text with a shimmer, for example "Scoring your answers…". `null` hides it. It is not a live region itself (the Thread announces it).
+
+### Composer
+
+`Composer({ onSend, hint?, disabled?, maxLength = 4000, ref? })`. The `ref` exposes `focus()`.
+
+- Grows with its text up to 6 lines, then scrolls. 16px text.
+- Desktop (fine pointer): Enter sends, Shift+Enter adds a line. Touch screens (coarse pointer): Enter adds a line; only Send sends. Enter never sends while a word is being composed (`isComposing`).
+- Send is off for empty (trimmed) text and for text over `maxLength`. A counter like "3,712 / 4,000" shows past 90% of the limit, at 16px.
+- `hint` shows small text above the field, like "Or type your answer" while an answer card is open. The composer stays usable while a card is open.
+- `onSend` gets the trimmed text only. What it means is the caller's job. After a card is answered, the caller moves focus here with `ref.current.focus()`.
+- Pads for the phone safe area.
+
+### Answer cards
+
+All four kinds render from one `QuestionView` (`src/components/answer-cards/types.ts`): `AnswerCard({ question, progress?, initialValue?, onSubmit, disabled? })`. The card only reports `onSubmit`; the parent decides whether a question shows as a card or as an `AnsweredBubble`.
+
+| Kind                               | Control                              | Submits when                                                                                                                     |
+| ---------------------------------- | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
+| `single`                           | Chips in a radio group               | One tap                                                                                                                          |
+| `multi`                            | Checkbox rows, hint "Pick 2 to 4"    | Confirm, off until `min` picks; unpicked rows blocked at `max`                                                                   |
+| `scale`                            | Numbered joined segments, end labels | One tap. One row up to 7 points, two balanced rows past that                                                                     |
+| `text` (`text`, `number`, `money`) | Field and Submit                     | Submit or Enter. Validated on submit with a short message under the field. Money is whole naira with a ₦ prefix, grouped on blur |
+
+- Radio groups (single, scale) are hand built: arrow keys only move focus; Space or Enter picks. One Tab stop. (Radix radios select on arrow keys, which would submit by accident.)
+- Every card with `help` has a "What does this mean?" toggle.
+- Progress reads "Marketing · Area 3 of 9 · Question 4 of 7", or "Question 4 of 7" with no area. Counts start at 1.
+- Every control is at least 44 by 44px (checkbox rows are 44px tall; the box is a 20px visual inside).
+- When `initialValue` is passed (editing), the selected control gets focus.
+- `formatAnswer(question, value)` (pure) turns a value into the bubble text; an unknown value shows raw.
+
+### AnsweredBubble
+
+`AnsweredBubble({ question, value, editable, onEdit })`. The user's reply bubble on `--primary`. An "Edit" link shows only while `editable` is true (until the run is scored); it is an inline text link (24px minimum). Reopen the card with `initialValue` set to the old answer.
+
+### RunProgressBar
+
+`RunProgressBar({ toolName, done, total, onPause })`. A thin bar pinned under the header: tool name, "{done} of {total} questions", and Pause. It is a `progressbar` with `aria-valuenow` and `aria-valuemax`. Render it only while a run is active. Paused state with Resume comes with Luna (feature #12).

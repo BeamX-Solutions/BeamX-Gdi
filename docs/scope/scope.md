@@ -69,7 +69,7 @@ spec [0003](../specs/0003-design-system-ui-foundation/index.md)
 - [ ] Build it: `/develop design system & UI foundation`
   - [x] Thin thread, tokens to CI: shadcn init, light and dark tokens, Inter, next-themes, flagged `/design` page, Playwright + axe job, first `DESIGN.md` (AC-1, AC-2, AC-3, AC-13, AC-14, AC-15)
   - [x] Workspace shell: header, history rail and drawer, resizable report panel, mobile report sheet, on fixtures (AC-4, AC-5, AC-14, AC-15)
-  - [ ] Chat thread, composer, and answer cards: AI Elements restyled, live region, composer rules, four card kinds, answered bubble, run progress bar (AC-6, AC-7, AC-8, AC-9, AC-10, AC-15)
+  - [x] Chat thread, composer, and answer cards: AI Elements restyled, live region, composer rules, four card kinds, answered bubble, run progress bar (AC-6, AC-7, AC-8, AC-9, AC-10, AC-15)
   - [ ] Report parts, errors, and the finished `DESIGN.md`: score, bars, advice, sections, skeleton, error card, full axe pass (AC-1, AC-3, AC-11, AC-12, AC-15)
 - [ ] Verify it: `/check verify design system & UI foundation`
 
