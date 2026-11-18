@@ -13,7 +13,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 |---|---------|-------|--------|
 | 1 | Stack & architecture | Foundation | done |
 | 2 | Coding standards & tooling | Foundation | done |
-| 3 | Data model | Foundation | planned |
+| 3 | Data model | Foundation | in-progress |
 | 4 | Design system & UI foundation | Foundation | planned |
 | 20 | Tool source access & parity fixtures | Foundation | planned |
 | 5 | Tool module contract & registry | Foundation | planned |
@@ -49,10 +49,17 @@ Capture conventions from the real scaffold, then install lint, format, and pre c
 **Done when:** root `AGENTS.md` reflects the real stack, and lint, format, and pre commit run clean.
 - [x] Capture conventions and tooling choices: `/audit`
 
-### 3. Data model · needs a decision
+### 3. Data model · in-progress
 The core records every slice builds on: guests and users, the business profile, conversations and messages, tool runs (answers, scores, report), uploaded files, and consultation requests.
 **Done when:** the model supports a guest run that later becomes an account, reports from all four tools, and follow up chat, with no breaking migration needed later.
-- [ ] Design it (spec): `/architect data model`
+spec [0002](../specs/0002-data-model/index.md)
+- [x] Design it (spec): `/architect data model`
+- [ ] Build it: `/develop data model`
+  - [x] Database and auth foundation: env, id helper, Neon client, minimal Better Auth with uuid id spike (AC-1, AC-6, AC-8, AC-11)
+  - [x] Thin thread end to end: schema and first migration, scripts, happy path test on a real Neon branch (AC-1, AC-3, AC-9, AC-11, AC-12)
+  - [ ] Thicken the query layer: conversations, messages, runs with pause and resume, reports, usage, plus their tests (AC-2, AC-3, AC-4, AC-5, AC-8, AC-9, AC-10)
+  - [ ] Guest link, deletion, CI: link batch in `onLinkAccount`, cascade tests, Neon branch per CI run (AC-6, AC-7, AC-11)
+- [ ] Verify it: `/check verify data model`
 
 ### 4. Design system & UI foundation · needs a decision
 The look and the building blocks of a modern AI chat workspace: the chat thread, the composer, inline answer cards (tap to answer), a report panel beside the chat, and loading and streaming states. It should feel like BeamX.
@@ -161,7 +168,7 @@ A public page that explains the workspace and starts a guest chat. It has proper
 ## Deferred
 Left out of the current build pass, kept here so the plan stays honest.
 - **Tool chaining journeys**: for example, validate an idea, then build its marketing plan with answers carried over · needs a decision
-- **Staff console**: an internal BeamX view of clients, reports, and bookings · needs a decision · Beta
+- **Staff console**: an internal BeamX view of clients, reports, and bookings · needs a decision · Beta (needs a durable audit table for staff access, guest links, and deletions first, from spec 0002)
 - **Analytics & error monitoring**: measure signups, completed runs, and bookings, and catch failures · needs a decision
 - **Accessibility audit (WCAG AA)**: a full pass beyond the base components' keyboard support
 - **Paid tier & billing**: premium reports or deeper follow up · needs a decision · GA

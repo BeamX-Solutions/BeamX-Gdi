@@ -14,7 +14,8 @@ Better Auth server and client config, with tables in Neon via the Drizzle adapte
 ## Gotchas
 
 - Anonymous users never linked to an account are purged after 30 days by a daily Vercel Cron job (protected by `CRON_SECRET`). Anything that hangs off a user must cascade on that delete.
-- Confirm the Better Auth Drizzle adapter supports Drizzle 0.45 before wiring it.
+- Auth tables use plain random uuid ids (`advanced.database.generateId: "uuid"`). A custom `generateId` (our UUID v7 `newId`) made the CLI emit `text` ids, so the spec 0002 fallback applies. `src/db/schema/auth.ts` is generated: regenerate with `pnpm dlx auth@latest generate --config src/auth/auth.ts --output src/db/schema/auth.ts -y` (set `SKIP_ENV_VALIDATION=1`), never hand edit.
+- The Better Auth Drizzle adapter works with Drizzle 0.45.4 (typechecks with `better-auth` 1.7.25).
 
 ## Agent skills
 
