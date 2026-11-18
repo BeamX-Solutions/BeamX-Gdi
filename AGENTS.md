@@ -32,7 +32,10 @@ pnpm dev          # dev server
 pnpm build        # production build
 pnpm lint         # ESLint
 pnpm typecheck    # next typegen + tsc --noEmit
-pnpm test         # Vitest (added by /test)
+pnpm test         # Vitest unit tests
+pnpm test:integration  # DB integration tests, against a throwaway Neon branch
+pnpm db:generate  # write a migration after a schema change (CI fails on drift)
+pnpm db:migrate   # apply migrations
 ```
 
 ## Specs
@@ -85,5 +88,6 @@ MCP servers: Neon (connected), Vercel (connected)
 
 - [src/auth/AGENTS.md](src/auth/AGENTS.md): Better Auth setup, guest (anonymous) users, account linking
 - [src/lib/AGENTS.md](src/lib/AGENTS.md): env, rate limits, AI spend cap, shared helpers
+- [src/db/AGENTS.md](src/db/AGENTS.md): Drizzle schema, migrations, the typed query layer, DB integration tests
 
 _Drafted by /audit from the repo, worth a quick human pass. Edit freely: once a line stops matching this draft, later runs treat it as curated and will flag rather than overwrite it._

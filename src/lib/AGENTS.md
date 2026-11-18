@@ -2,7 +2,7 @@
 
 ## Overview
 
-Shared server helpers every feature leans on: the Zod checked env module, rate limits, the daily AI spend cap, and small shared utilities. Not built yet; this records the rules from spec 0001.
+Shared server helpers every feature leans on: the Zod checked env module, rate limits, the daily AI spend cap, and small shared utilities. `env.ts`, `result.ts`, and `log.ts` exist; rate limits, the spend cap, and `ai-cost.ts` are not built yet, so those lines record the rules from spec 0001.
 
 ## Key files
 
@@ -10,12 +10,15 @@ Shared server helpers every feature leans on: the Zod checked env module, rate l
 | ------------ | ---------------------------------------------------------- |
 | `env.ts`     | The only place env vars are read; Zod schema for every var |
 | `ai-cost.ts` | Price table used to turn AI `usage` tokens into dollars    |
+| `result.ts`  | `Result<T, E>` with `ok()` / `err()` for expected failures |
+| `log.ts`     | `logEvent(event, fields)`: one structured JSON log line    |
 
 ## Conventions
 
 - `env.ts`: required vars fail the app at boot; optional ones (`RESEND_API_KEY`, `BLOB_READ_WRITE_TOKEN`, `INNGEST_*`) fail only when their feature is used. `SKIP_ENV_VALIDATION=1` lets `next build` run in CI without secrets. Every var is listed in `.env.example`.
 - Abuse limits come from env with these defaults: 3 tool runs a day per guest, 20 per IP (loose, Nigerian carriers share IPs), 40 messages per run, 4,000 characters per message, and a `maxOutputTokens` ceiling on every AI call. Hitting a limit shows a friendly message, never an error.
 - Spend cap: after each AI call, `onFinish` adds usage tokens times the `ai-cost.ts` price into an Upstash Redis counter keyed by UTC day. Over `AI_DAILY_SPEND_CAP_USD`, new guest runs pause; signed in users continue.
+- `logEvent` takes an event name plus ids, counts, and flags only; never message content, answers, or secrets.
 - Upstash Redis lives in `eu-central-1` and is shared with `resumable-stream`; namespace keys with a clear prefix per use.
 
 ## Agent skills
