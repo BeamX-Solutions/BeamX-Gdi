@@ -64,13 +64,13 @@ spec [0002](../specs/0002-data-model/index.md) · code in `src/db`, `src/auth`, 
 ### 4. Design system & UI foundation · in-progress
 The look and the building blocks of a modern AI chat workspace: the chat thread, the composer, inline answer cards (tap to answer), a report panel beside the chat, and loading and streaming states. It should feel like BeamX.
 **Done when:** `design.md` covers type, color, spacing, and the chat components, and the base components work on mobile and with a keyboard.
-spec [0003](../specs/0003-design-system-ui-foundation/index.md)
+spec [0003](../specs/0003-design-system-ui-foundation/index.md) · code in `src/components`, `src/app/design`, `e2e`, `DESIGN.md`
 - [x] Design it (spec): `/architect design system & UI foundation`
-- [ ] Build it: `/develop design system & UI foundation`
+- [x] Build it: `/develop design system & UI foundation`
   - [x] Thin thread, tokens to CI: shadcn init, light and dark tokens, Inter, next-themes, flagged `/design` page, Playwright + axe job, first `DESIGN.md` (AC-1, AC-2, AC-3, AC-13, AC-14, AC-15)
   - [x] Workspace shell: header, history rail and drawer, resizable report panel, mobile report sheet, on fixtures (AC-4, AC-5, AC-14, AC-15)
   - [x] Chat thread, composer, and answer cards: AI Elements restyled, live region, composer rules, four card kinds, answered bubble, run progress bar (AC-6, AC-7, AC-8, AC-9, AC-10, AC-15)
-  - [ ] Report parts, errors, and the finished `DESIGN.md`: score, bars, advice, sections, skeleton, error card, full axe pass (AC-1, AC-3, AC-11, AC-12, AC-15)
+  - [x] Report parts, errors, and the finished `DESIGN.md`: score, bars, advice, sections, skeleton, error card, full axe pass (AC-1, AC-3, AC-11, AC-12, AC-15)
 - [ ] Verify it: `/check verify design system & UI foundation`
 
 ### 20. Tool source access & parity fixtures

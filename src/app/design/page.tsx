@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChatGallery } from "@/components/workspace/chat-gallery";
+import { ReportGallery } from "@/components/workspace/report-gallery";
 import { ThemeToggle } from "@/components/workspace/theme-toggle";
 import { env } from "@/lib/env";
 
@@ -245,6 +246,10 @@ export default function DesignPage() {
 
       <Section id="chat" title="Chat thread, composer, and answer cards">
         <ChatGallery />
+      </Section>
+
+      <Section id="report" title="Report parts and error cards">
+        <ReportGallery />
       </Section>
 
       <Section id="surfaces" title="Card and skeleton">

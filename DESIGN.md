@@ -99,7 +99,55 @@ Tailwind defaults. The split view (rail, chat, report panel) starts at `lg` (102
 
 ## Components
 
-Sections per shared component (props, states, usage rules) are added as each one lands. Built so far: the shadcn primitives `button`, `card`, `badge`, `dropdown-menu`, `skeleton`, `checkbox`, `collapsible`, `input`, `textarea`, and `progress` with 44px touch sizes, `ThemeToggle`, and the chat parts below. The workspace shell and report parts get their sections in the next milestones.
+Every shared component has a section here (props, states, usage rules) and an entry on `/design` for each state. Foundations first (primitives, the shell), then the chat parts, the report parts, and errors. Do not invent a new look: compose these, and add a section here in the same change when you add one.
+
+### Primitives
+
+`button`, `card`, `badge`, `dropdown-menu`, `skeleton`, `checkbox`, `collapsible`, `input`, `textarea`, `progress`, `sheet`, `resizable`, `scroll-area`, `separator`, `tooltip` from shadcn (Radix base), in `src/components/ui/`. Sizes are overridden for 44px touch targets. They follow the same lint and strict TypeScript rules as our code.
+
+### ThemeToggle
+
+`ThemeToggle()`. A header menu with Light, Dark, and System radio items. It shows the current choice only after mount (`next-themes` has no theme on the server), so it never causes a hydration mismatch.
+
+### BrandMark
+
+`BrandMark({ variant: "logo" | "mark", className? })`. `logo` is the full lockup at 28px tall in the header; `mark` is the X alone, used in the collapsed rail and on phones under 400px wide. Alt text is "BeamX Solutions". In the dark theme the logo sits on a white rounded badge (`--logo-badge`), because its blue and ink text vanish on dark. Do not recolor the files.
+
+### WorkspaceShell
+
+`WorkspaceShell({ header, rail, report, reportTitle?, progress?, children })`. `children` are the Thread and the Composer. `report` is a node, or `null` for no panel and no sheet.
+
+- It renders exactly one layout tree, picked by `useIsDesktop`, never both hidden by CSS. The server and the first paint use the phone layout.
+- At 1024px and up: the `HistoryRail` (16rem open, 3.5rem collapsed), the chat column, and a resizable `ReportPanel` when `report` is set. Below 1280px the rail collapses on its own when the panel opens. Panel width and rail state are not saved.
+- Below 1024px: one column, the rail as a drawer from a menu button, the report in a full screen `ReportSheet` opened from a `ViewReportCard` in the thread.
+- With no report, the chat column is centered at 48rem max.
+- It is `h-dvh`; the viewport is set with `viewportFit: "cover"` and `interactiveWidget: "resizes-content"`, so the composer stays above the Android keyboard. iOS Safari ignores `interactiveWidget` and relies on its own scroll into view (not tested in CI).
+
+Usage rules: text containers use `min-w-0` and `wrap-anywhere`, so long words and URLs wrap instead of widening the page.
+
+### Header
+
+`Header({ children? })`. The brand mark, a menu button below `lg` that opens the history drawer, and a menu holding the `ThemeToggle`. `children` go beside the menu (the run progress bar is passed to the shell, not here).
+
+### HistoryRail
+
+`HistoryRail({ items })` with `items: { id, title, href }[]`. An `aside` on desktop, a `Sheet` drawer on phones. It shows placeholder data until feature #14 fills it.
+
+### ReportPanel
+
+`ReportPanel({ title, children })`. The report beside the chat on desktop: a titled region with its own scroll. In the shell it sits in a resizable panel: 45% wide by default, never under 360px or over 60%, and the chat column never under 360px. The handle resizes by mouse and by arrow keys, with a 44px hit area.
+
+### ReportSheet
+
+`ReportSheet({ open, onOpenChange, title, children })`. The phone version of the report: full screen, closed by its close button or Escape. Focus returns to the `ViewReportCard` that opened it. If the screen grows past 1024px while it is open, it closes and the panel shows.
+
+### ViewReportCard
+
+`ViewReportCard({ title, verdict?, verdictLabel?, onOpen? })`. A tappable card in the thread that opens the report sheet. With a verdict it shows a `VerdictBadge`. Inside a `WorkspaceShell` it opens the sheet on its own; `onOpen` overrides that.
+
+### useIsDesktop
+
+`useIsDesktop(): boolean`. `matchMedia("(min-width: 1024px)")`; false on the server and before mount.
 
 ### AI Elements
 
@@ -160,3 +208,58 @@ All four kinds render from one `QuestionView` (`src/components/answer-cards/type
 ### RunProgressBar
 
 `RunProgressBar({ toolName, done, total, onPause })`. A thin bar pinned under the header: tool name, "{done} of {total} questions", and Pause. It is a `progressbar` with `aria-valuenow` and `aria-valuemax`. Render it only while a run is active. Paused state with Resume comes with Luna (feature #12).
+
+## Report parts
+
+Plain HTML and CSS, no chart or animation library. They are rendered from props by a tool's report view (feature #5). The tool maps its own verdict words (Stellar's green, yellow, red) to `Verdict` (`good`, `caution`, `risk`) and passes its own label.
+
+### VerdictBadge
+
+`VerdictBadge({ verdict, label, className? })`. Icon, text label, and color together: check circle for good, alert triangle for caution, x octagon for risk. A verdict is never color alone. Icons and colors come from one place, `src/components/report/verdict.ts`.
+
+Use verdict colors only for verdicts and score bars. Never for errors (use `--destructive`) or decoration.
+
+### ScoreHeader
+
+`ScoreHeader({ score, max, verdict, verdictLabel, summary })`. The score as a whole number over its max ("72/100"), the badge, and a one or two sentence summary.
+
+### CategoryBars
+
+`CategoryBars({ items, label? })` with `items: { label, score, max, verdict? }[]`. Each row shows the label, the value as text ("6/10"), and a bar. The bar width is `score / max`, clamped to 0..1 (bad input gives an empty bar). The fill is the verdict color when `verdict` is given, else `--primary`. The bar is decorative (`aria-hidden`); the text carries the value.
+
+### AdviceList
+
+`AdviceList({ items, label? })` with `items: { title, detail?, priority: "high" | "medium" | "low" }[]`. A numbered list of cards. Priority tags are neutral text badges: "High priority" is filled with `--primary`; "Medium priority" and "Low priority" are outlined. Never verdict colors.
+
+### ReportSection
+
+`ReportSection({ title, markdown, streaming? })`. A long written part. It renders streaming markdown through the same safe renderer as chat (no raw HTML, no code highlighting, links open in a new tab). While `streaming`, it sets `aria-busy="true"` and shows a shimmer line under the text.
+
+### ReportSkeleton
+
+`ReportSkeleton({ steps })` with `steps: { label, state: "pending" | "active" | "done" }[]`. Placeholder blocks plus the named steps. Each step shows an icon and its state as text: done is a check and "Done", active is a spinner and "In progress", pending is an empty circle and "Waiting". The report state moves `none → generating (skeleton) → ready | failed (ErrorCard with Retry)`.
+
+## Errors
+
+### ErrorCard
+
+`ErrorCard({ kind, title, message, action })`. One card for every expected failure, inline in the thread or the panel. A neutral card with a destructive border and icon (never verdict colors), a short plain message, and exactly one primary action. `action` is `{ label, onAction }` or `{ label, href }`.
+
+| Kind            | Icon        | Default action label  | Behavior                                              |
+| --------------- | ----------- | --------------------- | ----------------------------------------------------- |
+| `ai_error`      | cloud alert | Retry                 | `onAction` retries the step                           |
+| `network`       | wifi off    | Retry                 | `onAction` retries the call                           |
+| `limit_reached` | user plus   | Sign up to keep going | `href` to `/sign-up` (a placeholder until feature #8) |
+| `spend_cap`     | gauge       | Got it                | `onAction` dismisses the card                         |
+
+The kind picks the icon; the caller supplies the wording (defaults in `src/components/feedback/error-copy.ts`, so the tone stays the same). A failure never renders a blank area and never relies on a toast. The card is not a live region: the Thread owns the one live region, so set the thread status text when a failure should be spoken. Each feature maps its typed `{ ok: false, error }` codes to a kind, a title, a message, and one action.
+
+## Fixtures
+
+Typed mock data for every state lives in `src/components/fixtures/` (`chat.ts`, `shell.ts`, `report.ts`). `/design`, Vitest, and Playwright all read it, so a state is written once.
+
+## Checks
+
+- `src/components/design-tokens.test.ts` (Vitest): every token named in backticks in this file exists in `globals.css`, in both themes.
+- `pnpm check:colors`: no raw colors in `src/components/` or `src/app/`.
+- Playwright (`pnpm e2e`, Chromium, 360 and 1280px, light and dark, against a production build with `ENABLE_DESIGN_PAGE=true`): axe scans with the `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`, `wcag22aa` tags, keyboard walks, live region text, reduced motion, and the 360px overflow checks. It runs on every PR as a required check.

@@ -42,3 +42,35 @@ _Steps derived from spec 0003 acceptance criteria. `/check verify` runs these; `
 ## Acceptance-criteria coverage
 
 - AC-6 … covered by the stream, jump, live region and markdown steps · AC-7 … composer steps · AC-8 … card steps and the 44px step · AC-9 … Edit, bubble, and locked steps · AC-10 … run progress bar steps · AC-14 (milestone 3 parts) … reduced motion step · AC-5 (overflow) … long URL step · AC-15 … the e2e command. AC-1 to AC-5, AC-11 to AC-13 are covered by their own milestones.
+
+## Milestone 4: report parts, errors, theme, shell, and the full pass
+
+_Added 2026-11-18. Also covers AC-1 to AC-5, AC-11 to AC-14 as a whole._
+
+### UI / manual
+
+- [ ] Open `/design`, pick Dark in the header menu, reload → no flash, `html` keeps the `dark` class; device Light/Dark followed by default → AC-2
+- [ ] At 1280px open `/design/shell`, focus the resize handle, press Left and Right → panel never under 360px or over 60%; rail collapses below 1280px when the panel opens → AC-4
+- [ ] At 360px open `/design/shell`, tap "View report", press Escape → sheet closes, focus is on the card, no horizontal scroll → AC-5
+- [ ] On a real Android phone, focus the composer → it stays above the keyboard and the safe area → AC-5
+- [ ] In the live conversation on `/design`: stream a reply and use a screen reader → full reply heard once, status text heard when it changes → AC-6
+- [ ] Composer: type 3,601 characters → counter "3,601 / 4,000" at 16px; 4,001 → Send disabled; desktop Enter sends, Shift+Enter adds a line; touch Enter adds a line → AC-7
+- [ ] Tab into each of the four card kinds and answer by keyboard → single and scale are one Tab stop, multi needs `min` picks, text validates on submit → AC-8
+- [ ] Answer a card, then press Edit → bubble shows the label, card reopens with the old answer focused, composer focused after answering, no Edit when locked → AC-9
+- [ ] Check the run progress bar → tool name, "n of N questions", Pause, hidden with no run → AC-10
+- [ ] On `/design` "Report parts and error cards": each verdict badge has icon plus label; each bar shows "n/max"; the streaming section is `aria-busy`; the skeleton shows Done, In progress, Waiting → AC-11
+- [ ] Press Retry on the failed report in the panel → skeleton shows; "Sign up to keep going" links to `/sign-up`; "Got it" dismisses the spend cap card; no failure leaves a blank area → AC-12
+- [ ] Build with `ENABLE_DESIGN_PAGE` unset and open `/design` → 404 → AC-13
+- [ ] Turn on reduced motion in the OS and open the sheet, drawer, and a shimmer → nothing animates, content still shows → AC-14
+
+### Commands
+
+- [ ] `pnpm test` → all Vitest tests pass, including the `DESIGN.md` and `globals.css` token check → AC-1
+- [ ] `pnpm check:colors` → "No raw colors." → AC-1
+- [ ] `SKIP_ENV_VALIDATION=1 ENABLE_DESIGN_PAGE=true pnpm build && pnpm e2e` → axe zero violations at 360 and 1280px in both themes, keyboard, live region, reduced motion, and overflow checks pass → AC-3, AC-15
+- [ ] CI run on a PR → the e2e job runs, uploads its HTML report, and is a required check → AC-15
+
+### Acceptance-criteria coverage
+
+- AC-1 covered by `pnpm test`, `pnpm check:colors` · AC-2 by the theme steps · AC-3 by the axe run · AC-4 by the resize step · AC-5 by the sheet, phone, and overflow steps · AC-6 by the live region step · AC-7 by the composer step · AC-8 by the card walk · AC-9 by the Edit step · AC-10 by the progress bar step · AC-11 by the report parts step · AC-12 by the error card step · AC-13 by the flag off step · AC-14 by the reduced motion step · AC-15 by the e2e commands
+

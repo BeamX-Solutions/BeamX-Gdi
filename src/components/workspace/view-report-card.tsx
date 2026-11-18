@@ -1,14 +1,8 @@
 "use client";
 
-import {
-  AlertTriangleIcon,
-  CheckCircle2Icon,
-  ChevronRightIcon,
-  FileTextIcon,
-  OctagonXIcon,
-} from "lucide-react";
+import { ChevronRightIcon, FileTextIcon } from "lucide-react";
 import type { Verdict } from "@/components/report/types";
-import { cn } from "@/lib/utils";
+import { VerdictBadge } from "@/components/report/verdict-badge";
 import { useWorkspace } from "./workspace-context";
 
 type ViewReportCardProps = {
@@ -19,21 +13,6 @@ type ViewReportCardProps = {
   readonly onOpen?: () => void;
 };
 
-const verdictStyle = {
-  good: {
-    Icon: CheckCircle2Icon,
-    classes: "bg-verdict-good-muted text-verdict-good-strong",
-  },
-  caution: {
-    Icon: AlertTriangleIcon,
-    classes: "bg-verdict-caution-muted text-verdict-caution-strong",
-  },
-  risk: {
-    Icon: OctagonXIcon,
-    classes: "bg-verdict-risk-muted text-verdict-risk-strong",
-  },
-} as const satisfies Record<Verdict, { Icon: unknown; classes: string }>;
-
 /** The card in the thread that opens the report sheet on phones. */
 export function ViewReportCard({
   title,
@@ -42,7 +21,6 @@ export function ViewReportCard({
   onOpen,
 }: ViewReportCardProps) {
   const workspace = useWorkspace();
-  const style = verdict ? verdictStyle[verdict] : null;
 
   return (
     <button
@@ -58,16 +36,8 @@ export function ViewReportCard({
           {title}
         </span>
       </span>
-      {style && verdictLabel ? (
-        <span
-          className={cn(
-            "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
-            style.classes,
-          )}
-        >
-          <style.Icon className="size-3.5" aria-hidden />
-          {verdictLabel}
-        </span>
+      {verdict && verdictLabel ? (
+        <VerdictBadge verdict={verdict} label={verdictLabel} />
       ) : null}
       <ChevronRightIcon
         className="size-4 shrink-0 text-muted-foreground"
