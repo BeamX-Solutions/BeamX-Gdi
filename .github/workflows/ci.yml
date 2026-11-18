@@ -26,6 +26,70 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm format:check
-      # Vitest arrives with /test; this step is skipped until a test script exists.
-      - run: pnpm run --if-present test
+      # Schema drift (spec 0002, AC-11). `db:check` only checks the migrations folder, so
+      # regenerate from the schema: any new or changed migration file means someone edited
+      # the schema without running `pnpm db:generate`. Needs no database.
+      - name: Fail on schema drift
+        run: |
+          pnpm db:generate
+          if [ -n "$(git status --porcelain src/db/migrations)" ]; then
+            git status --porcelain src/db/migrations
+            echo "::error::The schema and the committed migrations differ. Run pnpm db:generate and commit the new migration."
+            exit 1
+          fi
+      # Unit tests (Vitest `unit` project). Integration tests run in the database job.
+      - run: pnpm test
       - run: pnpm build
+
+  # Database integration tests on a throwaway Neon branch (spec 0002, AC-11).
+  # Needs the NEON_API_KEY secret and the NEON_PROJECT_ID variable. Fork PRs get no
+  # secrets, so this job is skipped for them.
+  database:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Neon settings
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+        run: |
+          if [ -z "$NEON_API_KEY" ] || [ -z "$NEON_PROJECT_ID" ]; then
+            echo "::error::Set the NEON_API_KEY secret and the NEON_PROJECT_ID variable in GitHub (Settings, Secrets and variables, Actions)."
+            exit 1
+          fi
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Expiry for the branch (safety net if cleanup is skipped)
+        id: expiry
+        run: echo "at=$(date -u -d '+2 hours' +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+      - name: Create Neon branch
+        id: branch
+        uses: neondatabase/create-branch-action@v6
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          api_key: ${{ secrets.NEON_API_KEY }}
+          branch_name: ci-${{ github.run_id }}-${{ github.run_attempt }}
+          expires_at: ${{ steps.expiry.outputs.at }}
+      - name: Connection settings for the next steps
+        run: |
+          echo "DATABASE_URL=${{ steps.branch.outputs.db_url_pooled }}" >> "$GITHUB_ENV"
+          echo "DATABASE_URL_UNPOOLED=${{ steps.branch.outputs.db_url }}" >> "$GITHUB_ENV"
+          echo "BETTER_AUTH_SECRET=$(openssl rand -base64 32)" >> "$GITHUB_ENV"
+          echo "NEXT_PUBLIC_APP_URL=http://localhost:3000" >> "$GITHUB_ENV"
+      # Migrations folder consistency (snapshot versions, collisions, journal order).
+      # Drift between the schema and the migrations is caught in the check job.
+      - run: pnpm db:check
+      - run: pnpm db:migrate
+      - run: pnpm test:integration
+      - name: Delete Neon branch
+        if: always() && steps.branch.outputs.branch_id != ''
+        uses: neondatabase/delete-branch-action@v3
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch_id: ${{ steps.branch.outputs.branch_id }}
+          api_key: ${{ secrets.NEON_API_KEY }}
