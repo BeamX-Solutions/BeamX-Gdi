@@ -174,6 +174,7 @@ There are no new HTTP endpoints. The surface is the query layer in `src/db/queri
 | `conversations.list` | read | `userId`, `cursor?`, `limit` (default 30, max 100) | page + `nextCursor` | owner | none |
 | `conversations.open` | read (batch) | `userId`, `conversationId`, `before?` | conversation, latest messages, runs with reports | owner | `not_found` |
 | `conversations.delete` | write (batch) | `userId`, `conversationId` | ok | owner | `not_found` |
+| `conversations.ownerOf` | read | `conversationId` | the conversation's current `user_id` | server only (`onFinish`, the report step) | `not_found` |
 | `messages.append` | write (batch) | `userId`, `conversationId`, `messages[]` of `{ id, role, parts, metadata? }` | count | owner | `not_found` |
 | `messages.listRecent` | read | `userId`, `conversationId`, `before?` (a `seq`), `limit` (default 100) | messages oldest first + `nextCursor` | owner | `not_found` |
 | `runs.start` | write (batch) | `userId`, `conversationId`, `toolId`, `toolVersion` | run (+ id of the run it paused, if any) | owner of conversation | `not_found` |
@@ -185,6 +186,7 @@ There are no new HTTP endpoints. The surface is the query layer in `src/db/queri
 | `runs.abandon` | write | `userId`, `runId` | run | owner | `not_found`, `already_completed` (already abandoned returns ok) |
 | `runs.get` | read (batch) | `userId`, `runId` | run + answers + report | owner | `not_found` |
 | `runs.getActive` | read (batch) | `userId`, `conversationId` | active run + answers, or null; plus paused runs in the chat | owner | none |
+| `runs.ownerOf` | read | `runId` | the run's current `user_id` | server only (the report step) | `not_found` |
 | `reports.claim` | write (CAS) | `userId`, `runId` | report (`generating`) with its `attempts` number | owner | `not_found`, `already_generating`, `already_ready`, `attempts_exhausted` |
 | `reports.markReady` | write (CAS) | `runId`, `attempt`, `content`, `model` | report | server only (after a successful claim) | `stale_attempt` |
 | `reports.markFailed` | write (CAS) | `runId`, `attempt`, `error` | report | server only | `stale_attempt` |
@@ -200,17 +202,17 @@ Implementation notes the build must follow:
 - **`messages.append`** is one `db.batch`: (1) `UPDATE conversation SET last_message_at = GREATEST(last_message_at, now()), updated_at = now() WHERE id = $c AND user_id = $user RETURNING id` (this is the ownership signal: zero rows means `not_found`); (2) a multi row `INSERT INTO message (...) SELECT v.* FROM (VALUES ...) v JOIN conversation c ON c.id = $c AND c.user_id = $user ON CONFLICT (id) DO UPDATE SET parts = excluded.parts, metadata = excluded.metadata, updated_at = now() WHERE message.conversation_id = excluded.conversation_id`. The `WHERE` stops a client supplied id from touching another conversation's message; the update keeps parts the AI SDK adds when it continues a message (answer card results). Written with the `sql` template.
 - **`conversations.open`** (AC-10) and **`runs.get` / `runs.getActive`** are one `db.batch` of selects (one HTTP round trip, one consistent snapshot): the owned conversation (empty result means `not_found`), the message page, and `listForConversation`'s query.
 - **`conversations.delete`** is one `db.batch`: `UPDATE tool_run SET status = 'abandoned' WHERE conversation_id = $c AND user_id AND status IN ('in_progress', 'paused')`, then `DELETE FROM conversation WHERE id AND user_id`. Completed runs and reports survive with `conversation_id` null.
-- **`reports.claim`** updates `SET status = 'generating', attempts = attempts + 1, updated_at = now() WHERE run_id = $run AND attempts < 3 AND (status IN ('pending', 'failed') OR (status = 'generating' AND updated_at < now() - interval '10 minutes'))` (mind the parentheses), joined to `tool_run` for ownership, `RETURNING attempts`, then a SELECT to pick the error. **`markReady` and `markFailed`** add `AND status = 'generating' AND attempts = $attempt`, so an older, reclaimed attempt gets `stale_attempt` and its result is dropped.
+- **`reports.claim`** updates `SET status = 'generating', attempts = attempts + 1, updated_at = now() WHERE run_id = $run AND attempts < 3 AND (status IN ('pending', 'failed') OR (status = 'generating' AND updated_at < now() - interval '10 minutes'))` (mind the parentheses), joined to `tool_run` for ownership, `RETURNING attempts`, then a SELECT to pick the error. **`markReady` and `markFailed`** add `AND status = 'generating' AND attempts = $attempt`, so an older, reclaimed attempt gets `stale_attempt` and its result is dropped. `markFailed` runs on the failure path, so it never throws on an error that does not fit the error schema: it stores a fixed `{ kind: "unknown" }` error and logs `report_error_invalid`, so the report still leaves `generating` and the retry stays available.
 - **`usage.record`** inserts `ON CONFLICT (call_key) DO NOTHING` and sets `user_id` with `(SELECT id FROM "user" WHERE id = $userId)`, so a user deleted or linked mid stream yields null instead of a foreign key error. It never throws on a missing user.
 - **`users.linkGuest`** is one `db.batch` of `UPDATE <table> SET user_id = $new WHERE user_id = $guest RETURNING id` for every user owned table that exists (in #3: `conversation`, `tool_run`, `ai_usage`). It is idempotent (a second call moves nothing). **The `onLinkAccount` hook must let any error propagate** (no try and log), so Better Auth aborts before deleting the anonymous user. Features #9, #16, #17, #18 each add their table (profile: read both profiles before the batch, merge in a pure function, then the batch upserts the merged facts guarded by the guest profile's `updated_at` and deletes the guest profile).
-- **Writes after a link**: `onFinish` and the report step resolve the owner from the conversation or run row (`SELECT user_id FROM conversation WHERE id = $c`), not from the session captured when the stream started, then call the query function with that owner. A stream that started as a guest and finishes after sign up still saves.
+- **Writes after a link**: `onFinish` and the report step resolve the owner with `conversations.ownerOf` or `runs.ownerOf` (`SELECT user_id FROM conversation WHERE id = $c`, or the same on `tool_run`), not from the session captured when the stream started, then call the query function with that owner. A stream that started as a guest and finishes after sign up still saves. Passing the stale guest id instead loses data: `messages.append` returns `not_found` and `usage.record` stores a null owner, because Better Auth has deleted the guest by then. The helpers take no `userId` on purpose (the caller has no trustworthy owner yet), so they are server only and must never be reachable from client input; the conversation or run id they take comes from the server's own stream context.
 
 ### Value sourcing
 
 | Action | Value | Source |
 |---|---|---|
 | any user facing query | `userId` | Better Auth session on the server (`auth.api.getSession`), never client input |
-| `onFinish` writes | owner `userId` | `conversation.user_id` (or `tool_run.user_id`) read at write time |
+| `onFinish` and report step writes | owner `userId` | `conversation.user_id` via `conversations.ownerOf` (or `tool_run.user_id` via `runs.ownerOf`), read at write time |
 | `runs.start` | `toolId`, `toolVersion` | the tool module from `tools/registry.ts` (contract in feature #5) |
 | `runs.saveAnswer` | `questionId`, `value` | the tool module's question list and its Zod schema (feature #5) |
 | `runs.saveAnswer` | `source` | the assistant layer, by how the answer was obtained (feature #6) |
@@ -307,7 +309,7 @@ Tracer Bullet: first stand up one real thread from the auth tables through to a 
 **Milestone 4: Guest link, deletion, CI**
 12. Implement `users.linkGuest` as one `db.batch` and wire it into `onLinkAccount` (errors propagate), with a structured log line; tests for success, forced failure, and the foreign key coverage check, satisfies **AC-6**, **AC-7**
 13. Deletion cascade test (owned rows gone, `ai_usage` detached), with a structured log line on delete, satisfies **AC-7**
-14. CI: add a job that creates a Neon branch (Neon's GitHub action), runs `db:check`, `db:migrate`, then the integration tests, and deletes the branch; add `NEON_API_KEY` and `NEON_PROJECT_ID` in GitHub, satisfies **AC-11**
+14. CI: add a job that creates a Neon branch (Neon's GitHub action), runs `db:check`, `db:migrate`, then the integration tests, and deletes the branch; add `NEON_API_KEY` and `NEON_PROJECT_ID` in GitHub. `db:check` only checks the migrations folder (snapshot versions, collisions, journal order), not the schema, so drift is caught by a separate step in the `check` job: run `pnpm db:generate` (no database needed) and fail if anything under `src/db/migrations` changes, satisfies **AC-11**
 
 ## Consequences
 
