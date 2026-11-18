@@ -1,0 +1,183 @@
+"use client";
+
+import { useRef, useState, type ReactNode } from "react";
+import { Button } from "@/components/ui/button";
+import { Suggestion, Suggestions } from "@/components/ai-elements/suggestion";
+import {
+  budgetQuestion,
+  channelsQuestion,
+  confidenceQuestion,
+  descriptionQuestion,
+  longScaleQuestion,
+  longUrlMessage,
+  lunaProgress,
+  openingMessages,
+  plainProgress,
+  sectorQuestion,
+  staffQuestion,
+  streamedReply,
+} from "@/components/fixtures/chat";
+import { Composer, type ComposerHandle } from "./composer";
+import { QuestionDemo } from "./question-demo";
+import { RunProgressBar } from "./run-progress-bar";
+import { StatusLine } from "./status-line";
+import { Thread } from "./thread";
+import type { MessageView } from "./types";
+
+function Block({
+  title,
+  children,
+}: {
+  readonly title: string;
+  readonly children: ReactNode;
+}) {
+  return (
+    <div className="flex min-w-0 flex-col gap-3">
+      <h3 className="text-lg font-semibold">{title}</h3>
+      {children}
+    </div>
+  );
+}
+
+/** Chat thread, composer, answer cards, and run progress, on fixture data (spec 0003). */
+export function ChatGallery() {
+  const composerRef = useRef<ComposerHandle | null>(null);
+  const [sent, setSent] = useState<readonly MessageView[]>([]);
+  const [paused, setPaused] = useState(false);
+  const [streamText, setStreamText] = useState<MessageView | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
+  const timer = useRef<number | null>(null);
+
+  function streamReply() {
+    if (timer.current !== null) window.clearInterval(timer.current);
+    const id = `stream-${Date.now()}`;
+    let shown = 0;
+    setStatus("Writing your reply…");
+    setStreamText({ id, role: "assistant", markdown: "", streaming: true });
+    timer.current = window.setInterval(() => {
+      shown = Math.min(shown + 8, streamedReply.length);
+      const done = shown >= streamedReply.length;
+      setStreamText({
+        id,
+        role: "assistant",
+        markdown: streamedReply.slice(0, shown),
+        streaming: !done,
+      });
+      if (done) {
+        setStatus(null);
+        if (timer.current !== null) window.clearInterval(timer.current);
+      }
+    }, 40);
+  }
+
+  return (
+    <div className="flex flex-col gap-10">
+      <Block title="Live conversation">
+        <p className="text-muted-foreground">
+          Answer the card, press Edit to change it, or type in the composer.
+        </p>
+        <div
+          data-testid="live-conversation"
+          className="flex h-[34rem] min-w-0 flex-col overflow-hidden rounded-xl border bg-background"
+        >
+          <RunProgressBar
+            toolName="Idea Check"
+            done={paused ? 3 : 2}
+            total={12}
+            onPause={() => setPaused(true)}
+          />
+          <Thread
+            label="Live conversation thread"
+            messages={[...openingMessages, ...sent]}
+            status={null}
+          >
+            <QuestionDemo
+              question={sectorQuestion}
+              progress={plainProgress}
+              onAnswered={() => composerRef.current?.focus()}
+            />
+          </Thread>
+          <Composer
+            ref={composerRef}
+            hint="Or type your answer"
+            onSend={(text) =>
+              setSent((list) => [
+                ...list,
+                {
+                  id: `u-${list.length}`,
+                  role: "user",
+                  markdown: text,
+                  streaming: false,
+                },
+              ])
+            }
+          />
+        </div>
+        <p className="text-sm text-muted-foreground" aria-live="off">
+          Paused: {paused ? "yes" : "no"}
+        </p>
+      </Block>
+
+      <Block title="Streaming reply and live region">
+        <div className="flex flex-wrap items-center gap-3">
+          <Button onClick={streamReply}>Stream a reply</Button>
+          <Suggestions>
+            <Suggestion suggestion="How healthy is my business?" />
+            <Suggestion suggestion="I have a business idea" />
+          </Suggestions>
+        </div>
+        <div
+          data-testid="stream-thread"
+          className="flex h-52 min-w-0 flex-col overflow-hidden rounded-xl border bg-background"
+        >
+          <Thread
+            label="Streaming thread"
+            messages={[longUrlMessage, ...(streamText ? [streamText] : [])]}
+            status={status}
+          />
+        </div>
+      </Block>
+
+      <Block title="Answer cards">
+        <div className="grid min-w-0 gap-6 lg:grid-cols-2">
+          <QuestionDemo question={channelsQuestion} progress={lunaProgress} />
+          <QuestionDemo question={confidenceQuestion} />
+          <QuestionDemo question={longScaleQuestion} />
+          <QuestionDemo question={descriptionQuestion} />
+          <QuestionDemo question={staffQuestion} />
+          <QuestionDemo question={budgetQuestion} />
+        </div>
+      </Block>
+
+      <Block title="Answered bubble, locked">
+        <QuestionDemo
+          question={{ ...sectorQuestion, id: "locked" }}
+          editable={false}
+        />
+      </Block>
+
+      <Block title="Run progress bar">
+        <div className="flex flex-col gap-3 overflow-hidden rounded-xl border">
+          <RunProgressBar
+            toolName="Luna: full marketing plan"
+            done={17}
+            total={48}
+            onPause={() => undefined}
+          />
+          <RunProgressBar
+            toolName="Idea Check"
+            done={0}
+            total={12}
+            onPause={() => undefined}
+          />
+        </div>
+      </Block>
+
+      <Block title="Status line">
+        <div className="rounded-xl border p-4">
+          <StatusLine text="Scoring your answers…" />
+        </div>
+      </Block>
+    </div>
+  );
+}
