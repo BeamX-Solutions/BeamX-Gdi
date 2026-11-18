@@ -28,6 +28,7 @@
   --color-ring: var(--ring);
   --color-brand-sky: var(--brand-sky);
   --color-brand-orange: var(--brand-orange);
+  --color-logo-badge: var(--logo-badge);
 
   --color-verdict-good: var(--verdict-good);
   --color-verdict-good-foreground: var(--verdict-good-foreground);
@@ -70,6 +71,7 @@
   --ring: oklch(0.614 0.152 244.2);
   --brand-sky: oklch(0.614 0.152 244.2);
   --brand-orange: oklch(0.703 0.179 52.9);
+  --logo-badge: oklch(1 0 0);
   --destructive: oklch(0.55 0.2 27);
 
   --verdict-good: oklch(0.52 0.13 155);
@@ -106,6 +108,7 @@
   --ring: oklch(0.688 0.135 240.8);
   --brand-sky: oklch(0.688 0.135 240.8);
   --brand-orange: oklch(0.703 0.179 52.9);
+  --logo-badge: oklch(1 0 0);
   --destructive: oklch(0.68 0.18 25);
 
   --verdict-good: oklch(0.72 0.14 155);

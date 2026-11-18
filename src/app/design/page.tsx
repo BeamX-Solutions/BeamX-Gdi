@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
   AlertTriangleIcon,
@@ -153,7 +154,7 @@ export default function DesignPage() {
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-10 p-4 md:p-8">
       <header className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="text-4xl font-semibold break-words">
+          <h1 className="text-4xl font-semibold wrap-anywhere">
             BeamX design system
           </h1>
           <p className="mt-2 text-muted-foreground">
@@ -169,7 +170,7 @@ export default function DesignPage() {
           {pairs.map((pair) => (
             <li
               key={pair.name}
-              className={`min-w-0 rounded-lg border p-4 text-sm font-medium break-words ${pair.classes}`}
+              className={`min-w-0 rounded-lg border p-4 text-sm font-medium wrap-anywhere ${pair.classes}`}
             >
               {pair.name}
             </li>
@@ -229,6 +230,16 @@ export default function DesignPage() {
           <Badge variant="secondary">Secondary</Badge>
           <Badge variant="outline">Outline</Badge>
         </div>
+      </Section>
+
+      <Section id="shell" title="Workspace shell">
+        <p className="text-muted-foreground">
+          The header, history rail, chat column, and report panel (or sheet on
+          phones), on fixture data.
+        </p>
+        <Button asChild className="self-start">
+          <Link href="/design/shell">Open the shell demo</Link>
+        </Button>
       </Section>
 
       <Section id="surfaces" title="Card and skeleton">

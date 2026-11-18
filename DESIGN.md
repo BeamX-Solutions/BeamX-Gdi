@@ -23,40 +23,41 @@ The caution verdict is yellow (hue about 90), not amber, so a score is never mis
 
 All are CSS variables in `oklch`, switched by the `dark` class on `<html>`. If a value fails the axe contrast check, change its lightness only and update this file in the same change.
 
-| Token                          | Use                                                         |
-| ------------------------------ | ----------------------------------------------------------- |
-| `--background`                 | Page                                                        |
-| `--foreground`                 | Body text                                                   |
-| `--card`                       | Cards                                                       |
-| `--card-foreground`            | Text on cards                                               |
-| `--popover`                    | Menus                                                       |
-| `--popover-foreground`         | Text on menus                                               |
-| `--secondary`                  | Secondary buttons, neutral badges                           |
-| `--secondary-foreground`       | Text on secondary                                           |
-| `--muted`                      | Assistant bubble, skeleton                                  |
-| `--muted-foreground`           | Secondary text                                              |
-| `--primary`                    | Brand, primary buttons, links, user bubble                  |
-| `--primary-foreground`         | Text on primary                                             |
-| `--accent`                     | Hover, selected chip background                             |
-| `--accent-foreground`          | Text on accent                                              |
-| `--border`                     | Lines                                                       |
-| `--input`                      | Input borders                                               |
-| `--ring`                       | Focus ring (2px, offset 2px)                                |
-| `--brand-sky`                  | Progress fill, selected chip border, small accents          |
-| `--brand-orange`               | Decoration only                                             |
-| `--destructive`                | Destructive actions and error card accents. Never a verdict |
-| `--verdict-good`               | Green verdict fill, strong score bars                       |
-| `--verdict-good-foreground`    | Text on the good fill                                       |
-| `--verdict-good-muted`         | Badge background                                            |
-| `--verdict-good-strong`        | Text on the muted badge                                     |
-| `--verdict-caution`            | Yellow verdict fill                                         |
-| `--verdict-caution-foreground` | Text on the caution fill (dark in both themes)              |
-| `--verdict-caution-muted`      | Badge background                                            |
-| `--verdict-caution-strong`     | Text on the muted badge                                     |
-| `--verdict-risk`               | Red verdict fill, weak score bars                           |
-| `--verdict-risk-foreground`    | Text on the risk fill                                       |
-| `--verdict-risk-muted`         | Badge background                                            |
-| `--verdict-risk-strong`        | Text on the muted badge                                     |
+| Token                          | Use                                                                                  |
+| ------------------------------ | ------------------------------------------------------------------------------------ |
+| `--background`                 | Page                                                                                 |
+| `--foreground`                 | Body text                                                                            |
+| `--card`                       | Cards                                                                                |
+| `--card-foreground`            | Text on cards                                                                        |
+| `--popover`                    | Menus                                                                                |
+| `--popover-foreground`         | Text on menus                                                                        |
+| `--secondary`                  | Secondary buttons, neutral badges                                                    |
+| `--secondary-foreground`       | Text on secondary                                                                    |
+| `--muted`                      | Assistant bubble, skeleton                                                           |
+| `--muted-foreground`           | Secondary text                                                                       |
+| `--primary`                    | Brand, primary buttons, links, user bubble                                           |
+| `--primary-foreground`         | Text on primary                                                                      |
+| `--accent`                     | Hover, selected chip background                                                      |
+| `--accent-foreground`          | Text on accent                                                                       |
+| `--border`                     | Lines                                                                                |
+| `--input`                      | Input borders                                                                        |
+| `--ring`                       | Focus ring (2px, offset 2px)                                                         |
+| `--brand-sky`                  | Progress fill, selected chip border, small accents                                   |
+| `--brand-orange`               | Decoration only                                                                      |
+| `--logo-badge`                 | White badge behind the logo PNG in dark theme (its blue and ink text vanish on dark) |
+| `--destructive`                | Destructive actions and error card accents. Never a verdict                          |
+| `--verdict-good`               | Green verdict fill, strong score bars                                                |
+| `--verdict-good-foreground`    | Text on the good fill                                                                |
+| `--verdict-good-muted`         | Badge background                                                                     |
+| `--verdict-good-strong`        | Text on the muted badge                                                              |
+| `--verdict-caution`            | Yellow verdict fill                                                                  |
+| `--verdict-caution-foreground` | Text on the caution fill (dark in both themes)                                       |
+| `--verdict-caution-muted`      | Badge background                                                                     |
+| `--verdict-caution-strong`     | Text on the muted badge                                                              |
+| `--verdict-risk`               | Red verdict fill, weak score bars                                                    |
+| `--verdict-risk-foreground`    | Text on the risk fill                                                                |
+| `--verdict-risk-muted`         | Badge background                                                                     |
+| `--verdict-risk-strong`        | Text on the muted badge                                                              |
 
 A verdict is never shown by color alone: it always carries an icon (check circle for good, alert triangle for caution, x octagon for risk) and a text label. There are no `sidebar` or `chart` tokens: this design uses neither.
 
