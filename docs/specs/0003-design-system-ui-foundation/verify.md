@@ -68,7 +68,7 @@ _Added 2026-11-18. Also covers AC-1 to AC-5, AC-11 to AC-14 as a whole._
 - [x] `pnpm test` → all Vitest tests pass, including the `DESIGN.md` and `globals.css` token check → AC-1
 - [x] `pnpm check:colors` → "No raw colors." → AC-1
 - [x] `SKIP_ENV_VALIDATION=1 ENABLE_DESIGN_PAGE=true pnpm build && pnpm e2e` → axe zero violations at 360 and 1280px in both themes, keyboard, live region, reduced motion, and overflow checks pass → AC-3, AC-15
-- [ ] CI run on a PR → the e2e job runs and uploads its HTML report (not a required check, see AC-15) → AC-15
+- [x] CI run on a PR → the e2e job runs and uploads its HTML report (not a required check, see AC-15) → AC-15
 
 ### Acceptance-criteria coverage
 
