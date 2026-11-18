@@ -13,7 +13,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 |---|---------|-------|--------|
 | 1 | Stack & architecture | Foundation | done |
 | 2 | Coding standards & tooling | Foundation | done |
-| 3 | Data model | Foundation | in-progress |
+| 3 | Data model | Foundation | done |
 | 4 | Design system & UI foundation | Foundation | planned |
 | 20 | Tool source access & parity fixtures | Foundation | planned |
 | 5 | Tool module contract & registry | Foundation | planned |
@@ -49,7 +49,7 @@ Capture conventions from the real scaffold, then install lint, format, and pre c
 **Done when:** root `AGENTS.md` reflects the real stack, and lint, format, and pre commit run clean.
 - [x] Capture conventions and tooling choices: `/audit`
 
-### 3. Data model · in-progress
+### 3. Data model · done
 The core records every slice builds on: guests and users, the business profile, conversations and messages, tool runs (answers, scores, report), uploaded files, and consultation requests.
 **Done when:** the model supports a guest run that later becomes an account, reports from all four tools, and follow up chat, with no breaking migration needed later.
 spec [0002](../specs/0002-data-model/index.md) · code in `src/db`, `src/auth`, `src/lib`

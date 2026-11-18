@@ -1,7 +1,7 @@
 # 0002. Data model for the BeamX Workspace
 
 **Date**: 2026-11-17
-**Status**: In Progress
+**Status**: Accepted
 
 ## Summary
 
