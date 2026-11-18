@@ -1,6 +1,6 @@
-import { sql } from "drizzle-orm";
+import { and, desc, eq, lt, sql } from "drizzle-orm";
 import { db } from "../client";
-import { conversation } from "../schema";
+import { conversation, message } from "../schema";
 import { err, ok, type Result } from "@/lib/result";
 
 export type NewMessage = {
@@ -11,6 +11,63 @@ export type NewMessage = {
 };
 
 export type MessageError = { readonly code: "not_found" };
+export type ListError =
+  { readonly code: "not_found" } | { readonly code: "invalid_cursor" };
+
+export const DEFAULT_PAGE = 100;
+
+export const encodeCursor = (seq: number): string =>
+  Buffer.from(String(seq)).toString("base64url");
+
+export const decodeCursor = (cursor: string): number | null => {
+  const n = Number(Buffer.from(cursor, "base64url").toString());
+  return Number.isSafeInteger(n) && n > 0 ? n : null;
+};
+
+/** Newest first, one extra row to learn whether an older page exists. */
+export const pageQuery = (
+  userId: string,
+  conversationId: string,
+  beforeSeq: number | null,
+  limit: number,
+) =>
+  db
+    .select({ message })
+    .from(message)
+    .innerJoin(
+      conversation,
+      and(
+        eq(conversation.id, message.conversationId),
+        eq(conversation.userId, userId),
+      ),
+    )
+    .where(
+      and(
+        eq(message.conversationId, conversationId),
+        beforeSeq === null ? undefined : lt(message.seq, beforeSeq),
+      ),
+    )
+    .orderBy(desc(message.seq))
+    .limit(limit + 1);
+
+type MessageRow = typeof message.$inferSelect;
+
+/** Turns a newest first page (with the extra row) into oldest first plus `nextCursor`. */
+export const toPage = (
+  rows: readonly { message: MessageRow }[],
+  limit: number,
+) => {
+  const hasMore = rows.length > limit;
+  const page = rows.slice(0, limit).map((r) => r.message);
+  const oldest = page.at(-1);
+  return {
+    messages: page.reverse(),
+    nextCursor: hasMore && oldest ? encodeCursor(oldest.seq) : null,
+  };
+};
+
+export const clampLimit = (limit: number | undefined) =>
+  Math.min(Math.max(limit ?? DEFAULT_PAGE, 1), 500);
 
 /**
  * One batch: the first statement is the ownership signal (zero rows = not_found),
@@ -60,9 +117,31 @@ export const append = async (
   return ok(inserted.rows.length);
 };
 
-export const countForConversation = async (conversationId: string) => {
-  const rows = await db.execute(
-    sql`SELECT count(*)::int AS n FROM message WHERE conversation_id = ${conversationId}::uuid`,
-  );
-  return Number((rows.rows[0] as { n: number } | undefined)?.n ?? 0);
+/** Oldest first within the page; `before` is the opaque cursor from a previous page. */
+export const listRecent = async (
+  userId: string,
+  conversationId: string,
+  before?: string,
+  limit?: number,
+): Promise<
+  Result<{ messages: MessageRow[]; nextCursor: string | null }, ListError>
+> => {
+  const beforeSeq = before === undefined ? null : decodeCursor(before);
+  if (before !== undefined && beforeSeq === null)
+    return err({ code: "invalid_cursor" });
+  const size = clampLimit(limit);
+  const [owned, rows] = await db.batch([
+    db
+      .select({ id: conversation.id })
+      .from(conversation)
+      .where(
+        and(
+          eq(conversation.id, conversationId),
+          eq(conversation.userId, userId),
+        ),
+      ),
+    pageQuery(userId, conversationId, beforeSeq, size),
+  ]);
+  if (owned.length === 0) return err({ code: "not_found" });
+  return ok(toPage(rows, size));
 };

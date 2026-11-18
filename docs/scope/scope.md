@@ -57,7 +57,7 @@ spec [0002](../specs/0002-data-model/index.md)
 - [ ] Build it: `/develop data model`
   - [x] Database and auth foundation: env, id helper, Neon client, minimal Better Auth with uuid id spike (AC-1, AC-6, AC-8, AC-11)
   - [x] Thin thread end to end: schema and first migration, scripts, happy path test on a real Neon branch (AC-1, AC-3, AC-9, AC-11, AC-12)
-  - [ ] Thicken the query layer: conversations, messages, runs with pause and resume, reports, usage, plus their tests (AC-2, AC-3, AC-4, AC-5, AC-8, AC-9, AC-10)
+  - [x] Thicken the query layer: conversations, messages, runs with pause and resume, reports, usage, plus their tests (AC-2, AC-3, AC-4, AC-5, AC-8, AC-9, AC-10)
   - [ ] Guest link, deletion, CI: link batch in `onLinkAccount`, cascade tests, Neon branch per CI run (AC-6, AC-7, AC-11)
 - [ ] Verify it: `/check verify data model`
 

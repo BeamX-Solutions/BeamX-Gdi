@@ -1,6 +1,7 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
+import { z } from "zod";
 import { db } from "../client";
-import { report, toolRun } from "../schema";
+import { conversation, report, toolRun } from "../schema";
 import { err, ok, type Result } from "@/lib/result";
 
 type ReportRow = typeof report.$inferSelect;
@@ -8,12 +9,40 @@ type ReportRow = typeof report.$inferSelect;
 export const STALE_AFTER_MINUTES = 10;
 export const MAX_ATTEMPTS = 3;
 
+/** Safe by construction: a kind and a short fixed message, never prompts or client data. */
+export const reportErrorSchema = z.object({
+  kind: z.enum([
+    "timeout",
+    "provider_overloaded",
+    "invalid_output",
+    "spend_cap",
+    "unknown",
+  ]),
+  message: z.string().max(300),
+});
+export type ReportError = z.infer<typeof reportErrorSchema>;
+
 export type ClaimError =
   | { readonly code: "not_found" }
   | { readonly code: "already_generating" }
   | { readonly code: "already_ready" }
   | { readonly code: "attempts_exhausted" };
 export type WriteError = { readonly code: "stale_attempt" };
+export type ListError = { readonly code: "not_found" };
+
+/** Every run in a chat (all statuses), newest first, each with its report or null. */
+export const runsWithReports = (userId: string, conversationId: string) =>
+  db
+    .select({ run: toolRun, report })
+    .from(toolRun)
+    .leftJoin(report, eq(report.runId, toolRun.id))
+    .where(
+      and(
+        eq(toolRun.conversationId, conversationId),
+        eq(toolRun.userId, userId),
+      ),
+    )
+    .orderBy(desc(toolRun.createdAt), desc(toolRun.id));
 
 /** Compare and set: pending or failed or stale `generating` becomes `generating`. */
 export const claim = async (
@@ -59,6 +88,7 @@ export const markReady = async (
       status: "ready",
       content,
       model,
+      error: null,
       generatedAt: sql`now()`,
       updatedAt: sql`now()`,
     })
@@ -72,4 +102,45 @@ export const markReady = async (
     .returning();
   const row = rows[0];
   return row ? ok(row) : err({ code: "stale_attempt" });
+};
+
+/** Server only. Same guard as `markReady`. */
+export const markFailed = async (
+  runId: string,
+  attempt: number,
+  error: ReportError,
+): Promise<Result<ReportRow, WriteError>> => {
+  const safe = reportErrorSchema.parse(error);
+  const rows = await db
+    .update(report)
+    .set({ status: "failed", error: safe, updatedAt: sql`now()` })
+    .where(
+      and(
+        eq(report.runId, runId),
+        eq(report.status, "generating"),
+        eq(report.attempts, attempt),
+      ),
+    )
+    .returning();
+  const row = rows[0];
+  return row ? ok(row) : err({ code: "stale_attempt" });
+};
+
+export const listForConversation = async (
+  userId: string,
+  conversationId: string,
+): Promise<Result<Awaited<ReturnType<typeof runsWithReports>>, ListError>> => {
+  const [owned, rows] = await db.batch([
+    db
+      .select({ id: conversation.id })
+      .from(conversation)
+      .where(
+        and(
+          eq(conversation.id, conversationId),
+          eq(conversation.userId, userId),
+        ),
+      ),
+    runsWithReports(userId, conversationId),
+  ]);
+  return owned.length === 0 ? err({ code: "not_found" }) : ok(rows);
 };
