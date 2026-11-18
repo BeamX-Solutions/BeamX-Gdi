@@ -34,6 +34,9 @@ pnpm lint         # ESLint
 pnpm typecheck    # next typegen + tsc --noEmit
 pnpm test         # Vitest unit tests
 pnpm test:integration  # DB integration tests, against a throwaway Neon branch
+pnpm format:check  # Prettier check (CI runs it)
+pnpm check:colors  # fail on raw colors in src/components and src/app
+pnpm e2e          # Playwright + axe against a production build (build first with ENABLE_DESIGN_PAGE=true)
 pnpm db:generate  # write a migration after a schema change (CI fails on drift)
 pnpm db:migrate   # apply migrations
 ```
@@ -54,10 +57,11 @@ Stored in `docs/specs/`. Format: `docs/specs/NNNN-title/` (`index.md` + `rationa
 - Model ids live only in `src/assistant/models.ts`. Keep DB calls per request few and parallel (Frankfurt is far from Nigeria).
 - Conventional commit messages (`feat:`, `fix:`, `chore:`, `docs:`, `test:`, `refactor:`).
 - Tests come with each feature: Vitest unit tests for pure logic, parity tests against original tool fixtures, Playwright for key flows.
+- Design system: build all UI to `DESIGN.md` (spec 0003); token values live in `src/app/globals.css`. Style only with tokens, never raw colors (`pnpm check:colors` enforces it).
 
 ## Tooling
 
-Chosen here, installed by `/develop tooling`: ESLint (`eslint-config-next`, installed) + Prettier with `prettier-plugin-tailwindcss` · husky + lint-staged pre commit: lint and format staged files, then typecheck · TS flags `noUncheckedIndexedAccess` (+ ESLint `no-explicit-any`, `switch-exhaustiveness-check`) · GitHub Actions on every PR: typecheck, lint, test, build.
+Chosen here, installed by `/develop tooling`: ESLint (`eslint-config-next`, installed) + Prettier with `prettier-plugin-tailwindcss` · husky + lint-staged pre commit: lint and format staged files, then typecheck · TS flags `noUncheckedIndexedAccess` (+ ESLint `no-explicit-any`, `switch-exhaustiveness-check`) · GitHub Actions on every PR: typecheck, lint, test, build, e2e (Playwright + axe, uploads its HTML report; not a required check on the free GitHub plan).
 
 ## Git
 
@@ -82,6 +86,7 @@ Chosen here, installed by `/develop tooling`: ESLint (`eslint-config-next`, inst
 - [playwright-cli](.claude/skills/playwright-cli/): `microsoft/playwright-cli`, browser automation and end to end tests
 
 Declined: Better Auth docs MCP, Upstash MCP, Resend MCP, Inngest MCP, Playwright MCP
+Declined: Agent Skills for next-themes, @axe-core/playwright
 MCP servers: Neon (connected), Vercel (connected)
 
 ## Context files
@@ -89,5 +94,6 @@ MCP servers: Neon (connected), Vercel (connected)
 - [src/auth/AGENTS.md](src/auth/AGENTS.md): Better Auth setup, guest (anonymous) users, account linking
 - [src/lib/AGENTS.md](src/lib/AGENTS.md): env, rate limits, AI spend cap, shared helpers
 - [src/db/AGENTS.md](src/db/AGENTS.md): Drizzle schema, migrations, the typed query layer, DB integration tests
+- [src/components/AGENTS.md](src/components/AGENTS.md): shared UI, shadcn and AI Elements, workspace shell, answer cards, report parts, fixtures
 
 _Drafted by /audit from the repo, worth a quick human pass. Edit freely: once a line stops matching this draft, later runs treat it as curated and will flag rather than overwrite it._

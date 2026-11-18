@@ -262,4 +262,4 @@ Typed mock data for every state lives in `src/components/fixtures/` (`chat.ts`, 
 
 - `src/components/design-tokens.test.ts` (Vitest): every token named in backticks in this file exists in `globals.css`, in both themes.
 - `pnpm check:colors`: no raw colors in `src/components/` or `src/app/`.
-- Playwright (`pnpm e2e`, Chromium, 360 and 1280px, light and dark, against a production build with `ENABLE_DESIGN_PAGE=true`): axe scans with the `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`, `wcag22aa` tags, keyboard walks, live region text, reduced motion, and the 360px overflow checks. It runs on every PR as a required check.
+- Playwright (`pnpm e2e`, Chromium, 360 and 1280px, light and dark, against a production build with `ENABLE_DESIGN_PAGE=true`): axe scans with the `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`, `wcag22aa` tags, keyboard walks, live region text, reduced motion, and the 360px overflow checks. It runs on every PR and uploads its HTML report; it is not a required check (the private repo on the free GitHub plan has no branch protection, see spec 0003 AC-15).

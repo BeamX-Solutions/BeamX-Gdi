@@ -1,7 +1,7 @@
 # 0003. Design system and UI foundation for the BeamX Workspace
 
 **Date**: 2026-11-18
-**Status**: In Progress
+**Status**: Accepted
 
 ## Summary
 
@@ -33,7 +33,7 @@ This spec sets the BeamX Workspace look and the building blocks every later scre
 - **AC-12**: One `ErrorCard` renders every expected failure inline, in the thread or the panel, with a short plain message and exactly one primary action, styled with neutral and destructive tokens (never verdict colors). The four kinds and their actions: `ai_error` → Retry; `network` → Retry; `limit_reached` → "Sign up to keep going" (links to `/sign-up`, a placeholder until feature #8); `spend_cap` → "Got it" (dismisses). No failure state in the fixtures renders a blank area or relies on a toast.
 - **AC-13**: The `/design` page renders every token and every shared component in every state listed in `DESIGN.md`, on fixture data. It returns 404 unless `ENABLE_DESIGN_PAGE` was `true` when the app was built (Cache Components renders the page at build time, so changing the flag needs a new build).
 - **AC-14**: With reduced motion set on the device, every animation and transition is off (shimmer, skeleton pulse, panel, sheet, drawer, and the Radix and `tw-animate-css` animations shadcn ships), through one global rule in `globals.css`; content still appears.
-- **AC-15**: The Playwright suite (axe scans with the `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`, `wcag22aa` tags for AC-3; keyboard walks for AC-4, AC-5, AC-7, AC-8, AC-9; live region text checks for AC-6; the 360px checks for AC-5; a reduced motion run for AC-14) runs in Chromium in CI on every PR against a production build, as a required check that uploads its HTML report.
+- **AC-15**: The Playwright suite (axe scans with the `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`, `wcag22aa` tags for AC-3; keyboard walks for AC-4, AC-5, AC-7, AC-8, AC-9; live region text checks for AC-6; the 360px checks for AC-5; a reduced motion run for AC-14) runs in Chromium in CI on every PR against a production build and uploads its HTML report. It is not enforced as a required check: the repo is private on the GitHub free plan, which has no branch protection, so you keep the rule yourself and never merge while it is red.
 
 ## Decision
 
@@ -269,7 +269,7 @@ Ordered as a Tracer Bullet (the project default): the first milestone pushes one
 2. Write the light and dark tokens in `src/app/globals.css` from the table above; switch fonts to Inter and Geist Mono in `src/app/layout.tsx`; drop the Arial rule; add the global reduced motion rule and the `viewport` export, satisfies **AC-1**, **AC-3**, **AC-14**
 3. Add `next-themes` (`ThemeProvider` with `attribute="class"`, `defaultTheme="system"`, `enableSystem`, `disableTransitionOnChange`, `suppressHydrationWarning` on `<html>`; toggle shows its state only after mount) and `ThemeToggle`, satisfies **AC-2**
 4. Add `ENABLE_DESIGN_PAGE` to `src/lib/env.ts` (schema and the skip branch) and `.env.example`; create `src/app/design/page.tsx` that calls `notFound()` when off and shows the token swatches, type scale, and buttons, satisfies **AC-13**
-5. Install Playwright and `@axe-core/playwright`; add `playwright.config.ts` (projects at 360 by 800 and 1280 by 800, light and dark color schemes) and `e2e/design.spec.ts` with the axe scan and the theme reload check; add an `e2e` script and a CI job that sets `SKIP_ENV_VALIDATION=1` and `ENABLE_DESIGN_PAGE=true` for **both** `pnpm build` and `pnpm start`, installs Chromium (`playwright install --with-deps chromium`, cached), runs the suite against `http://localhost:3000`, and uploads the HTML report; mark the job required. Add the raw color search step and the Vitest token test, satisfies **AC-1**, **AC-3**, **AC-15**
+5. Install Playwright and `@axe-core/playwright`; add `playwright.config.ts` (projects at 360 by 800 and 1280 by 800, light and dark color schemes) and `e2e/design.spec.ts` with the axe scan and the theme reload check; add an `e2e` script and a CI job that sets `SKIP_ENV_VALIDATION=1` and `ENABLE_DESIGN_PAGE=true` for **both** `pnpm build` and `pnpm start`, installs Chromium (`playwright install --with-deps chromium`, cached), runs the suite against `http://localhost:3000`, and uploads the HTML report (not marked required, see AC-15). Add the raw color search step and the Vitest token test, satisfies **AC-1**, **AC-3**, **AC-15**
 6. Start `DESIGN.md` with feel, tokens, type, spacing, radius, motion, and breakpoints, satisfies **AC-1**
 
 **Milestone 2: Workspace shell**
@@ -321,3 +321,4 @@ Ordered as a Tracer Bullet (the project default): the first milestone pushes one
 - [ ] Set `ENABLE_DESIGN_PAGE=true` for the Preview environment in Vercel; leave it unset in Production.
 - [ ] For `AGENTS.md` (`/sync` owns the edit): the rule "style only with tokens from `DESIGN.md`, never raw colors", the component folders above, and `Declined:` Agent Skills for `next-themes` and `@axe-core/playwright`.
 - [ ] The full WCAG audit stays deferred in the scope; this spec covers the base components only.
+- [ ] If the repo moves to GitHub Pro or Team, or goes public, make the `e2e` job a required check on `main` (branch protection) and restore that wording in AC-15.
