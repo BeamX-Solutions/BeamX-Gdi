@@ -8,3 +8,5 @@ next-env.d.ts
 .claude/
 docs/
 skills-lock.json
+playwright-report/
+test-results/

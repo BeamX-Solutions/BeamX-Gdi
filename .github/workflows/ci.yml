@@ -26,6 +26,8 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm format:check
+      # Only tokens style components (spec 0003): no raw colors in src/components or src/app.
+      - run: pnpm check:colors
       # Schema drift (spec 0002, AC-11). `db:check` only checks the migrations folder, so
       # regenerate from the schema: any new or changed migration file means someone edited
       # the schema without running `pnpm db:generate`. Needs no database.
@@ -40,6 +42,41 @@ jobs:
       # Unit tests (Vitest `unit` project). Integration tests run in the database job.
       - run: pnpm test
       - run: pnpm build
+
+  # Accessibility and layout checks on /design (spec 0003, AC-15). Chromium only, against a
+  # production build. ENABLE_DESIGN_PAGE must be set for BOTH build and start: Cache
+  # Components renders the page at build time.
+  e2e:
+    runs-on: ubuntu-latest
+    env:
+      SKIP_ENV_VALIDATION: "1"
+      ENABLE_DESIGN_PAGE: "true"
+      CI: "true"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm build
+      - run: pnpm e2e
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14
 
   # Database integration tests on a throwaway Neon branch (spec 0002, AC-11).
   # Needs the NEON_API_KEY secret and the NEON_PROJECT_ID variable. Fork PRs get no
