@@ -15,7 +15,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 2 | Coding standards & tooling | Foundation | done |
 | 3 | Data model | Foundation | done |
 | 4 | Design system & UI foundation | Foundation | done |
-| 20 | Tool source access & parity fixtures | Foundation | planned |
+| 20 | Tool source access & parity fixtures | Foundation | in-progress |
 | 5 | Tool module contract & registry | Foundation | planned |
 | 6 | Assistant brain | Foundation | planned |
 | 7 | Validate an idea in chat (Stellar) | Slice 1 | planned |
@@ -73,10 +73,11 @@ spec [0003](../specs/0003-design-system-ui-foundation/index.md) · code in `src/
   - [x] Report parts, errors, and the finished `DESIGN.md`: score, bars, advice, sections, skeleton, error card, full axe pass (AC-1, AC-3, AC-11, AC-12, AC-15)
 - [x] Verify it: `/check verify design system & UI foundation`
 
-### 20. Tool source access & parity fixtures
+### 20. Tool source access & parity fixtures · in-progress
 Get read access to the source code of Beacon, Beacon Pro, Luna, and Stellar, and capture real answer sets with the scores and verdicts the live tools give them. The rebuilt tools are tested against these so they score the same way (from spec 0001).
 **Done when:** all four source repos are readable by the team, and each tool has at least 5 fixture answer sets with its original scores, verdict, and report captured in the repo.
-- [ ] Gather access and capture fixtures: `/develop tool source access & parity fixtures`
+code in `fixtures/parity`, `scripts/parity`
+- [x] Gather access and capture fixtures: `/develop tool source access & parity fixtures`
 
 ### 5. Tool module contract & registry · needs a decision
 The tools are rebuilt inside the workspace, ported from their source (spec 0001). This is the one typed contract every tool implements (its questions, a pure scoring function, its report prompt, its report view) and the registry the assistant reaches tools through, so a new tool is added by adding one folder.

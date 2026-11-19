@@ -1,0 +1,380 @@
+{
+  "source": {
+    "remote": "https://github.com/BeamX-Solutions/paid-marketing-plan.git",
+    "commit": "6da7b6917d105799cbab9d7d6dfd9be46718f776",
+    "commitDate": "2026-10-07",
+    "uncommittedChanges": false
+  },
+  "note": "The reference plan shipped in the Luna repo (test business, no client data). It shows the shape every generated plan follows.",
+  "plan": {
+    "business": "Test",
+    "industry": "Professional Services",
+    "model": "B2B2C",
+    "date": "June 17, 2026",
+    "executiveSummary": {
+      "stats": [
+        {
+          "value": "₦500K–₦2M",
+          "label": "AVERAGE CLIENT VALUE"
+        },
+        {
+          "value": "25–50%",
+          "label": "CONSULTATION CLOSE RATE",
+          "accent": "orange"
+        },
+        {
+          "value": "50–100%",
+          "label": "PROJECTED 6-MONTH GROWTH"
+        }
+      ],
+      "paragraphs": [
+        "Test is an early-stage B2B2C professional services firm with strong unit economics, yet critical gaps in digital presence, referral systematization, and marketing consistency are suppressing growth well below its potential. This 180-day plan prioritizes high-ROI foundational investments first: a professional website, a formal referral program, and a consistent email marketing system.",
+        "These three activities alone can deliver **50 to 100% revenue growth within six months** without significant budget outlay, by converting existing goodwill from satisfied clients into documented referrals and repeat engagements.",
+        "From Day 31 onward, the plan builds an inbound pipeline through consistent LinkedIn thought leadership targeting ambitious Nigerian business owners aged 25 to 44, a downloadable AI Readiness lead magnet gated behind email capture, and tiered service packages that reduce conversion friction. Podcast guest appearances establish regional authority at zero production cost. By Month 4 to 6, the business will have a multi-channel acquisition engine operating within its ₦0 to ₦500K budget and 3 to 5 hour weekly time constraint."
+      ],
+      "callout": {
+        "title": "HOW SUCCESS IS MEASURED",
+        "body": "Five KPIs, reviewed monthly: referrals received, website consultation bookings, LinkedIn engagement rate, email open rates, and new-client source attribution. Every action is sequenced to build on the prior one rather than compete for limited time and budget."
+      }
+    },
+    "customerJourney": {
+      "intro": "The strategy maps to three stages: attracting the right prospects, converting them into qualified leads, and turning customers into a repeat, referral-generating base.",
+      "stages": [
+        {
+          "tag": "BEFORE",
+          "sub": "Prospects",
+          "step": "ATTRACT",
+          "tone": "before",
+          "columns": [
+            {
+              "heading": "Target Market",
+              "body": "Ambitious Nigerian business owners and executives aged 25 to 44, earning ₦30M to ₦50M annually, based in regional capitals or commercial hubs. Time-poor but resourceful, digitally engaged, making research-driven decisions over 1 to 4 weeks and responding to peer recommendations and ROI."
+            },
+            {
+              "heading": "Core Message",
+              "body": "Test helps owners achieve measurable profitability improvements and navigate AI adoption through personalized services across the full B2B2C value chain. Unlike generalists, we deliver end-to-end expertise backed by documented case studies and media-verified credibility."
+            },
+            {
+              "heading": "Media Channels",
+              "body": "LinkedIn for organic thought leadership at near-zero cost. Podcast guest appearances on Nigerian business shows to build regional authority. Referral and event marketing to access the peer-driven trust economy at the lowest acquisition cost."
+            }
+          ]
+        },
+        {
+          "tag": "DURING",
+          "sub": "Leads",
+          "step": "CONVERT",
+          "tone": "during",
+          "columns": [
+            {
+              "heading": "Lead Capture",
+              "body": "An \"AI Readiness for Nigerian Businesses\" self-assessment, gated behind an email form and promoted via LinkedIn and podcasts. A free 30-minute strategy consultation serves as the primary homepage CTA."
+            },
+            {
+              "heading": "Lead Nurture",
+              "body": "A 5-email automated welcome sequence delivers the resource, a success story, a tip, a case study, and a time-framed offer. A segmented monthly newsletter reinforces three weekly LinkedIn posts for multi-touch visibility."
+            },
+            {
+              "heading": "Sales Conversion",
+              "body": "A discovery-first framework protects the 25 to 50% close rate: targeted questions, then a tailored proposal within 48 hours. Three packages anchor perception toward the mid-tier, with ROI framing in naira terms."
+            }
+          ]
+        },
+        {
+          "tag": "AFTER",
+          "sub": "Customers",
+          "step": "RETAIN & GROW",
+          "tone": "after",
+          "columns": [
+            {
+              "heading": "Deliver Experience",
+              "body": "A structured onboarding checklist within 24 hours of signing, a 30-60-90 day check-in cadence with a mid-project NPS survey, and a client success dashboard that visually demonstrates value."
+            },
+            {
+              "heading": "Lifetime Value",
+              "body": "Quarterly strategic reviews surface new needs. 2 to 3 upsell pathways (project to retainer, strategy to AI implementation) introduced at the 60-day check-in. Target: lift repeat business from 25 to 50% toward 60 to 70%."
+            },
+            {
+              "heading": "Referrals",
+              "body": "A formal program launched within 30 days, with value-based incentives rather than cash, embedded into offboarding to make it automatic. Target: grow referral-sourced revenue from 10 to 25% toward 35 to 50% within 6 months."
+            }
+          ]
+        }
+      ]
+    },
+    "strategicInsights": {
+      "strengths": [
+        "High average customer value of ₦500K to ₦2M means even 3 to 5 new clients per quarter produces significant revenue impact, making relationship-based marketing highly efficient.",
+        "A 25 to 50% consultation-to-close rate is well above industry norms, indicating strong consultative selling capability that should be systematized and protected.",
+        "The B2B2C model creates multi-directional value that pure B2B or B2C competitors cannot replicate, providing structural differentiation.",
+        "Existing media coverage and satisfied-customer proof points are high-credibility assets, currently underutilized and best placed front-and-center.",
+        "The agility of a 2 to 5 person team enables faster customization than larger competitors, a genuine selling point for executives who value speed."
+      ],
+      "opportunities": [
+        "AI adoption advisory is a largely underserved niche in regional Nigerian professional services, offering first-mover positioning.",
+        "A formalized referral program is the single highest-ROI growth activity: ₦0 to ₦25K against ₦500K to ₦2M client values means a 20 to 80x return.",
+        "LinkedIn thought leadership is virtually uncontested among regional peers, making consistent posting a low-cost path to visibility.",
+        "The absence of a website is both the biggest weakness and the highest-leverage quick win; even a 5-page site unlocks credibility.",
+        "Podcast guest appearances offer immediate access to aligned audiences at zero production budget, building authority before competitors."
+      ]
+    },
+    "risksPositioning": {
+      "risks": [
+        {
+          "severity": "high",
+          "label": "Capacity constraint.",
+          "body": "Successful marketing could generate more demand than a 2 to 5 person team can service. Build a waitlist process and scalable delivery frameworks proactively."
+        },
+        {
+          "severity": "medhigh",
+          "label": "Budget exhaustion.",
+          "body": "At ₦0 to ₦500K, allocate at least 60% to website and email platform as foundational infrastructure before any paid advertising."
+        },
+        {
+          "severity": "med",
+          "label": "AI credibility.",
+          "body": "Positioning as an AI advisor while internally learning the tools requires transparent \"fellow navigator\" framing, supported by rapidly-built internal case studies."
+        },
+        {
+          "severity": "high",
+          "label": "Client concentration.",
+          "body": "If any single client exceeds 30% of revenue, its loss threatens continuity, making the new-client acquisition program urgent."
+        },
+        {
+          "severity": "medhigh",
+          "label": "Inconsistent execution.",
+          "body": "With only 3 to 5 hours weekly, focus on exactly two channels (LinkedIn and email) and batch content with scheduling tools."
+        }
+      ],
+      "positioning": "Position the business as the regional **AI-forward professional services partner** for ambitious Nigerian business owners who need both strategic guidance and practical implementation across the full B2B2C value chain, resting on three pillars: specialization in AI adoption and profitability, end-to-end B2B2C expertise, and a track record validated by media coverage and measurable results.",
+      "callout": {
+        "title": "COMPETITIVE ADVANTAGE & GROWTH POTENTIAL",
+        "accent": "orange",
+        "body": "B2B2C structural expertise, genuine AI advisory capability, and a high-touch model create a moat neither large national firms nor freelancers can replicate. Conservative projection: 50 to 100% revenue growth in the first 6 months; 2 to 3x within 12 to 18 months; 5 to 10x long-term with productized packages and geographic expansion. The primary ceiling is delivery capacity, so document scalable frameworks now."
+      }
+    },
+    "implementation": {
+      "intro": "Three sequenced phases across 180 days. Each phase establishes infrastructure the next one depends on, so nothing competes for the same limited time and budget.",
+      "phases": [
+        {
+          "code": "PHASE 01",
+          "title": "Foundation",
+          "when": "First 30 Days",
+          "steps": [
+            "Register a domain and build a 5-page mobile-optimized website on Wix or WordPress for ₦50K to ₦150K, with 2 to 3 anonymized case studies, media logos, and a Calendly CTA.",
+            "Publish a one-page referral program, then personally contact every current and past client via WhatsApp or phone within two weeks.",
+            "Create a Mailchimp or Brevo account, import contacts into three segments, and send a warm reactivation email to past clients.",
+            "Optimize the LinkedIn page with AI-forward positioning and publish the first three posts.",
+            "Draft the 5-email welcome sequence and install Calendly, testing the booking flow on mobile.",
+            "Batch-schedule three LinkedIn posts per week for four weeks in a single 90-minute session using Buffer."
+          ]
+        },
+        {
+          "code": "PHASE 02",
+          "title": "Pipeline",
+          "when": "Days 31–90",
+          "steps": [
+            "Create the AI Readiness assessment in Canva (10 scored questions), gate it behind an email form, and promote it for six weeks.",
+            "Pitch 10 to 15 Nigerian business podcasts, targeting one confirmed appearance by Day 60.",
+            "Define three tiered packages: Starter (₦300K–₦500K), Growth (₦700K–₦1.2M), Enterprise (custom).",
+            "Send the first segmented monthly newsletter with one insight, one win, and one tailored CTA.",
+            "Introduce a post-project offboarding checklist with an NPS survey and a written referral ask.",
+            "Track five KPIs weekly and develop a 90-minute discovery-call framework with 48-hour proposals."
+          ]
+        },
+        {
+          "code": "PHASE 03",
+          "title": "Scale",
+          "when": "Days 91–180",
+          "steps": [
+            "Publish the first AI advisory case study (600 to 800 words) and repurpose it across channels.",
+            "Host an invitation-only roundtable (10 to 15 prospects) with a 48-hour follow-up sequence.",
+            "Introduce quarterly strategic reviews as standard, targeting repeat business of 60 to 70%.",
+            "Repurpose podcast audio into short LinkedIn clips to extend reach and build social proof.",
+            "Evaluate ₦100K to ₦150K of LinkedIn Sponsored Content, measuring cost-per-lead against the organic benchmark.",
+            "Document all delivery steps into a shared Drive folder, then run a full 180-day KPI review and reallocate."
+          ]
+        }
+      ]
+    },
+    "resources": {
+      "intro": "The entire plan runs on free and low-cost tooling, with most of the budget reserved as contingency for a paid test once organic data is in.",
+      "stats": [
+        {
+          "value": "₦175K–₦375K",
+          "label": "TOTAL 180-DAY SPEND"
+        },
+        {
+          "value": "₦125K–₦325K",
+          "label": "RESERVE WITHIN CEILING",
+          "accent": "orange"
+        },
+        {
+          "value": "3–5 hrs",
+          "label": "WEEKLY TIME COMMITMENT"
+        }
+      ],
+      "items": [
+        {
+          "label": "Website:",
+          "body": "Wix Business or WordPress + Hostinger (₦50K–₦150K one-time); domain ₦5K–₦15K/year."
+        },
+        {
+          "label": "Email platform:",
+          "body": "Mailchimp free tier (up to 500 contacts) or Brevo, ₦0 to start."
+        },
+        {
+          "label": "LinkedIn scheduling:",
+          "body": "Buffer free tier, ₦0; upgrade (~₦8K/month) only if volume requires."
+        },
+        {
+          "label": "Lead magnet design:",
+          "body": "Canva free tier, sufficient for the PDF assessment, ₦0."
+        },
+        {
+          "label": "Scheduling tool:",
+          "body": "Calendly free tier for consultation booking, ₦0."
+        },
+        {
+          "label": "Referral program:",
+          "body": "One-page document in Google Docs/Canva, ₦0; incentives are service-based."
+        },
+        {
+          "label": "Contingency reserve:",
+          "body": "₦100K–₦200K held for a Sponsored Content test or speaking opportunity."
+        }
+      ],
+      "callout": {
+        "title": "WEEKLY TIME ALLOCATION",
+        "body": "90 minutes of LinkedIn content batching (weekly), 60 minutes of email and newsletter writing (monthly), 30 minutes of referral follow-up calls (weekly), and 60 minutes of proposal and discovery-call preparation."
+      }
+    },
+    "kpis": {
+      "intro": "Eight metrics, reviewed at Day 60, Day 90, and Day 180, tell you which channels deserve more time and budget and which need rework.",
+      "rows": [
+        {
+          "metric": "Referrals received",
+          "tracked": "Google Sheet with source and conversion per referral",
+          "target": "5 by Day 90, 12 by Day 180"
+        },
+        {
+          "metric": "Consultation bookings",
+          "tracked": "Calendly dashboard, measured monthly",
+          "target": "3–5/mo by M2, 6–10/mo by M6"
+        },
+        {
+          "metric": "LinkedIn growth",
+          "tracked": "Follower count and engagement in LinkedIn Analytics",
+          "target": "300 followers, 3%+ by D90"
+        },
+        {
+          "metric": "Email open rate",
+          "tracked": "Per-send reports in Mailchimp/Brevo",
+          "target": "40%+ newsletter, 50%+ sequence"
+        },
+        {
+          "metric": "Lead magnet downloads",
+          "tracked": "Website form submissions in list-growth report",
+          "target": "20 by D30, 60 by D90"
+        },
+        {
+          "metric": "New-client source",
+          "tracked": "Originating channel logged for every signed client",
+          "target": "Referrals 35–50% by D180"
+        },
+        {
+          "metric": "Repeat business rate",
+          "tracked": "Clients re-engaging, measured quarterly",
+          "target": "25–50% → 60% by M6"
+        },
+        {
+          "metric": "Close rate",
+          "tracked": "Consultation-to-close, monitored monthly",
+          "target": "Maintain 25–50%"
+        }
+      ],
+      "note": "**Trigger:** if the close rate drops below 25% for two consecutive months, review and revise the discovery-call framework and proposal template before scaling spend."
+    },
+    "templates": {
+      "intro": "Four assets you can build once and reuse for every prospect, so execution never stalls on a blank page.",
+      "cards": [
+        {
+          "index": "1",
+          "title": "Referral Program One-Pager",
+          "meta": "GOOGLE DOCS",
+          "body": "Headline: \"Refer a Business Leader, Earn Exclusive Access.\" Three sections — How It Works, What You Receive (first access at a reserved rate, or one complimentary 60-minute review per signed referral), and Submit a Referral. Footer carries a client testimonial. Tone: warm, peer-level, never transactional."
+        },
+        {
+          "index": "2",
+          "title": "5-Email Welcome Sequence",
+          "meta": "MAILCHIMP",
+          "body": "Email 1 (immediate): deliver the assessment + a P.S. inviting their biggest AI question. Email 2 (Day 2): a 150-word client story with a naira outcome. Email 3 (Day 4): a practical tool tip. Email 4 (Day 7): a detailed case study. Email 5 (Day 10): a time-framed, no-obligation consultation offer."
+        },
+        {
+          "index": "3",
+          "title": "Discovery Call Framework",
+          "meta": "GOOGLE DOC SCRIPT",
+          "body": "Open by confirming the goal is to understand fully before recommending. Five questions: biggest operational challenge; where profitability is most compressed; what they've tried; team familiarity with AI; what solving it in 90 days is worth in naira. Close by summarizing back and confirming the 48-hour proposal."
+        },
+        {
+          "index": "4",
+          "title": "Monthly Newsletter Template",
+          "meta": "MAILCHIMP · 3 VERSIONS",
+          "body": "Section 1: \"This Month in AI\" (100 words). Section 2: \"Client Win\" (80 words, a naira outcome). Section 3: a CTA block switched by segment — prospects get a strategy-call offer, current clients an AI Advisory upsell, past clients a catch-up invitation."
+        }
+      ]
+    },
+    "investmentRoi": {
+      "intro": "Where to put the first naira, and what each move is expected to return.",
+      "investments": [
+        {
+          "badge": "₦50K–₦150K\nMonth 1",
+          "title": "Website development",
+          "body": "The single highest-leverage investment. Without it, every other digital effort is undermined and the credibility gap stays open."
+        },
+        {
+          "badge": "₦0–₦30K\nMonth 1",
+          "title": "Email marketing platform",
+          "body": "Stand up Mailchimp or Brevo immediately to begin building the segmented list and automated sequence that drive retention."
+        },
+        {
+          "badge": "₦0–₦25K\nImmediate",
+          "title": "Referral program launch",
+          "accent": "orange",
+          "body": "The highest-ROI activity in the plan. A one-page document and personal outreach cost almost nothing against ₦500K–₦2M in referral value."
+        },
+        {
+          "badge": "₦20K–₦80K\nMonth 2–3",
+          "title": "AI Readiness lead magnet",
+          "body": "A professionally designed assessment that anchors LinkedIn, podcast, and event traffic at the top of the funnel."
+        },
+        {
+          "badge": "₦0–₦25K\nAnnual",
+          "title": "LinkedIn scheduling tool",
+          "body": "Buffer or Hootsuite enables the batch creation needed to hold a 3-post-per-week cadence within the time budget."
+        },
+        {
+          "badge": "₦100K–₦200K\nReserve",
+          "title": "Contingency fund",
+          "accent": "orange",
+          "body": "Held for a speaking opportunity or a targeted Sponsored Content test once organic performance data guides the spend."
+        }
+      ],
+      "callout": {
+        "title": "EXPECTED RETURN",
+        "accent": "orange",
+        "body": "The referral program alone, converting one additional client, returns ₦500K–₦2M against under ₦25K, a minimum 20x ROI in 90 days. A ₦150K website pays back 3 to 13x on a single warm conversion per quarter. LinkedIn and email, at a 25 to 50% close rate and ₦750K average deal, represent ₦562K–₦1.875M in monthly pipeline."
+      }
+    },
+    "nextSteps": {
+      "steps": [
+        "Review this plan with your team and key stakeholders.",
+        "Prioritize Phase 1 activities and assign clear ownership.",
+        "Set up the tracking systems for the recommended KPIs.",
+        "Schedule regular review meetings to assess progress.",
+        "Consider professional implementation support if capacity becomes the bottleneck."
+      ],
+      "note": "**A note on this plan.** It is generated from your specific responses and industry analysis. Market conditions change rapidly, so regular review and adaptation is recommended. Generated with BeamX Luna."
+    }
+  }
+}
