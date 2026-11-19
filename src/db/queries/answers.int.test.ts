@@ -59,18 +59,12 @@ describe("answers and completion (AC-2, AC-4)", () => {
     const u = await t.guest();
     const { run } = await runWithAnswers(u);
     const snap = unwrap(await runs.get(u, run.id));
-    const last =
-      snap.answers
-        .map((a) => a.updatedAt)
-        .sort()
-        .at(-1) ?? null;
     unwrap(await runs.saveAnswer(u, run.id, "q2", "changed", "client"));
     const stale = await runs.complete(
       u,
       run.id,
       { total: 1 },
-      snap.answers.length,
-      last,
+      snap.run.answersVersion,
     );
     expect(stale).toEqual({ ok: false, error: { code: "answers_changed" } });
     expect(unwrap(await runs.get(u, run.id)).run.status).toBe("in_progress");
@@ -81,14 +75,9 @@ describe("answers and completion (AC-2, AC-4)", () => {
       const u = await t.guest();
       const { run } = await runWithAnswers(u);
       const snap = unwrap(await runs.get(u, run.id));
-      const last =
-        snap.answers
-          .map((a) => a.updatedAt)
-          .sort()
-          .at(-1) ?? null;
       const [save, done] = await Promise.all([
         runs.saveAnswer(u, run.id, "q3", "late", "client"),
-        runs.complete(u, run.id, { total: 1 }, snap.answers.length, last),
+        runs.complete(u, run.id, { total: 1 }, snap.run.answersVersion),
       ]);
       const final = unwrap(await runs.get(u, run.id));
       const hasLate = final.answers.some((a) => a.questionId === "q3");

@@ -43,16 +43,11 @@ describe("guest thread, end to end (AC-1)", () => {
 
     const snapshot = await runs.get(userId, runId);
     if (!snapshot.ok) throw new Error("get failed");
-    const lastAnswerAt = snapshot.value.answers
-      .map((a) => a.updatedAt)
-      .sort()
-      .at(-1);
     const done = await runs.complete(
       userId,
       runId,
       { total: 42 },
-      snapshot.value.answers.length,
-      lastAnswerAt ?? null,
+      snapshot.value.run.answersVersion,
     );
     expect(done.ok && done.value.status).toBe("completed");
 

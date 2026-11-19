@@ -65,11 +65,6 @@ export const completeFromAnswers = async (
   runId: string,
   scores: unknown = { total: 1 },
 ) => {
-  const { answers } = unwrap(await runs.get(userId, runId));
-  const last =
-    answers
-      .map((a) => a.updatedAt)
-      .sort()
-      .at(-1) ?? null;
-  return runs.complete(userId, runId, scores, answers.length, last);
+  const { run } = unwrap(await runs.get(userId, runId));
+  return runs.complete(userId, runId, scores, run.answersVersion);
 };

@@ -8,6 +8,13 @@
       "when": 1794976726230,
       "tag": "0000_spooky_viper",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1795039817677,
+      "tag": "0001_brave_bromley",
+      "breakpoints": true
     }
   ]
 }

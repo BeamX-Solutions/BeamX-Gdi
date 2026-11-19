@@ -53,6 +53,9 @@ export const toolRun = pgTable(
     toolVersion: text("tool_version").notNull(),
     status: runStatus("status").notNull().default("in_progress"),
     scores: jsonb("scores").$type<unknown>(),
+    // Bumped by every saveAnswer under the run's row lock. runs.complete accepts scores
+    // only if this still matches the value read alongside the answers they came from.
+    answersVersion: integer("answers_version").notNull().default(0),
     basedOnRunId: uuid("based_on_run_id").references(
       (): AnyPgColumn => toolRun.id,
       { onDelete: "set null" },

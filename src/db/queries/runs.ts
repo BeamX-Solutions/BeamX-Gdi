@@ -3,6 +3,7 @@ import { db } from "../client";
 import { isUniqueViolation } from "../errors";
 import { newId } from "../id";
 import { report, toolRun, toolRunAnswer } from "../schema";
+import { isUuid } from "./codecs";
 import { err, ok, type Result } from "@/lib/result";
 
 type RunRow = typeof toolRun.$inferSelect;
@@ -38,7 +39,8 @@ export type GetRunError = { readonly code: "not_found" };
 
 /**
  * Two parallel writers can both see "no active run" and race to the partial unique
- * index (AC-3). The loser retries once (it then pauses the winner), then gives up.
+ * index (AC-3). The loser retries (each retry pauses the winner), up to 3 attempts in
+ * total, then gives up.
  */
 const withActiveRetry = async <T>(
   run: () => Promise<T>,
@@ -62,6 +64,7 @@ export const start = async (
   toolId: string,
   toolVersion: string,
 ): Promise<Result<{ run: RunRow; pausedRunId: string | null }, StartError>> => {
+  if (!isUuid(conversationId)) return err({ code: "not_found" });
   const runId = newId();
   const outcome = await withActiveRetry(async () => {
     const [paused, , created] = await db.batch([
@@ -98,6 +101,7 @@ export const pause = async (
   userId: string,
   runId: string,
 ): Promise<Result<RunRow, PauseError>> => {
+  if (!isUuid(runId)) return err({ code: "not_found" });
   const [, current] = await db.batch([
     db
       .update(toolRun)
@@ -127,6 +131,7 @@ export const resume = async (
 ): Promise<
   Result<{ run: RunRow; pausedRunId: string | null }, ResumeError>
 > => {
+  if (!isUuid(runId)) return err({ code: "not_found" });
   const outcome = await withActiveRetry(async () => {
     const [paused, , current] = await db.batch([
       db.execute(sql`
@@ -233,7 +238,9 @@ export const startFrom = async (
 
 /**
  * One statement upsert guarded by ownership and `in_progress`. FOR SHARE makes a
- * concurrent `complete` wait, so an answer never lands in a completed run.
+ * concurrent `complete` wait, so an answer never lands in a completed run. The second
+ * statement bumps `answers_version` under the run's row lock, so every saved answer,
+ * in whatever order concurrent saves commit, invalidates scores computed before it.
  */
 export const saveAnswer = async (
   userId: string,
@@ -244,6 +251,7 @@ export const saveAnswer = async (
 ): Promise<
   Result<{ questionId: string; source: AnswerSource }, SaveAnswerError>
 > => {
+  if (!isUuid(runId)) return err({ code: "not_found_or_not_in_progress" });
   const [inserted] = await db.batch([
     db.execute(sql`
       INSERT INTO tool_run_answer (id, run_id, question_id, value, source)
@@ -256,7 +264,7 @@ export const saveAnswer = async (
       RETURNING question_id
     `),
     db.execute(sql`
-      UPDATE tool_run SET updated_at = now()
+      UPDATE tool_run SET updated_at = now(), answers_version = answers_version + 1
       WHERE id = ${runId}::uuid AND user_id = ${userId}::uuid AND status = 'in_progress'
     `),
   ]);
@@ -265,18 +273,21 @@ export const saveAnswer = async (
   return ok({ questionId, source });
 };
 
-/** Completes a run only if its answers still match what the scores were computed from. */
+/**
+ * Completes a run only if its answers still match what the scores were computed from:
+ * `answersVersion` is `run.answersVersion` from the same `runs.get` that returned them.
+ */
 export const complete = async (
   userId: string,
   runId: string,
   scores: unknown,
-  answerCount: number,
-  lastAnswerAt: string | null,
+  answersVersion: number,
 ): Promise<Result<RunRow, CompleteError>> => {
+  if (!isUuid(runId)) return err({ code: "not_found" });
   const [, , , runRows] = await db.batch([
-    // Lock first: a concurrent saveAnswer holds FOR SHARE. The fingerprint check below
-    // must run in a snapshot taken after that answer committed, which a plain UPDATE
-    // that merely waits on the row lock would not do (its subquery keeps the old snapshot).
+    // Lock first: a concurrent saveAnswer holds FOR SHARE and bumps answers_version.
+    // Taking FOR UPDATE here makes this batch wait for that answer to commit (and then
+    // see the new version) or makes the answer wait for this batch (and then be refused).
     db.execute(sql`
       SELECT id FROM tool_run
       WHERE id = ${runId}::uuid AND user_id = ${userId}::uuid AND status = 'in_progress'
@@ -287,8 +298,7 @@ export const complete = async (
       SET status = 'completed', scores = ${JSON.stringify(scores)}::jsonb,
           completed_at = now(), updated_at = now()
       WHERE id = ${runId}::uuid AND user_id = ${userId}::uuid AND status = 'in_progress'
-        AND (SELECT ROW(count(*), max(updated_at)) FROM tool_run_answer WHERE run_id = ${runId}::uuid)
-            IS NOT DISTINCT FROM ROW(${answerCount}::bigint, ${lastAnswerAt}::timestamptz)
+        AND answers_version = ${answersVersion}
     `),
     db.execute(sql`
       INSERT INTO report (id, run_id)
@@ -312,6 +322,7 @@ export const abandon = async (
   userId: string,
   runId: string,
 ): Promise<Result<RunRow, AbandonError>> => {
+  if (!isUuid(runId)) return err({ code: "not_found" });
   const [, current] = await db.batch([
     db
       .update(toolRun)
@@ -347,6 +358,7 @@ export const get = async (
     GetRunError
   >
 > => {
+  if (!isUuid(runId)) return err({ code: "not_found" });
   const [runs, answers, reports] = await db.batch([
     db
       .select()
@@ -386,6 +398,7 @@ export const get = async (
 export const ownerOf = async (
   runId: string,
 ): Promise<Result<string, GetRunError>> => {
+  if (!isUuid(runId)) return err({ code: "not_found" });
   const rows = await db
     .select({ userId: toolRun.userId })
     .from(toolRun)
@@ -395,7 +408,14 @@ export const ownerOf = async (
 };
 
 /** The chat's active run with its answers (or null), plus its paused runs. */
-export const getActive = async (userId: string, conversationId: string) => {
+export const getActive = async (
+  userId: string,
+  conversationId: string,
+): Promise<{
+  active: { run: RunRow; answers: AnswerRow[] } | null;
+  paused: RunRow[];
+}> => {
+  if (!isUuid(conversationId)) return { active: null, paused: [] };
   const [live, answers] = await db.batch([
     db
       .select()

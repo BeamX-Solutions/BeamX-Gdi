@@ -1,7 +1,10 @@
 import { and, desc, eq, lt, sql } from "drizzle-orm";
 import { db } from "../client";
 import { conversation, message } from "../schema";
+import { decodeCursor, dedupeById, isUuid, toPage } from "./codecs";
 import { err, ok, type Result } from "@/lib/result";
+
+export { decodeCursor, encodeCursor, toPage } from "./codecs";
 
 export type NewMessage = {
   readonly id: string;
@@ -15,14 +18,6 @@ export type ListError =
   { readonly code: "not_found" } | { readonly code: "invalid_cursor" };
 
 export const DEFAULT_PAGE = 100;
-
-export const encodeCursor = (seq: number): string =>
-  Buffer.from(String(seq)).toString("base64url");
-
-export const decodeCursor = (cursor: string): number | null => {
-  const n = Number(Buffer.from(cursor, "base64url").toString());
-  return Number.isSafeInteger(n) && n > 0 ? n : null;
-};
 
 /** Newest first, one extra row to learn whether an older page exists. */
 export const pageQuery = (
@@ -52,32 +47,20 @@ export const pageQuery = (
 
 type MessageRow = typeof message.$inferSelect;
 
-/** Turns a newest first page (with the extra row) into oldest first plus `nextCursor`. */
-export const toPage = (
-  rows: readonly { message: MessageRow }[],
-  limit: number,
-) => {
-  const hasMore = rows.length > limit;
-  const page = rows.slice(0, limit).map((r) => r.message);
-  const oldest = page.at(-1);
-  return {
-    messages: page.reverse(),
-    nextCursor: hasMore && oldest ? encodeCursor(oldest.seq) : null,
-  };
-};
-
 export const clampLimit = (limit: number | undefined) =>
   Math.min(Math.max(limit ?? DEFAULT_PAGE, 1), 500);
 
 /**
  * One batch: the first statement is the ownership signal (zero rows = not_found),
- * the second upserts the messages, joined to the owned conversation.
+ * the second upserts the messages, joined to the owned conversation. A repeated id in
+ * `messages` keeps its last entry. Returns the number of rows written.
  */
 export const append = async (
   userId: string,
   conversationId: string,
   messages: readonly NewMessage[],
 ): Promise<Result<number, MessageError>> => {
+  if (!isUuid(conversationId)) return err({ code: "not_found" });
   const touch = db
     .update(conversation)
     .set({
@@ -95,7 +78,7 @@ export const append = async (
   }
 
   const values = sql.join(
-    messages.map(
+    dedupeById(messages).map(
       (m) =>
         sql`(${m.id}::uuid, ${m.role}::message_role, ${JSON.stringify(m.parts)}::jsonb, ${m.metadata === undefined ? null : JSON.stringify(m.metadata)}::jsonb)`,
     ),
@@ -126,6 +109,7 @@ export const listRecent = async (
 ): Promise<
   Result<{ messages: MessageRow[]; nextCursor: string | null }, ListError>
 > => {
+  if (!isUuid(conversationId)) return err({ code: "not_found" });
   const beforeSeq = before === undefined ? null : decodeCursor(before);
   if (before !== undefined && beforeSeq === null)
     return err({ code: "invalid_cursor" });

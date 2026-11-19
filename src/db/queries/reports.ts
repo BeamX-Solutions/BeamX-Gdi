@@ -3,6 +3,7 @@ import { z } from "zod";
 import { db } from "../client";
 import { conversation, report, toolRun } from "../schema";
 import { logEvent } from "@/lib/log";
+import { isUuid } from "./codecs";
 import { err, ok, type Result } from "@/lib/result";
 
 type ReportRow = typeof report.$inferSelect;
@@ -50,6 +51,7 @@ export const claim = async (
   userId: string,
   runId: string,
 ): Promise<Result<ReportRow, ClaimError>> => {
+  if (!isUuid(runId)) return err({ code: "not_found" });
   const [claimed, current] = await db.batch([
     db.execute(sql`
       UPDATE report SET status = 'generating', attempts = attempts + 1, updated_at = now()

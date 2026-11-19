@@ -1,0 +1,1 @@
+ALTER TABLE "tool_run" ADD COLUMN "answers_version" integer DEFAULT 0 NOT NULL;

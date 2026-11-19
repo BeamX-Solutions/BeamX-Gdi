@@ -2,7 +2,14 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "../client";
 import { newId } from "../id";
 import { conversation, toolRun } from "../schema";
-import { clampLimit, decodeCursor, pageQuery, toPage } from "./messages";
+import {
+  decodeCursor,
+  decodeListCursor,
+  encodeListCursor,
+  isUuid,
+  toPage,
+} from "./codecs";
+import { clampLimit, pageQuery } from "./messages";
 import { runsWithReports } from "./reports";
 import { err, ok, type Result } from "@/lib/result";
 
@@ -26,6 +33,7 @@ export const get = async (
   userId: string,
   conversationId: string,
 ): Promise<Result<ConversationRow, ConversationError>> => {
+  if (!isUuid(conversationId)) return err({ code: "not_found" });
   const rows = await db
     .select()
     .from(conversation)
@@ -45,32 +53,13 @@ export const get = async (
 export const ownerOf = async (
   conversationId: string,
 ): Promise<Result<string, ConversationError>> => {
+  if (!isUuid(conversationId)) return err({ code: "not_found" });
   const rows = await db
     .select({ userId: conversation.userId })
     .from(conversation)
     .where(eq(conversation.id, conversationId));
   const row = rows[0];
   return row ? ok(row.userId) : err({ code: "not_found" });
-};
-
-const encodeListCursor = (c: { lastMessageAt: string; id: string }) =>
-  Buffer.from(JSON.stringify([c.lastMessageAt, c.id])).toString("base64url");
-
-const decodeListCursor = (cursor: string): [string, string] | null => {
-  try {
-    const parsed: unknown = JSON.parse(
-      Buffer.from(cursor, "base64url").toString(),
-    );
-    if (
-      Array.isArray(parsed) &&
-      typeof parsed[0] === "string" &&
-      typeof parsed[1] === "string"
-    )
-      return [parsed[0], parsed[1]];
-    return null;
-  } catch {
-    return null;
-  }
 };
 
 /** Newest activity first. Keyset pagination on (last_message_at, id). */
@@ -115,6 +104,7 @@ export const open = async (
   conversationId: string,
   options: { before?: string; limit?: number } = {},
 ) => {
+  if (!isUuid(conversationId)) return err<OpenError>({ code: "not_found" });
   const beforeSeq =
     options.before === undefined ? null : decodeCursor(options.before);
   if (options.before !== undefined && beforeSeq === null)
