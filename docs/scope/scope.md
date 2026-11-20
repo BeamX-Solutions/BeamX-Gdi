@@ -101,7 +101,7 @@ spec [0006](../specs/0006-assistant-brain/index.md) · code in `src/assistant`, 
 - [ ] Build it: `/develop assistant brain`
   - [x] Provider check, models, message parts, card flow and the deterministic turn path with the turn lock and owner lookup (AC-1, AC-6, AC-6b, AC-7, AC-13)
   - [x] AI turn: instructions, run state note, registry built startRun with approval, typed answers and reopening cards (AC-2, AC-3, AC-4, AC-8, AC-10, AC-11, AC-12, AC-14)
-  - [ ] Known facts extraction and prefill card, stop, resume and restart with credits.startFromWithHold (AC-3, AC-5, AC-5b, AC-9)
+  - [x] Known facts extraction and prefill card, stop, resume and restart with credits.startFromWithHold (AC-3, AC-5, AC-5b, AC-9)
   - [ ] Real model eval harness and the first committed results (AC-4, AC-10, AC-11, AC-12, AC-15)
 - [ ] Verify it: `/check verify assistant brain`
 
