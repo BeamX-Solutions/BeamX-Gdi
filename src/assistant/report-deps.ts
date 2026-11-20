@@ -1,14 +1,15 @@
 /**
- * Server only. The real dependencies of the report runner: the query layer, the
- * registry, the spend cap hook, the model provider, and the logger.
+ * Server only. The real dependencies of the report runner and the report routes: the
+ * query layer, the registry, the spend cap hook, the model provider, and the logger.
  */
 import * as reports from "@/db/queries/reports";
 import * as runs from "@/db/queries/runs";
 import * as usage from "@/db/queries/usage";
 import { logEvent } from "@/lib/log";
 import { checkSpendCap } from "@/lib/spend-cap";
-import { getTool } from "@/tools/registry";
+import { getReader, getTool } from "@/tools/registry";
 import { resolveModel } from "./model-provider";
+import type { ReportApiDeps } from "./report-api";
 import type { RunnerDeps } from "./report-runner";
 
 export const reportDeps: RunnerDeps = {
@@ -23,5 +24,17 @@ export const reportDeps: RunnerDeps = {
   checkSpendCap,
   model: resolveModel,
   now: () => Date.now(),
+  log: logEvent,
+};
+
+/** The real dependencies of the report routes. */
+export const reportApiDeps: ReportApiDeps = {
+  status: reports.status,
+  claim: reports.claim,
+  failStale: reports.failStale,
+  getRun: runs.get,
+  getTool,
+  getReader,
+  runner: reportDeps,
   log: logEvent,
 };

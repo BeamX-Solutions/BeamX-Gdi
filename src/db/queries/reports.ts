@@ -4,13 +4,13 @@ import { db } from "../client";
 import { newId } from "../id";
 import { conversation, creditHold, report, toolRun } from "../schema";
 import { chargeRunHoldCtes, releaseRunHoldCtes } from "./credit-holds";
+import { MAX_ATTEMPTS, STALE_AFTER_MINUTES } from "./report-limits";
 import { logEvent } from "@/lib/log";
 import { err, ok, type Result } from "@/lib/result";
 
 type ReportRow = typeof report.$inferSelect;
 
-export const STALE_AFTER_MINUTES = 10;
-export const MAX_ATTEMPTS = 3;
+export { MAX_ATTEMPTS, STALE_AFTER_MINUTES };
 
 /** Safe by construction: a kind and a short fixed message, never prompts or client data. */
 export const reportErrorSchema = z.object({

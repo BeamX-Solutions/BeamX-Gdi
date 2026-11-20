@@ -41,3 +41,38 @@ _Steps derived from spec 0005 acceptance criteria. `/check verify` runs these; `
 ## Acceptance criteria coverage (this milestone)
 
 - AC-8: runner order, resume, savePhase steps · AC-9: error kinds, repair, crash, third attempt · AC-10: status query (the GET route comes in milestone 3) · AC-12: usage rows, cost, spend cap, overlap · AC-14: lint rule and model roles · AC-15: failStale (the POST route comes in milestone 3)
+
+## Milestone 3: report routes (POST and GET `/api/runs/[runId]/report`)
+
+### Commands
+
+- [ ] `pnpm typecheck`, `pnpm lint` and `pnpm test` → clean; `src/assistant/report-status.test.ts` passes (phases, error kinds, canRetry, view) → AC-10, AC-13
+- [ ] `SKIP_ENV_VALIDATION=1 pnpm build` → `/api/runs/[runId]/report` listed as dynamic (ƒ) → AC-7
+- [ ] On a throwaway Neon branch (never `dev` or `production`): `pnpm test:integration` → `src/assistant/report-api.int.test.ts` passes → AC-7, AC-8, AC-10, AC-13, AC-15
+
+### Route behavior
+
+- [ ] POST on a completed, funded run → `202`, `status: "generating"`, every phase `done: false`; no AI call before the response; the phases then run in `after()`, the report turns `ready`, and the hold is `charged` → AC-7, AC-8
+- [ ] GET after that → `200`, `status: "ready"`, every phase done, `view` holds the tool's blocks; a second POST → `200` and nothing is scheduled → AC-7, AC-10
+- [ ] Two POSTs at once → both `202`, one runner scheduled, one set of AI calls, `attempts` 1 → AC-7
+- [ ] Another user's run, an unknown run, or a run not completed yet → `404` `{ code: "not_found" }` on POST and GET, nothing changes → AC-7, AC-10
+- [ ] A bad uuid → `400` `invalid_run_id`; no session → `401` `unauthenticated` → API surface
+- [ ] A run stored with an older tool version → POST `409` `version_changed`, `attempts` stays 0, the hold stays `active` → AC-7
+- [ ] Phase 2 fails with a 529 → GET shows `failed`, `canRetry: true`, kind `provider_overloaded` with the friendly copy, phase 1 done; the retry POST makes no call for phase 1 → AC-8, AC-10
+- [ ] A report reclaimed after going stale → the old runner stops before its first phase with no AI call; the new attempt finishes → AC-7, AC-12
+- [ ] The last attempt still running → POST `202`, nothing scheduled; the last attempt stale for 11 minutes → POST `409` `attempts_exhausted`, the hold `released`, GET shows kind `exhausted` ("We could not make this report", "Your credits were returned.") with no retry → AC-15
+- [ ] A ready report stored as version `0` → drawn by `readers["0"]`, `phases: []`; an unknown version or content that fails its schema → `error.kind: "stored_data_invalid"`, no `view`, no retry → AC-13
+
+### Value sourcing
+
+- [ ] GET `phases[].done`: phase key present in `report.content` (fail at phase 2, see phase 1 done and phase 2 not) → value row "GET, phases[].done"
+- [ ] GET `phases[].label`: from the current module; an old version gives an empty list → value row "GET, phases[].label, total"
+- [ ] GET `canRetry`: true only for failed (or stale) with attempts left, an active hold and a current version; false at attempt 3, without a hold, or on an old version → value row "GET, canRetry"
+- [ ] GET `stale`: true only when `generating` and older than 10 minutes by the DB clock → value row "GET, stale"
+- [ ] GET error message: from `reportErrorCopy`; a stored message such as "secret" never appears in the body → value row "GET, error message"
+- [ ] GET `view`: `reader.toView` after parsing answers, scores and content with the reader for the stored version → value row "GET, view"
+- [ ] runner `attempt`: the claimed row's `attempts` (a reclaim gives 2 and the old runner's writes are refused) → value row "runner, attempt"
+
+## Acceptance criteria coverage (milestone 3)
+
+- AC-7: POST claim, 202/200/404/409, concurrency, overlap · AC-10: GET payload, owner only 404 · AC-13: old version reader, `stored_data_invalid` · AC-15: stale last attempt fails and releases the hold. AC-11 (the panel) comes in milestone 4.
