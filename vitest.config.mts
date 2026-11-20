@@ -10,7 +10,7 @@ export default defineConfig({
         resolve: { alias },
         test: {
           name: "unit",
-          include: ["src/**/*.test.ts"],
+          include: ["src/**/*.test.ts", "evals/**/*.test.ts"],
           exclude: ["src/**/*.int.test.ts", "node_modules/**"],
         },
       },
