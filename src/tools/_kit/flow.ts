@@ -1,4 +1,4 @@
-import type { Answers, ToolQuestion } from "../_contract";
+import type { Answers, QuestionProgress, ToolQuestion } from "../_contract";
 
 type HasQuestions = { readonly questions: readonly ToolQuestion[] };
 
@@ -64,5 +64,34 @@ export const progress = (tool: HasQuestions, answers: Answers): Progress => {
   return {
     answered: visible.filter((q) => answers[q.id] !== undefined).length,
     total: visible.length,
+  };
+};
+
+/**
+ * Where one question sits among the visible questions, for its card (spec 0006). With
+ * areas, the area is counted among the visible areas in order of first appearance, and
+ * the question is counted within its area. Returns null for a question that is not
+ * visible.
+ */
+export const questionProgress = (
+  tool: HasQuestions,
+  answers: Answers,
+  questionId: string,
+): QuestionProgress | null => {
+  const visible = visibleQuestions(tool, answers);
+  const question = visible.find((q) => q.id === questionId);
+  if (!question) return null;
+  const position = (list: readonly ToolQuestion[]) => ({
+    index: list.findIndex((q) => q.id === questionId) + 1,
+    total: list.length,
+  });
+  const area = question.area;
+  if (area === undefined) return { question: position(visible) };
+  const areas = [
+    ...new Set(visible.flatMap((q) => (q.area === undefined ? [] : [q.area]))),
+  ];
+  return {
+    area: { index: areas.indexOf(area) + 1, total: areas.length, name: area },
+    question: position(visible.filter((q) => q.area === area)),
   };
 };

@@ -15,6 +15,14 @@ describe("models and prices (spec 0005, AC-12, AC-14)", () => {
     });
   });
 
+  it("uses Opus 5.5 at low effort for chat and helper (spec 0006, AC-13)", () => {
+    expect(modelConfigs.chat).toEqual({ id: "claude-opus-5-5", effort: "low" });
+    expect(modelConfigs.helper).toEqual({
+      id: "claude-opus-5-5",
+      effort: "low",
+    });
+  });
+
   it("has a price for every model id in use", () => {
     for (const id of modelIds)
       expect(Object.hasOwn(modelPrices, id)).toBe(true);

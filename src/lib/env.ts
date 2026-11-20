@@ -14,6 +14,17 @@ const schema = z.object({
     (v) => (v === "" ? undefined : v),
     z.string().min(1).optional(),
   ),
+  // Upstash Redis (spec 0001): the chat turn lock now, rate limits and resumable streams
+  // later. Optional at boot: without them the turn lock is off (logged), so dev and CI
+  // run without Redis. Production must set both.
+  UPSTASH_REDIS_REST_URL: z.preprocess(
+    (v) => (v === "" ? undefined : v),
+    z.url().optional(),
+  ),
+  UPSTASH_REDIS_REST_TOKEN: z.preprocess(
+    (v) => (v === "" ? undefined : v),
+    z.string().min(1).optional(),
+  ),
 });
 
 export type Env = z.infer<typeof schema>;
@@ -41,5 +52,8 @@ export const env: Env = skip
       NEXT_PUBLIC_APP_URL: appUrl ?? "",
       ENABLE_DESIGN_PAGE: process.env.ENABLE_DESIGN_PAGE === "true",
       ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || undefined,
+      UPSTASH_REDIS_REST_URL: process.env.UPSTASH_REDIS_REST_URL || undefined,
+      UPSTASH_REDIS_REST_TOKEN:
+        process.env.UPSTASH_REDIS_REST_TOKEN || undefined,
     } satisfies Env)
   : schema.parse({ ...process.env, NEXT_PUBLIC_APP_URL: appUrl });

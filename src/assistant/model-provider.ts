@@ -4,8 +4,7 @@
 import { createAnthropic } from "@ai-sdk/anthropic";
 import type { LanguageModel } from "ai";
 import { env } from "@/lib/env";
-import type { ModelRole } from "@/tools/registry";
-import { modelConfigs, type Effort } from "./models";
+import { modelConfigs, type AssistantRole, type Effort } from "./models";
 
 /** What a call needs to use a role: the model, its id for records, and its options. */
 export type ResolvedModel = {
@@ -18,7 +17,7 @@ export type ResolvedModel = {
 // runner records as a failed attempt; the app itself still boots without it.
 const anthropic = createAnthropic({ apiKey: env.ANTHROPIC_API_KEY });
 
-export const resolveModel = (role: ModelRole): ResolvedModel => {
+export const resolveModel = (role: AssistantRole): ResolvedModel => {
   const config = modelConfigs[role];
   return {
     id: config.id,
