@@ -42,3 +42,10 @@ Smaller calls, made on the same grounds:
 - **Client generated UUID v7 conversation ids**: let the URL change at once without a round trip; the server only checks the format and ownership.
 - **Resumable streams now**: spec 0001 assigns them here, and dropped connections are the common case for this audience.
 - **Credit UI now, metering later**: the confirm card and chip are on the thread's path; charging chat waits for its own milestone and #21, both before any public link.
+
+### Added 2026-11-20, after the assistant brain review
+
+Two gaps in the `handleTurn` contract surfaced in the spec 0006 code review, settled here before any route code exists.
+
+- **When the turn lock is freed.** `handleTurn` freed the lock when its stream ended, but this route saves the reply in `onFinish`, a moment later. An approval tap sent again in that gap would still look pending and run a money tool twice. Options: (1) the route frees the lock after the save, through a `release` that `handleTurn` returns; (2) `handleTurn` detects a resent message id and refuses it; (3) save the reply inside `handleTurn`. Chose (1): one ordering rule closes the gap for every kind of turn, with no new query, and the reply stays saved in one place (`onFinish`). (2) is kept as a follow up for resent typed text. (3) would split saving between two layers.
+- **How chat usage reaches `ai_usage`.** The AI turn's stream carries no usage, and the turn returned none, so `onFinish` had nothing to record. Options: (1) `handleTurn` returns a `usage` promise that settles after the stream; (2) put usage in the stream's message metadata; (3) the AI turn records usage itself, as extraction does. Chose (1): the write stays at the route edge with the assistant message id the `callKey` needs, and token counts never reach the browser or the saved message, which (2) would cause. (3) would need the route's message id passed down and move a write the spec places in `onFinish`.
