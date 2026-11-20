@@ -16,7 +16,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 3 | Data model | Foundation | done |
 | 4 | Design system & UI foundation | Foundation | done |
 | 20 | Tool source access & parity fixtures | Foundation | in-progress |
-| 5 | Tool module contract & registry | Foundation | in-progress |
+| 5 | Tool module contract & registry | Foundation | done |
 | 6 | Assistant brain | Foundation | in-progress |
 | 7 | Validate an idea in chat (Stellar) | Slice 1 | in-progress |
 | 22 | Credits & billing | Slice 1 | in-progress |
@@ -81,7 +81,7 @@ Fixtures are captured (PR #5; Luna has no scoring, so it carries its question se
 code in `fixtures/parity`, `scripts/parity`
 - [x] Gather access and capture fixtures: `/develop tool source access & parity fixtures`
 
-### 5. Tool module contract & registry · in-progress
+### 5. Tool module contract & registry · done
 The tools are rebuilt inside the workspace, ported from their source (spec 0001). This is the one typed contract every tool implements (its questions, a pure scoring function, its report prompt, its report view, its credit price) and the registry the assistant reaches tools through, so a new tool is added by adding one folder. The contract has to fit three real shapes found in the sources: fixed scoring plus one AI call (Stellar), one scoring engine with two report styles (Beacon and Beacon Pro), and a plan written by AI in phases with no scoring (Luna).
 **Done when:** a sample tool plugs in by adding one folder and one registry line, its scoring is tested against fixtures, and a failed report step shows a clear, retryable error.
 spec [0005](../specs/0005-tool-module-contract/index.md) · code in `src/tools`, `src/assistant`, `src/db/queries/reports.ts`, `src/components/report`
