@@ -3,7 +3,7 @@
 ## Context
 
 Spec 0001 rebuilds the four BeamX tools inside the workspace as code modules behind one registry, and leaves the exact contract to this feature. The contract has to fit three real shapes, found in the source repos and captured in `fixtures/parity/`:
-- Stellar: 10 questions (one with a follow up), fixed scoring, and one AI call that returns a structured analysis.
+- Stellar: 10 questions (four with a follow up), fixed scoring, and one AI call that returns a structured analysis.
 - Beacon and Beacon Pro: the same questions and identical scoring, but different reports (rule based advice polished by AI, or a streamed Claude advisory) and different prices (50 and 150 credits).
 - Luna: 50 questions in 9 areas, no scoring, and a plan written by five AI calls in sequence, each building on the last.
 
@@ -63,3 +63,4 @@ Smaller calls, made on the same grounds:
 - **Readable question ids with a parity map**: self describing in the DB, logs and prompts.
 - **One repair try on bad output**: catches format slips without burning one of the 3 attempts.
 - **Recording usage now, with the cap behind a hook**: no AI call ever goes unrecorded, without pulling the abuse feature into #5.
+- **Stellar follow ups as four stored questions** (update, 2026-11-20): the first draft listed only `commitment_detail`, but the original asks a follow up on Q4, Q5, Q6 and Q10. Q6's follow up feeds `actionItems` in 17 parity cases, so all four became their own questions with `when` rules, which keeps parity and gives the report prompt the same detail the original sent. They stay required, as in the original form; the parity test calls the scoring core directly for the one fixture case the form could never produce (a trigger answer with no follow up). The two generic "Tell us more" prompts were reworded for chat, and text answers are capped at 500 characters instead of the original 2000.
