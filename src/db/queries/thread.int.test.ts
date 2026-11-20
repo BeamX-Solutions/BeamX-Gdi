@@ -4,7 +4,7 @@ import * as conversations from "./conversations";
 import * as messages from "./messages";
 import * as reports from "./reports";
 import * as runs from "./runs";
-import { createGuest, deleteUser } from "../test/helpers";
+import { createGuest, deleteUser, fundRun } from "../test/helpers";
 
 const guests: string[] = [];
 afterAll(async () => {
@@ -31,6 +31,8 @@ describe("guest thread, end to end (AC-1)", () => {
     if (!started.ok) throw new Error("start failed");
     const runId = started.value.run.id;
     expect(started.value.run.status).toBe("in_progress");
+    // Spec 0004: a report is only claimed for a run whose credits are held.
+    await fundRun(userId, runId);
 
     const saved = await runs.saveAnswer(
       userId,

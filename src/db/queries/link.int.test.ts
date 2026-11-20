@@ -63,7 +63,13 @@ describe("guest to account (AC-6)", () => {
     await record(guest, conv.id, run.id);
 
     const counts = await linkGuest(guest, account);
-    expect(counts).toEqual({ conversation: 1, toolRun: 1, aiUsage: 1 });
+    expect(counts).toEqual({
+      conversation: 1,
+      toolRun: 1,
+      aiUsage: 1,
+      creditLedger: 1,
+      creditHolds: 1,
+    });
 
     // The new user now owns it all; the old guest owns nothing.
     expect(unwrap(await conversations.get(account, conv.id)).userId).toBe(
@@ -81,6 +87,8 @@ describe("guest to account (AC-6)", () => {
       conversation: 0,
       toolRun: 0,
       aiUsage: 0,
+      creditLedger: 0,
+      creditHolds: 0,
     });
   });
 
@@ -214,6 +222,10 @@ describe("deleting a user (AC-7)", () => {
     expect(await count("tool_run", "user_id", u)).toBe(0);
     expect(await count("tool_run_answer", "run_id", run.id)).toBe(0);
     expect(await count("report", "run_id", run.id)).toBe(0);
+    // Spec 0004, AC-19: credit rows go with the user (an active hold must not block it).
+    expect(await count("credit_account", "user_id", u)).toBe(0);
+    expect(await count("credit_ledger", "user_id", u)).toBe(0);
+    expect(await count("credit_hold", "user_id", u)).toBe(0);
 
     const [kept] = await db
       .select()

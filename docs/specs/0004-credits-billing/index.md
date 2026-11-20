@@ -1,7 +1,7 @@
 # 0004. Credits and billing for the BeamX Workspace
 
 **Date**: 2026-11-19
-**Status**: Proposed
+**Status**: In Progress
 
 ## Summary
 
@@ -261,9 +261,9 @@ Billing config (`src/billing/config.ts`, Zod checked at module load, defaults ag
 Ordered Tracer Bullet: milestone 1 is one thin, real thread (a guest pays for a Stellar run with starter credits) through config, DB, assistant, report, and UI. Each later milestone thickens it. Milestones 3 and 4 need signed in users with verified emails, so they start once feature #8 provides sign up.
 
 **Milestone 1: thin thread, a Stellar run paid with starter credits**
-1. `src/billing/config.ts` (Zod checked, agreed defaults) and `src/billing/pricing.ts` pure functions (`available`, `shortfall`, `coveringPacks`, `chatCharge`, `expiryDate`, `lagosDate`) with Vitest tests, satisfies **AC-18**, **AC-10**, **AC-15**
-2. Migration 1: `credit_account`, `credit_ledger` (without the `payment_id` FK), `credit_hold`, their enums, indexes, CHECKs, and `billing_assert`, satisfies **AC-3**, **AC-20**
-3. `queries/credits.ts`: `ensureAccount` with starter grant, `startRunWithHold`, `getSummary`, and the charge and release statement builders; wire charge into `reports.markReady` and release into `reports.markFailed` (at 3 attempts) and `conversations.delete`; add the hold check to `reports.claim`. Integration tests on a Neon branch, including the concurrency race, satisfies **AC-3**, **AC-4**, **AC-5**, **AC-11**
+1. [x] `src/billing/config.ts` (Zod checked, agreed defaults) and `src/billing/pricing.ts` pure functions (`available`, `shortfall`, `coveringPacks`, `chatCharge`, `expiryDate`, `lagosDate`) with Vitest tests, satisfies **AC-18**, **AC-10**, **AC-15**
+2. [x] Migration 1: `credit_account`, `credit_ledger` (without the `payment_id` FK), `credit_hold`, their enums, indexes, CHECKs, and `billing_assert`, satisfies **AC-3**, **AC-20**
+3. [x] `queries/credits.ts`: `ensureAccount` with starter grant, `startRunWithHold`, `getSummary`, and the charge and release statement builders; wire charge into `reports.markReady` and release into `reports.markFailed` (at 3 attempts) and `conversations.delete`; add the hold check to `reports.claim`. Integration tests on a Neon branch, including the concurrency race, satisfies **AC-3**, **AC-4**, **AC-5**, **AC-11**
 4. Add `creditPrice` to the tool module (Stellar 30) and make the assistant's `startRun` require approval via AI SDK 7 `toolApproval`; render the confirm card and the short balance card (guest variant: sign up prompt), satisfies **AC-1**, **AC-2**, **AC-8**, **AC-21**
 5. Header balance chip (available balance), satisfies **AC-14**
 

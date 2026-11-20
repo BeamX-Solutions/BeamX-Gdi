@@ -101,7 +101,7 @@ The walking skeleton. A guest types an idea, the assistant routes to Stellar, co
 ### 22. Credits & billing · Beta · in-progress
 Clients pay for tool runs with credits from one balance. Each tool has a fixed price per run, and chat beyond a small daily free allowance costs a little. The assistant always confirms before spending ("this uses 30 credits, go ahead?"). Credits are held when a run starts, charged when the report arrives, and released if it fails; Luna's phased plan resumes without charging twice. New accounts get starter credits, top ups are paid through Paystack in naira, credits expire after 12 months of inactivity (with a reminder first), and existing Luna credit balances move in. Comes right after the first Stellar thread and before any public link.
 **Done when:** a client sees a tool's price, confirms, and is charged only when the report arrives (a failed run costs nothing), can buy credits with Paystack, and sees their balance and history; prices and the free chat allowance come from config.
-spec [0004](../specs/0004-credits-billing/index.md)
+spec [0004](../specs/0004-credits-billing/index.md) · code in `src/billing`, `src/db`
 - [x] Design it (spec): `/architect credits & billing`
 - [ ] Build it: `/develop credits & billing`
   - [ ] Thin thread: a guest pays for a Stellar run with starter credits (config, ledger and holds migration, hold on approve, charge on report ready, release on failure, confirm card, header chip) (AC-1, AC-2, AC-3, AC-4, AC-5, AC-8, AC-11, AC-14, AC-18, AC-20, AC-21)
