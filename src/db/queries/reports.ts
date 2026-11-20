@@ -113,6 +113,8 @@ export const claim = async (
  * report turning ready charges the run's hold in the same statement (spec 0004, AC-4): a
  * stale attempt matches no row at the first step, so nothing below it runs. If the hold
  * is gone, the attempt is marked failed instead, so a report is never ready for free.
+ * Throws (`billing_assert` code `charge_missing`) only if ready would land without its
+ * charge, an invariant break that rolls the batch back rather than give a free report.
  */
 export const markReady = async (
   runId: string,
@@ -121,16 +123,31 @@ export const markReady = async (
   model: string,
 ): Promise<Result<ReportRow, ReadyError>> => {
   const [ready, noHold, current] = await db.batch([
+    // `h` locks the hold row before the report moves. A plain EXISTS reads the statement
+    // snapshot, so a release committing just before `ch` takes its lock would leave the
+    // report ready and uncharged; FOR UPDATE waits and rechecks the live row instead.
+    // The final assert is the backstop: every ready report charged exactly one hold and
+    // wrote its ledger entry, or the whole batch rolls back.
     db.execute(sql`
-      WITH r AS (
+      WITH h AS (
+        SELECT id FROM credit_hold
+        WHERE run_id = ${runId}::uuid AND status = 'active' AND purpose = 'run'
+        FOR UPDATE
+      ), r AS (
         UPDATE report
         SET status = 'ready', content = ${JSON.stringify(content)}::jsonb, model = ${model},
             error = NULL, generated_at = now(), updated_at = now()
         WHERE run_id = ${runId}::uuid AND status = 'generating' AND attempts = ${attempt}
-          AND ${activeHoldExists(runId)}
+          AND EXISTS (SELECT 1 FROM h)
         RETURNING run_id
       ), ${chargeRunHoldCtes(sql`SELECT run_id FROM r`, newId())}
-      SELECT run_id FROM r
+      SELECT r.run_id FROM r
+      CROSS JOIN LATERAL (
+        SELECT billing_assert(
+          (SELECT count(*) FROM ch) = 1 AND (SELECT count(*) FROM cl) = 1,
+          'charge_missing'
+        )
+      ) AS charged
     `),
     db.execute(sql`
       UPDATE report
