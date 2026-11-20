@@ -2,7 +2,7 @@
 
 _Steps derived from spec 0006 acceptance criteria. `/check verify` runs these; `/test` locks the durable ones._
 
-Milestones 1 and 2 are built (card path and AI turn). The chat route and screen are #7, so until #7 lands, the steps run through tests and a real model harness. The UI steps below apply once `POST /api/chat` renders these parts. Milestone 3 (stop, resume, restart, known facts prefill) has its steps in the section at the end. Evals (milestone 4) add theirs when they land.
+Milestones 1 and 2 are built (card path and AI turn). The chat route and screen are #7, so until #7 lands, the steps run through tests and a real model harness. The UI steps below apply once `POST /api/chat` renders these parts. Milestone 3 (stop, resume, restart, known facts prefill) has its steps in the section at the end. Evals (milestone 4) have their steps in the last section.
 
 ## Commands
 
@@ -53,7 +53,7 @@ Milestones 1 and 2 are built (card path and AI turn). The chat route and screen 
 - AC-13 covered by the cache and model role steps
 - AC-14 covered by the failure step and the mock model failure tests
 - AC-5 and AC-5b covered by the milestone 3 prefill steps
-- AC-15: milestone 4
+- AC-15: covered by the milestone 4 steps
 
 ## Milestone 3: stop, resume, restart and known facts (updated 2026-11-20)
 
@@ -83,3 +83,31 @@ Milestones 1 and 2 are built (card path and AI turn). The chat route and screen 
 - AC-5 covered by the prefill, short text, usage and failure steps
 - AC-5b covered by the version change restart step
 - AC-9 covered by the stop, resume and restart steps
+
+## Milestone 4: real model eval harness (updated 2026-11-20)
+
+### Commands
+
+- [ ] `pnpm test -- evals` → the grader tests and `cases.json` schema check pass, and `results.test.ts` finds a results file whose `fingerprint` matches the current prompts → AC-15
+- [ ] Change one word in `src/assistant/instructions.ts`, then `pnpm test -- evals` → `results.test.ts` fails and says to run `pnpm eval:assistant`; revert the word → it passes again → AC-15
+- [ ] `pnpm eval:assistant` (needs `ANTHROPIC_API_KEY`, spends real tokens) → writes `evals/assistant/results/<today>.json` (or `-2`, `-3` on the same day) and prints the summary; exit code 0 only when every bar holds → AC-15
+- [ ] In that file, `summary.routing` is at least 90% over the route and ambiguous cases, with "I have a business idea" proposing `stellar` behind an approval card → AC-4
+- [ ] `summary.offTopicDeclined` is at least 95%, and `summary.onTopicDeclines.declined` is 0 → AC-10
+- [ ] The Pidgin cases and `summary.voice` show short replies with no headings; read the Pidgin replies yourself for a light, respectful touch → AC-11
+- [ ] The grounding cases (price, score, balance) pass, so no reply states a number of its own → AC-12
+- [ ] `cache.prefixRead` and `cache.historyRead` are both true: a later turn reads the tools and instructions, plus the history the turn before it cached → AC-13
+- [ ] `.github/workflows` runs `pnpm test` but never `pnpm eval:assistant` → AC-15 (CI runs only the mock model tests)
+
+### Value sourcing
+
+- [ ] Only the off topic, on topic and Pidgin cases carry a `judge` verdict (Opus 5.5 on the `helper` role, effort low); every other case is graded by the deterministic checks in `evals/assistant/graders.ts` → (eval results, pass rates)
+- [ ] Add a test tool with id `beacon` to the registry locally → the `route-health-*` cases stop being skipped and run, and the fingerprint changes (so a new results file is owed); remove it again → AC-4
+
+### Coverage
+
+- AC-4 covered by the routing bar and the registry step
+- AC-10 covered by the off topic and on topic bars
+- AC-11 covered by the voice step
+- AC-12 covered by the grounding step
+- AC-13 cache reads on real traffic covered by the cache step
+- AC-15 covered by the results file, fingerprint and CI steps
