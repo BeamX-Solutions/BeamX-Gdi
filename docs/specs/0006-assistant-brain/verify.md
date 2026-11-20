@@ -10,10 +10,10 @@ Milestones 1 and 2 are built (card path and AI turn). The chat route and screen 
 - [x] `pnpm test:integration src/assistant/turn.int.test.ts` on a throwaway Neon branch → a tapped answer saves, the last answer completes and returns `data-report`, a busy lock saves nothing → AC-1, AC-6, AC-7
 - [x] Real model, typed text "I want to sell zobo drinks to offices in Lekki" with no active run → one short reason plus a `startRun` approval request for `stellar` whose input has `shownPrice` equal to Stellar's `creditPrice`; no run is created → AC-3, AC-4, AC-12
 - [x] Approve that card → `credits.startRunWithHold` runs at the registry price, the reply says the run started, and the first `data-question` follows → AC-3
-- [ ] Change Stellar's `creditPrice` between the card and the tap, then approve → no run is created and a fresh approval card shows the new price → AC-3
+- [x] Change Stellar's `creditPrice` between the card and the tap, then approve → no run is created and a fresh approval card shows the new price → AC-3
 - [x] Decline the card → nothing starts, one sentence acknowledgement, no question card → AC-3
 - [x] Approve with an approval id that matches no waiting card → "That confirmation has expired" text and no model call → AC-3
-- [ ] With an open card, type an answer in your own words ("we are selling already") → `saveAnswer` saves it with `source = 'chat'` and the next card shows; a value outside the options saves nothing and the same card shows with a short reason → AC-8
+- [x] With an open card, type an answer in your own words ("we are selling already") → `saveAnswer` saves it with `source = 'chat'` and the next card shows; a value outside the options saves nothing and the same card shows with a short reason → AC-8
 - [x] With an open card, type a side question ("how long does this take?") → a short reply, then the same open card again → AC-8
 - [x] Type "change my first answer" mid run → `showQuestion` reopens that card → AC-8, AC-9
 - [x] Type the last answer → the run completes with no extra tap and `data-report` shows → AC-7, AC-8
@@ -71,8 +71,8 @@ Milestones 1 and 2 are built (card path and AI turn). The chat route and screen 
 - [x] "Stop" a run with no hold → the card shows 0 to return; decline → nothing changes → AC-9
 - [x] "Stop" a completed run → no card, the assistant says it is already finished → AC-9
 - [x] After a completed run, "change my channels answer" → a restart card at today's price; approve → a new run with every old answer copied (same sources) and the channels card open → AC-9 (restart price, copied answers)
-- [ ] Restart a completed run after bumping the tool's `version` → a fresh run, and a "From your last run" card listing only answers that still parse and are visible; Accept → saved with their old sources → AC-5b (offered answers)
-- [ ] Type a message of 40+ characters stating two answers, then approve a start → a "From our chat" card lists just those valid, visible answers, with labels from `formatAnswer`; nothing is saved until Accept → AC-5 (prefill label)
+- [x] Restart a completed run after bumping the tool's `version` → a fresh run, and a "From your last run" card listing only answers that still parse and are visible; Accept → saved with their old sources → AC-5b (offered answers)
+- [x] Type a message of 40+ characters stating two answers, then approve a start → a "From our chat" card lists just those valid, visible answers, with labels from `formatAnswer`; nothing is saved until Accept → AC-5 (prefill label)
 - [x] Same, with a message under 40 characters → no extraction call, and the first card shows → AC-5
 - [x] Check `ai_usage` after an extraction → one row, purpose `extraction`, `call_key` `<runId>:extraction`, model from the `helper` role → AC-5, AC-13 (extraction model id, usage)
 - [x] Make the helper model fail or take over 8 seconds → the first card shows, plus an `assistant_extract` log with `failed` → AC-5, AC-14
@@ -89,7 +89,7 @@ Milestones 1 and 2 are built (card path and AI turn). The chat route and screen 
 ### Commands
 
 - [x] `pnpm test -- evals` → the grader tests and `cases.json` schema check pass, and `results.test.ts` finds a results file whose `fingerprint` matches the current prompts → AC-15
-- [ ] Change one word in `src/assistant/instructions.ts`, then `pnpm test -- evals` → `results.test.ts` fails and says to run `pnpm eval:assistant`; revert the word → it passes again → AC-15
+- [x] Change one word in `src/assistant/instructions.ts`, then `pnpm test -- evals` → `results.test.ts` fails and says to run `pnpm eval:assistant`; revert the word → it passes again → AC-15
 - [x] `pnpm eval:assistant` (needs `ANTHROPIC_API_KEY`, spends real tokens) → writes `evals/assistant/results/<today>.json` (or `-2`, `-3` on the same day) and prints the summary; exit code 0 only when every bar holds → AC-15
 - [x] In that file, `summary.routing` is at least 90% over the route and ambiguous cases, with "I have a business idea" proposing `stellar` behind an approval card → AC-4
 - [x] `summary.offTopicDeclined` is at least 95%, and `summary.onTopicDeclines.declined` is 0 → AC-10
@@ -101,7 +101,7 @@ Milestones 1 and 2 are built (card path and AI turn). The chat route and screen 
 ### Value sourcing
 
 - [x] Only the off topic, on topic and Pidgin cases carry a `judge` verdict (Opus 5.5 on the `helper` role, effort low); every other case is graded by the deterministic checks in `evals/assistant/graders.ts` → (eval results, pass rates)
-- [ ] Add a test tool with id `beacon` to the registry locally → the `route-health-*` cases stop being skipped and run, and the fingerprint changes (so a new results file is owed); remove it again → AC-4
+- [x] Add a test tool with id `beacon` to the registry locally → the `route-health-*` cases stop being skipped and run, and the fingerprint changes (so a new results file is owed); remove it again → AC-4
 
 ### Coverage
 
