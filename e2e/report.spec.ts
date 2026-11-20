@@ -1,7 +1,10 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 import { errorKinds, reportFixtures } from "../src/components/fixtures/report";
-import { errorCopy } from "../src/components/feedback/error-copy";
+import {
+  errorCopy,
+  reportErrorCopy,
+} from "../src/components/feedback/error-copy";
 
 const wcagTags = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
 
@@ -112,23 +115,92 @@ test.describe("error cards (AC-12)", () => {
     await expect(page.getByTestId("gone-spend_cap")).toHaveText("Dismissed.");
   });
 
-  test("the failed report in the panel retries into the skeleton", async ({
-    page,
-  }) => {
-    const panel = page.getByTestId("report-panel-demo");
-    await expect(
-      panel.getByText("We could not write your report"),
-    ).toBeVisible();
-    await panel.getByRole("button", { name: "Retry" }).click();
-    await expect(panel.getByTestId("report-skeleton")).toBeVisible();
-    await expect(page.getByText("Retries: 1")).toBeVisible();
-  });
-
   test("an error card in the thread sits after the last message", async ({
     page,
   }) => {
     const thread = page.getByRole("region", { name: "Thread with an error" });
     await expect(thread.locator('[data-error-kind="network"]')).toBeVisible();
+  });
+});
+
+test.describe("report panel states (spec 0005, AC-11)", () => {
+  test("generating shows one step per phase, done steps ticked", async ({
+    page,
+  }) => {
+    const panel = page.getByTestId("panel-generating");
+    const steps = panel.getByRole("list", { name: "Report steps" });
+    await expect(steps.getByRole("listitem")).toHaveCount(3);
+    await expect(steps.getByText("Done")).toHaveCount(1);
+    await expect(steps.getByText("In progress")).toHaveCount(1);
+    await expect(steps.getByText("Waiting")).toHaveCount(1);
+  });
+
+  test("a retryable failure shows a friendly card whose Retry goes back to the skeleton", async ({
+    page,
+  }) => {
+    const panel = page.getByTestId("panel-failed");
+    await expect(
+      panel.getByText(reportErrorCopy.provider_overloaded.message),
+    ).toBeVisible();
+    await panel.getByRole("button", { name: "Retry" }).click();
+    await expect(panel.getByTestId("report-skeleton")).toBeVisible();
+    await expect(page.getByText("Retries: 1 · Start again: 0")).toBeVisible();
+  });
+
+  test("the last failed attempt says the credits were returned, with no Retry", async ({
+    page,
+  }) => {
+    const panel = page.getByTestId("panel-exhausted");
+    await expect(
+      panel.getByText(reportErrorCopy.exhausted.title),
+    ).toBeVisible();
+    await expect(
+      panel.getByText(reportErrorCopy.exhausted.message),
+    ).toBeVisible();
+    await expect(panel.getByRole("button", { name: "Retry" })).toHaveCount(0);
+    await panel.getByRole("button", { name: "Start again" }).click();
+    await expect(page.getByText("Retries: 0 · Start again: 1")).toBeVisible();
+  });
+
+  test("ready draws every block kind with the shared renderer", async ({
+    page,
+  }) => {
+    const report = page.getByTestId("panel-ready").getByTestId("report-view");
+    await expect(report.getByText("74/100", { exact: true })).toBeVisible();
+    await expect(report.getByText("Needs work")).toBeVisible();
+    for (const name of [
+      "Your ten checks",
+      "Your next steps",
+      "Your plan",
+      "Strengths",
+      "Your roadmap",
+      "Resources",
+    ]) {
+      await expect(report.getByRole("region", { name })).toBeVisible();
+    }
+    await expect(
+      report.getByRole("list", { name: "Your roadmap" }).getByText("Week 2"),
+    ).toBeVisible();
+  });
+
+  test("AI text is plain text, and only https resource links become links", async ({
+    page,
+  }) => {
+    const report = page.getByTestId("panel-ready").getByTestId("report-view");
+    const plan = report.getByRole("region", { name: "Your plan" });
+    await expect(plan.getByRole("link")).toHaveCount(0);
+    await expect(
+      plan.getByText("[this](https://example.com)", { exact: false }),
+    ).toBeVisible();
+
+    const resources = report.getByRole("region", { name: "Resources" });
+    const links = resources.getByRole("link");
+    await expect(links).toHaveCount(1);
+    await expect(links).toHaveAttribute("href", "https://example.com/pricing");
+    await expect(links).toHaveAttribute("target", "_blank");
+    await expect(links).toHaveAttribute("rel", "noopener noreferrer nofollow");
+    await expect(resources.getByText("Plain http guide")).toBeVisible();
+    await expect(resources.getByText("Script link")).toBeVisible();
   });
 });
 

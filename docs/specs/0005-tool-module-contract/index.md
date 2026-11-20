@@ -1,7 +1,7 @@
 # 0005. Tool module contract and registry
 
 **Date**: 2026-11-20
-**Status**: In Progress
+**Status**: Accepted
 
 ## Summary
 
