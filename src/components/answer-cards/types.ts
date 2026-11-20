@@ -1,45 +1,7 @@
-export type Option = { readonly value: string; readonly label: string };
+import type { QuestionView } from "@/tools/_contract";
 
-export type QuestionView =
-  | {
-      readonly kind: "single";
-      readonly id: string;
-      readonly prompt: string;
-      readonly help?: string;
-      readonly options: readonly Option[];
-    }
-  | {
-      readonly kind: "multi";
-      readonly id: string;
-      readonly prompt: string;
-      readonly help?: string;
-      readonly options: readonly Option[];
-      readonly min: number;
-      readonly max: number;
-    }
-  | {
-      readonly kind: "scale";
-      readonly id: string;
-      readonly prompt: string;
-      readonly help?: string;
-      readonly min: number;
-      readonly max: number;
-      readonly minLabel: string;
-      readonly maxLabel: string;
-    }
-  | {
-      readonly kind: "text";
-      readonly id: string;
-      readonly prompt: string;
-      readonly help?: string;
-      readonly input: "text" | "number" | "money";
-      readonly placeholder?: string;
-      readonly maxLength?: number;
-      readonly minValue?: number;
-      readonly maxValue?: number;
-    };
-
-export type AnswerValue = string | number | readonly string[];
+// Moved to the tool contract (spec 0005); re-exported so card imports stay put.
+export type { AnswerValue, Option, QuestionView } from "@/tools/_contract";
 
 export type QuestionProgress = {
   readonly area?: {

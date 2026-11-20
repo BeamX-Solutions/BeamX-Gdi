@@ -1,20 +1,10 @@
-export type Verdict = "good" | "caution" | "risk";
-
-export type CategoryBarItem = {
-  readonly label: string;
-  readonly score: number;
-  readonly max: number;
-  /** Fills the bar with the verdict color. Without it the bar uses `--primary`. */
-  readonly verdict?: Verdict;
-};
-
-export type AdvicePriority = "high" | "medium" | "low";
-
-export type AdviceItem = {
-  readonly title: string;
-  readonly detail?: string;
-  readonly priority: AdvicePriority;
-};
+// Moved to the tool contract (spec 0005); re-exported so report imports stay put.
+export type {
+  AdviceItem,
+  AdvicePriority,
+  CategoryBarItem,
+  Verdict,
+} from "@/tools/_contract";
 
 export type SkeletonStepState = "pending" | "active" | "done";
 

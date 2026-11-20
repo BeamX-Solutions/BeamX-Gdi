@@ -20,7 +20,9 @@
     "e2e": "playwright test"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^4.0.106",
     "@neondatabase/serverless": "^1.2.1",
+    "ai": "^7.0.177",
     "better-auth": "^1.7.25",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

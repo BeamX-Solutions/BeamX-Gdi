@@ -1,7 +1,8 @@
 import { err, ok, type Result } from "@/lib/result";
+import { DEFAULT_TEXT_MAX } from "@/tools/_contract";
 import type { MultiQuestion, TextQuestion } from "./types";
 
-export const DEFAULT_TEXT_MAX = 200;
+export { DEFAULT_TEXT_MAX };
 
 /** Turns what was typed into a number: drops grouping commas, spaces, and the naira sign. */
 const toNumber = (raw: string): number =>

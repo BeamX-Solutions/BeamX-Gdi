@@ -1,7 +1,7 @@
 # 0005. Tool module contract and registry
 
 **Date**: 2026-11-20
-**Status**: Proposed
+**Status**: In Progress
 
 ## Summary
 
@@ -18,8 +18,8 @@ Every BeamX tool (Stellar, Beacon, Beacon Pro, Luna) becomes one folder under `s
 - **AC-1**: A tool is one folder `src/tools/<folder>/` exporting one or more `ToolModule`s built with `defineTool`. Adding a module to the list in `src/tools/registry.ts` is the only other change needed for it to be startable, scorable, reportable and viewable. A contract test runs over every registered module and fails on: a duplicate tool id; a duplicate question id within a tool; a `creditPrice` that is not a positive integer; duplicate phase keys; phase keys that do not exactly match the top level keys of `contentSchema`; a `when` predicate that throws when given empty answers.
 - **AC-2**: `getTool(id)` returns `{ ok: false, error: { code: "unknown_tool" } }` for an id not in the registry. `getReader(id, version)` returns `unknown_tool` or `unsupported_version` as typed errors. Nothing throws on an unknown id or version.
 - **AC-3**: `parseAnswer(tool, questionId, value)` accepts exactly what the card allows. Single: one of the option values. Multi: `min` to `max` distinct option values. Scale: an integer from `min` to `max`. Text: a trimmed string within `maxLength` (number and money inputs: a finite number within `minValue` and `maxValue`). Then it applies the question's optional `refine`. A failure returns `invalid_answer` with the question id and a short reason. An unknown question id returns `unknown_question`.
-- **AC-4**: `visibleQuestions(tool, answers)` returns the questions whose `when` passes, in list order. `nextQuestion(tool, answers)` returns the first visible, unanswered question, or `null` when none is left. `progress(tool, answers)` counts visible questions only. For Stellar, `commitment_detail` is visible only when `commitment` is `yes` or `no`. An answer to a question that later becomes hidden is ignored by scoring and prompts.
-- **AC-5**: Stellar's port matches all 75 cases in `fixtures/parity/stellar/scoring.json`: score, level, totalPositive, title, summary, actionItems, timeframe and the dimension scores, with the two documented differences (dimensions matched by question id; dimension 8 renamed to "Competitor Awareness").
+- **AC-4**: `visibleQuestions(tool, answers)` returns the questions whose `when` passes, in list order. `nextQuestion(tool, answers)` returns the first visible, unanswered question, or `null` when none is left. `progress(tool, answers)` counts visible questions only. For Stellar, each of the four follow ups is visible only when its trigger answer is picked: `investment_detail` when `investment` is `500-1000` or `over-1000`, `skills_detail` when `skills` is `no`, `speed_detail` when `speed` is `almost` or `months`, and `commitment_detail` when `commitment` is `yes` or `no`. An answer to a question that later becomes hidden is ignored by scoring and prompts.
+- **AC-5**: Stellar's port matches all 75 cases in `fixtures/parity/stellar/scoring.json`: score, level, totalPositive, title, summary, actionItems, timeframe and the dimension scores, with the two documented differences (dimensions matched by question id; dimension 8 renamed to "Competitor Awareness"). The parity test calls the ported scoring core (no completeness check) with each fixture case mapped to question ids and filtered to the visible answers, so the one case with a trigger answer but no follow up (`yellow-almost-without-followup`) is still compared.
 - **AC-6**: `score(answers)` is pure (no AI, DB, clock or randomness) and never throws. When a visible question is unanswered, it returns `{ ok: false, error: { code: "incomplete", missing: [questionIds] } }`. Luna style tools with no scoring declare an empty scores schema and return `ok({})`.
 - **AC-7**: `POST /api/runs/[runId]/report` first checks that the run's `tool_version` is the registry's current version. If not, it returns `409 version_changed` without claiming, so no attempt is used and the hold is untouched. It then claims the report for the session user (spec 0002 `reports.claim`, which requires an active credit hold per spec 0004, and also reclaims a `generating` report that has been stale for 10 minutes). On a successful claim, it returns `202` with the status payload and runs the phases inside `after()`. When the report is already generating (and not stale), it returns `202` with the current status and makes no AI call. When the report is already ready, it returns `200` with the status payload. An unknown run, another user's run, or a run with no report row yet (not completed) returns `404`. Two concurrent POSTs never make two sets of AI calls for the same attempt.
 - **AC-8**: Phases run in order. Each phase's prompt receives the visible answers, the scores, and the outputs of earlier phases. Each finished phase output is saved into `report.content` under its key before the next phase starts. A retry after a failure skips phases already saved. When every phase is saved, the merged content is validated against `contentSchema` and written with `reports.markReady`, which charges the hold once (spec 0004, AC-4).
@@ -126,8 +126,8 @@ src/tools/
   registry.ts         export const tools = [stellar] as const; getTool, getReader, toolIds
   stellar/
     index.ts          defineTool({ id: "stellar", version: "1", creditPrice: 30, ... })
-    questions.ts      11 questions (10 plus commitment_detail)
-    scoring.ts        ported calculateScore and calculateDimensionScores
+    questions.ts      14 questions (10 plus 4 follow ups)
+    scoring.ts        ported calculateScore and calculateDimensionScores (the core), and score = completeness check + core
     report.ts         one phase "analysis" (the original AI output schema, as Zod)
     view.ts           toView
     parity.test.ts    the 75 fixture cases
@@ -146,9 +146,21 @@ A folder that serves two products (Beacon and Beacon Pro) exports two modules fr
 | 3 | `market_validation` | 8 | `competitors` |
 | 4 | `investment` | 9 | `learning` |
 | 5 | `skills` | 10 | `commitment` |
-| 10 follow up | `commitment_detail` (text, `when` commitment is `yes` or `no`) | | |
 
-The parity test maps fixture `questionId` N (and `followUpAnswer`) to these ids.
+Each follow up is its own text question (`input: "text"`), placed right after its parent, and required like in the original form (it blocks Next until answered). One prompt per question, as in the original:
+
+| Original | id | `when` | Prompt |
+|---|---|---|---|
+| 4 follow up | `investment_detail` | `investment` is `500-1000` or `over-1000` | What do you think you need to spend money on? |
+| 5 follow up | `skills_detail` | `skills` is `no` | What skill do people actually ask you about? |
+| 6 follow up | `speed_detail` | `speed` is `almost` or `months` | What still stands between you and your first sale? |
+| 10 follow up | `commitment_detail` | `commitment` is `yes` or `no` | What will you do in the next 24 hours, or what is holding you back? |
+
+Every Stellar text question (`value_creation`, `competitors` and the four follow ups) has `maxLength: 500`. The original allowed 2000; 500 leaves room for a real explanation on a phone and keeps the prompt small. The positive thresholds stay as the original: `value_creation` longer than 20 characters, `competitors` longer than 5.
+
+The scoring core reads `speed_detail` only when `speed` is `almost`, and puts its first 80 characters into the blocker action item (`String.prototype.slice(0, 80)`, as the original). The Stellar report prompt attaches each follow up answer to its parent question's line, like the original `(Follow-up: ...)`.
+
+The parity test maps fixture `questionId` N to these ids, and a `followUpAnswer` to its parent's `_detail` id. A fixture follow up on an answer that does not trigger one (one case gives `commitment` `maybe` a follow up) is hidden, so it is dropped, as AC-4 says.
 
 ### Report runner (`src/assistant/report-runner.ts`)
 
@@ -212,6 +224,7 @@ The POST route sets `export const maxDuration = 800` (Vercel Pro limit, so the f
 | GET | `phases[].label`, total | the reader for the run's `tool_version` (phases come from the current module; old versions show `ready` only) |
 | runs.complete (#7 calls it) | `scores`, `answerCount`, `lastAnswerAt` | `scoreRun(tool, runs.get answer rows)` (AC-16) |
 | runner | run owner | `runs.ownerOf(runId)` inside `after()` |
+| Stellar scoring | blocker text in `actionItems` | first 80 characters of `speed_detail`, read only when `speed` is `almost` |
 | Stellar `toView` | `score_header` score, max, verdict | ported `score` out of `max` 100; level green → `good`, yellow → `caution`, red → `risk` |
 | parity test | expected differences | `fixtures/parity/README.md`, "Known differences on purpose" 1 and 2 |
 | GET | `canRetry` | `buildStatus` rule above, from `reports.status` (`attempts`, `has_hold`, `updated_at`, version) |
@@ -243,7 +256,7 @@ The POST route sets `export const maxDuration = 800` (Vercel Pro limit, so the f
 - Contract: every registered module passes the invariants; a broken test tool (duplicate question id, price 0, phase key missing from contentSchema) fails, verifies **AC-1**, **AC-14**
 - Registry: unknown id and unknown version return typed errors, verifies **AC-2**
 - Answers: each card kind accepts its range and rejects outside it; refine reasons surface, verifies **AC-3**
-- Flow: the Stellar follow up appears only for yes or no; progress counts visible questions; a hidden answer is ignored, verifies **AC-4**
+- Flow: each Stellar follow up appears only for its trigger answers (for example `speed_detail` for `almost` and `months`, never `yes-ready`); progress counts visible questions; a hidden answer is ignored, verifies **AC-4**
 - Parity: all 75 Stellar cases match, verifies **AC-5**
 - Scoring: a missing answer returns `incomplete` with the ids; Luna style empty scores, verifies **AC-6**
 - Happy path (integration, mock model): complete a funded Stellar run, POST returns 202, the runner saves the phase, marks ready, and charges 30; GET returns `ready` with blocks, verifies **AC-7**, **AC-8**, **AC-10**
@@ -265,7 +278,7 @@ The POST route sets `export const maxDuration = 800` (Vercel Pro limit, so the f
 Tracer Bullet: get the thinnest real path working (Stellar scored, generated with a mock model, shown in the panel), then thicken it.
 
 1. Contract and kit: `_contract.ts` (move `QuestionView`, `AnswerValue` and the report item types in, re-export from components), `defineTool`, `_kit/` (`parseAnswer`, flow helpers, `toAnswers`, `scoreRun`), `registry.ts`, and the ESLint import boundary rule, with unit tests, satisfies **AC-2**, **AC-3**, **AC-4**, **AC-14**, **AC-16**
-2. Stellar pure port: questions with ids, scoring, scores schema, and the parity test over all 75 cases, satisfies **AC-5**, **AC-6**
+2. Stellar pure port: the 14 questions with ids and `when` rules, the scoring core plus the completeness gated `score`, scores schema, and the parity test over all 75 cases, satisfies **AC-5**, **AC-6**
 3. Install AI SDK 7 (`ai`, `@ai-sdk/anthropic`); read `node_modules/ai/docs/` for `generateText`, `Output.object`, usage fields and the test mock model. Add `ANTHROPIC_API_KEY` to `env.ts` and `.env.example`; `assistant/models.ts` (role `report`); `lib/ai-cost.ts` if absent (with the every model has a price test); `lib/spend-cap.ts` with `checkSpendCap(userId)` that allows everything until the abuse feature fills it in, satisfies **AC-12**, **AC-14**
 4. Queries `reports.savePhase`, `reports.status` and `reports.failStale` with integration tests (CAS on attempt, merge, stale attempt, owner scoping, failStale releases the hold only when stale and exhausted), satisfies **AC-8**, **AC-10**, **AC-15**
 5. Stellar report phase and `contentSchema` (from `ai-output-schema.json`), then the runner with the mock model: owner lookup, phases, resume with revalidation, repair, error mapping, top level catch, attempt recheck, usage, spend cap, stale attempt, satisfies **AC-8**, **AC-9**, **AC-12**
