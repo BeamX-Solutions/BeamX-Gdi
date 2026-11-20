@@ -47,7 +47,7 @@ Stored in `docs/specs/`. Format: `docs/specs/NNNN-title/` (`index.md` + `rationa
 
 ## Rules
 
-- Keep the module boundaries of spec 0001: `src/app/` is routes only and calls into `assistant/`, `tools/`, `db/`; a tool folder never imports another tool; the assistant reaches tools only through `tools/registry.ts`.
+- Keep the module boundaries of spec 0001: `src/app/` is routes only and calls into `assistant/`, `tools/`, `db/`, `billing/` (spec 0004; the assistant may call `billing/` too); a tool folder never imports another tool; the assistant reaches tools only through `tools/registry.ts`.
 - Functional style: pure functions by default, no shared mutable state, immutable data (`const`, `readonly`); prefer plain functions and composition over classes.
 - Push side effects (DB, AI calls, Redis, I/O) to the edges: route handlers, Server Actions, `onFinish`. Tool scoring is pure (answers in, scores out), with no AI or DB.
 - Expected failures return typed results (`{ ok: true, value } | { ok: false, error }`), not thrown exceptions; the UI turns them into friendly cards, never a blank screen or a 500.
@@ -62,6 +62,8 @@ Stored in `docs/specs/`. Format: `docs/specs/NNNN-title/` (`index.md` + `rationa
 ## Tooling
 
 Chosen here, installed by `/develop tooling`: ESLint (`eslint-config-next`, installed) + Prettier with `prettier-plugin-tailwindcss` · husky + lint-staged pre commit: lint and format staged files, then typecheck · TS flags `noUncheckedIndexedAccess` (+ ESLint `no-explicit-any`, `switch-exhaustiveness-check`) · GitHub Actions on every PR: typecheck, lint, test, build, e2e (Playwright + axe, uploads its HTML report; not a required check on the free GitHub plan).
+
+- lint-staged calls ESLint and Prettier through their entry files (`node node_modules/eslint/bin/eslint.js`, `node node_modules/prettier/bin/prettier.cjs`), not the bare `eslint` / `prettier` commands. On Windows, lint-staged 17 starts the `.cmd` shims through `cmd.exe`, which hangs forever once more than a few files are staged. Keep it that way.
 
 ## Git
 
@@ -95,5 +97,6 @@ MCP servers: Neon (connected), Vercel (connected)
 - [src/lib/AGENTS.md](src/lib/AGENTS.md): env, rate limits, AI spend cap, shared helpers
 - [src/db/AGENTS.md](src/db/AGENTS.md): Drizzle schema, migrations, the typed query layer, DB integration tests
 - [src/components/AGENTS.md](src/components/AGENTS.md): shared UI, shadcn and AI Elements, workspace shell, answer cards, report parts, fixtures
+- [src/billing/AGENTS.md](src/billing/AGENTS.md): credits and billing config, pure pricing math, money write rules
 
 _Drafted by /audit from the repo, worth a quick human pass. Edit freely: once a line stops matching this draft, later runs treat it as curated and will flag rather than overwrite it._
