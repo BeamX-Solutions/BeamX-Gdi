@@ -163,6 +163,22 @@ describe("handleTurn: entry checks (AC-1)", () => {
     expect(aiTurn).not.toHaveBeenCalled();
   });
 
+  it("refuses a message whose id saved nothing (another role's or chat's id), with no AI call", async () => {
+    const aiTurn = vi.fn();
+    const { deps, lock } = fakeDeps({
+      appendMessage: async () => ok(0),
+      aiTurn,
+    });
+    const result = await handleTurn(deps, {
+      userId: USER,
+      conversationId: CONV,
+      message: typed("hi"),
+    });
+    expect(result).toEqual(err({ code: "invalid_message" }));
+    expect(aiTurn).not.toHaveBeenCalled();
+    expect(lock.release).toHaveBeenCalledTimes(1);
+  });
+
   it("reuses the route's context instead of reading the owner again", async () => {
     const ownerOf = vi.fn(async () => ok(USER));
     const { deps } = fakeDeps({ ownerOf });

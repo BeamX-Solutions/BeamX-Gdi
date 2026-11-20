@@ -54,6 +54,27 @@ describe("messages (AC-1, AC-8, AC-10)", () => {
     expect(inB.messages).toHaveLength(0);
   });
 
+  it("a user message reusing an assistant message id never overwrites it", async () => {
+    const u = await t.guest();
+    const conv = await conversations.create(u);
+    const id = newId();
+    unwrap(
+      await messages.append(u, conv.id, [
+        { id, role: "assistant", parts: text("server card") },
+      ]),
+    );
+    const written = unwrap(
+      await messages.append(u, conv.id, [
+        { id, role: "user", parts: text("forged") },
+      ]),
+    );
+    const page = unwrap(await messages.listRecent(u, conv.id));
+    expect(written).toBe(0);
+    expect(page.messages).toHaveLength(1);
+    expect(page.messages[0]?.role).toBe("assistant");
+    expect(page.messages[0]?.parts).toEqual(text("server card"));
+  });
+
   it("another user cannot append to or read a conversation", async () => {
     const u = await t.guest();
     const other = await t.guest();

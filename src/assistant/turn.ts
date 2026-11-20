@@ -396,6 +396,12 @@ export const handleTurn = async (
       await release();
       return err({ code: "not_found" });
     }
+    // Zero rows: the id belongs to a message of another role or chat, so nothing was
+    // saved and the turn must not run on a message history lacks.
+    if (saved.result.value === 0) {
+      await release();
+      return err({ code: "invalid_message" });
+    }
     const owner = saved.owner;
 
     if (turn.kind === "text" || turn.kind === "approval") {
