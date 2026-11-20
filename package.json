@@ -69,9 +69,9 @@
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx,mjs,cjs}": [
-      "eslint --fix --max-warnings=0",
-      "prettier --write"
+      "node node_modules/eslint/bin/eslint.js --fix --max-warnings=0",
+      "node node_modules/prettier/bin/prettier.cjs --write"
     ],
-    "*.{json,css,md,yml,yaml}": "prettier --write"
+    "*.{json,css,md,yml,yaml}": "node node_modules/prettier/bin/prettier.cjs --write"
   }
 }
