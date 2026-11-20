@@ -89,7 +89,7 @@ spec [0005](../specs/0005-tool-module-contract/index.md) · code in `src/tools`,
 - [ ] Build it: `/develop tool module contract & registry`
   - [x] Contract, kit, registry and the Stellar pure port with parity tests (AC-2, AC-3, AC-4, AC-5, AC-6, AC-14, AC-16)
   - [x] AI SDK 7, models, cost and spend cap hook, report queries, and the runner with a mock model (AC-8, AC-9, AC-10, AC-12, AC-15)
-  - [ ] Report routes with after() and polling status, version and stale handling (AC-7, AC-10, AC-13, AC-15)
+  - [x] Report routes with after() and polling status, version and stale handling (AC-7, AC-10, AC-13, AC-15)
   - [ ] Report blocks, renderer, panel states on /design, and the contract test over the registry (AC-1, AC-11, AC-13)
 - [ ] Verify it: `/check verify tool module contract & registry`
 
