@@ -1,0 +1,414 @@
+/**
+ * The AI turn (spec 0006, "AI turn"): one `streamText` call on the `chat` role for a
+ * typed message or an approval tap. The tools come from the registry, money actions
+ * wait for approval, and after the stream the server appends the card the turn calls
+ * for (first card, completion, a reopened card, or the open card again).
+ *
+ * Prompt layout (AC-13): tools (fixed order) and instructions form the cached prefix,
+ * breakpoint 1 on the instructions; the history follows with breakpoint 2 on its last
+ * message; the run state note comes last as a turn scoped system message.
+ */
+import {
+  createUIMessageStream,
+  stepCountIs,
+  streamText,
+  type ModelMessage,
+  type SystemModelMessage,
+  type UIMessageChunk,
+} from "ai";
+import type { Result } from "@/lib/result";
+import type { ToolModule } from "@/tools/registry";
+import {
+  afterSave,
+  answersFromRows,
+  latestShownQuestion,
+  openQuestion,
+  questionPart,
+} from "./card-flow";
+import {
+  completeRun,
+  type NotFound,
+  type StepDeps,
+  type TurnRun,
+} from "./card-steps";
+import { INSTRUCTIONS } from "./instructions";
+import type { ResolvedModel } from "./model-provider";
+import {
+  pendingApprovals,
+  respondedCalls,
+  toModelMessages,
+  type SavedMessage,
+  type ServerPart,
+} from "./parts";
+import { buildRunState } from "./run-state";
+import {
+  assistantTools,
+  TOOL_APPROVAL,
+  TOOL_ORDER,
+  toolInputRefinement,
+  type AssistantToolDeps,
+  type OwnerBox,
+  type ToolEvent,
+} from "./tools";
+import { partsStream, type ActiveRead, type AiTurnContext } from "./turn";
+
+/** Steps per turn: room for a tool call, its result and a reply, plus one retry. */
+export const MAX_STEPS = 5;
+export const MAX_OUTPUT_TOKENS = 1024;
+
+/** A run of the chat with its report status (`conversations.open`, newest first). */
+export type ChatRun = {
+  readonly run: TurnRun;
+  readonly report: { readonly status: string } | null;
+};
+
+export type AiTurnDeps = StepDeps &
+  AssistantToolDeps & {
+    /** The last 30 messages (oldest first) and the chat's runs, in one read. */
+    readonly openChat: (
+      ownerId: string,
+      conversationId: string,
+    ) => Promise<
+      Result<
+        {
+          readonly messages: readonly SavedMessage[];
+          readonly runs: readonly ChatRun[];
+        },
+        NotFound
+      >
+    >;
+    readonly model: () => ResolvedModel;
+    readonly newId: () => string;
+    readonly now: () => number;
+  };
+
+export const AI_REPLIES = {
+  approvalExpired:
+    "That confirmation has expired. Tell me what you'd like to do and I'll show a fresh card.",
+} as const;
+
+const AI_ERROR: ServerPart = {
+  type: "data-error",
+  data: { kind: "ai_error", retry: true },
+};
+
+const REFUSAL: ServerPart = {
+  type: "data-error",
+  data: { kind: "refusal", retry: true },
+};
+
+const CACHE = { anthropic: { cacheControl: { type: "ephemeral" } } } as const;
+
+/** Breakpoint 1: the instructions close the cached prefix (tools are sent before them). */
+export const INSTRUCTIONS_MESSAGE: SystemModelMessage = {
+  role: "system",
+  content: INSTRUCTIONS,
+  providerOptions: CACHE,
+};
+
+/** Breakpoint 2 on the last history message. */
+export const withHistoryBreakpoint = (
+  messages: readonly ModelMessage[],
+): ModelMessage[] => {
+  const last = messages.at(-1);
+  return last === undefined
+    ? []
+    : [
+        ...messages.slice(0, -1),
+        {
+          ...last,
+          providerOptions: { ...last.providerOptions, ...CACHE },
+        } as ModelMessage,
+      ];
+};
+
+/** The run state note, applied until the next user message (never saved). */
+export const runStateMessage = (note: string): SystemModelMessage => ({
+  role: "system",
+  content: note,
+  providerOptions: { anthropic: { clearAt: "next_user_message" } },
+});
+
+/**
+ * The note goes last in every step. The history holds no system messages, so any
+ * system message in a step's messages is an earlier copy of the note.
+ */
+export const withNote = (
+  messages: readonly ModelMessage[],
+  note: SystemModelMessage,
+): ModelMessage[] => [...messages.filter((m) => m.role !== "system"), note];
+
+// ---------------------------------------------------------------------------
+// After the stream
+// ---------------------------------------------------------------------------
+
+type Live = {
+  readonly run: TurnRun;
+  readonly tool: ToolModule;
+  readonly answers: ReturnType<typeof answersFromRows>;
+};
+
+const liveOf = (deps: AiTurnDeps, read: ActiveRead): Live | null => {
+  const active = read.active;
+  if (active === null) return null;
+  const tool = deps.getTool(active.run.toolId);
+  if (!tool.ok || tool.value.version !== active.run.toolVersion) return null;
+  return {
+    run: active.run,
+    tool: tool.value,
+    answers: answersFromRows(tool.value, active.answers),
+  };
+};
+
+const lastOf = <K extends ToolEvent["kind"]>(
+  events: readonly ToolEvent[],
+  kind: K,
+): Extract<ToolEvent, { kind: K }> | undefined =>
+  events
+    .filter((e): e is Extract<ToolEvent, { kind: K }> => e.kind === kind)
+    .at(-1);
+
+/**
+ * The card the turn ends with (spec 0006, "AI turn", AC-8), in this order: a run started
+ * this turn shows its first card (extraction joins in build plan task 5); a typed answer
+ * that finished the run completes it; otherwise, unless an approval is pending, the
+ * reopened card, the next card after a typed answer, or the open card again.
+ */
+export const partsAfterStream = async (
+  deps: AiTurnDeps,
+  turn: {
+    readonly conversationId: string;
+    readonly owner: OwnerBox;
+    readonly history: readonly SavedMessage[];
+    readonly events: readonly ToolEvent[];
+    readonly approvalPending: boolean;
+  },
+): Promise<readonly ServerPart[]> => {
+  const started = lastOf(turn.events, "started");
+  const saved = lastOf(turn.events, "saved");
+  const shown = lastOf(turn.events, "show");
+  if (!started && !saved?.complete && turn.approvalPending) return [];
+
+  const live = liveOf(
+    deps,
+    await deps.getActive(turn.owner.current, turn.conversationId),
+  );
+  if (live === null) return [];
+  const { run, tool, answers } = live;
+
+  if (started?.runId === run.id) {
+    const first = openQuestion(tool, answers, null);
+    return first === null ? [] : [questionPart(tool, run.id, answers, first)];
+  }
+  if (saved?.complete && saved.runId === run.id)
+    return completeRun(deps, turn.conversationId, turn.owner, { run, tool });
+  if (turn.approvalPending) return [];
+
+  if (shown?.runId === run.id) {
+    const question = tool.questions.find((q) => q.id === shown.questionId);
+    const visible = openQuestion(tool, answers, shown.questionId);
+    if (question && visible?.id === question.id)
+      return [questionPart(tool, run.id, answers, question)];
+  }
+  if (saved?.runId === run.id) {
+    const next = afterSave(tool, answers);
+    return next.kind === "card"
+      ? [questionPart(tool, run.id, answers, next.question)]
+      : completeRun(deps, turn.conversationId, turn.owner, { run, tool });
+  }
+  const open = openQuestion(
+    tool,
+    answers,
+    latestShownQuestion(turn.history, run.id),
+  );
+  return open === null ? [] : [questionPart(tool, run.id, answers, open)];
+};
+
+// ---------------------------------------------------------------------------
+// The turn
+// ---------------------------------------------------------------------------
+
+const writeParts = (
+  writer: { write: (chunk: UIMessageChunk) => void },
+  parts: readonly ServerPart[],
+  newId: () => string,
+) => {
+  for (const part of parts) {
+    if (part.type === "text") {
+      const id = newId();
+      writer.write({ type: "text-start", id });
+      writer.write({ type: "text-delta", id, delta: part.text });
+      writer.write({ type: "text-end", id });
+    } else {
+      writer.write({ type: part.type, data: part.data });
+    }
+  }
+};
+
+/** Builds `TurnDeps.aiTurn`. The stream holds no start or finish chunk (#7 wraps it). */
+export const createAiTurn =
+  (deps: AiTurnDeps) =>
+  async (ctx: AiTurnContext): Promise<ReadableStream<UIMessageChunk>> => {
+    const started = deps.now();
+    const chat = await deps.openChat(ctx.ownerId, ctx.conversationId);
+    if (!chat.ok) return partsStream([AI_ERROR], deps.newId);
+    const history = chat.value.messages;
+
+    if (
+      ctx.turn.kind === "approval" &&
+      pendingApprovals(history, ctx.turn.responses).length === 0
+    )
+      return partsStream(
+        [{ type: "text", text: AI_REPLIES.approvalExpired }],
+        deps.newId,
+      );
+
+    const noteFor = (read: ActiveRead) => {
+      const active = read.active;
+      const tool = active === null ? null : deps.getTool(active.run.toolId);
+      return runStateMessage(
+        buildRunState({
+          getTool: deps.getTool,
+          active:
+            active === null
+              ? null
+              : {
+                  runId: active.run.id,
+                  toolId: active.run.toolId,
+                  answers: tool?.ok
+                    ? answersFromRows(tool.value, active.answers)
+                    : {},
+                  latestShownId: latestShownQuestion(history, active.run.id),
+                },
+          paused: read.paused.map((r) => ({ runId: r.id, toolId: r.toolId })),
+          runs: chat.value.runs.map((r) => ({
+            runId: r.run.id,
+            toolId: r.run.toolId,
+            status: r.run.status,
+            reportStatus: r.report?.status ?? null,
+          })),
+          ...(ctx.freeMessagesLeft === undefined
+            ? {}
+            : { freeMessagesLeft: ctx.freeMessagesLeft }),
+        }),
+      );
+    };
+
+    const messages = withHistoryBreakpoint(await toModelMessages(history));
+    const owner: OwnerBox = { current: ctx.ownerId };
+    // What the tools did this turn; local to this call, read after the stream.
+    const events: ToolEvent[] = [];
+    const env = {
+      deps,
+      conversationId: ctx.conversationId,
+      owner,
+      record: (event: ToolEvent) => {
+        events.push(event);
+      },
+    };
+    const model = deps.model();
+    // The note as of the last tool event. An approved call runs before the first step
+    // and a tool may change the run mid turn, so the note is read again after either.
+    const note = { message: noteFor(ctx.active), events: 0 };
+    const currentNote = async () => {
+      if (events.length !== note.events) {
+        note.events = events.length;
+        note.message = noteFor(
+          await deps.getActive(owner.current, ctx.conversationId),
+        );
+      }
+      return note.message;
+    };
+    const responded =
+      ctx.turn.kind === "approval"
+        ? respondedCalls(history, ctx.turn.responses)
+        : new Map<string, { toolName: string; input: unknown }>();
+    const introduced = new Set<string>();
+
+    const result = streamText({
+      model: model.model,
+      instructions: INSTRUCTIONS_MESSAGE,
+      messages,
+      allowSystemInMessages: true,
+      tools: assistantTools(env),
+      toolOrder: [...TOOL_ORDER],
+      toolApproval: TOOL_APPROVAL,
+      experimental_refineToolInput: toolInputRefinement(deps),
+      prepareStep: async ({ messages: stepMessages }) => ({
+        messages: withNote(stepMessages, await currentNote()),
+      }),
+      stopWhen: stepCountIs(MAX_STEPS),
+      maxOutputTokens: MAX_OUTPUT_TOKENS,
+      providerOptions: {
+        anthropic: { ...model.providerOptions.anthropic, fallbacks: "default" },
+      },
+    });
+
+    return createUIMessageStream({
+      execute: async ({ writer }) => {
+        const seen = { approvalPending: false, failed: false };
+        for await (const chunk of result.toUIMessageStream({
+          sendStart: false,
+          sendFinish: false,
+          onError: () => "",
+        })) {
+          if (chunk.type === "error") {
+            seen.failed = true;
+            continue;
+          }
+          if (chunk.type === "tool-approval-request")
+            seen.approvalPending = true;
+          if ("toolCallId" in chunk) {
+            const call = responded.get(chunk.toolCallId);
+            if (call && !introduced.has(chunk.toolCallId))
+              writer.write({
+                type: "tool-input-available",
+                toolCallId: chunk.toolCallId,
+                toolName: call.toolName,
+                input: call.input,
+              });
+            introduced.add(chunk.toolCallId);
+          }
+          if (
+            chunk.type === "tool-input-available" &&
+            chunk.toolName === "startRun"
+          ) {
+            const toolId = (chunk.input as { toolId?: unknown }).toolId;
+            deps.log("assistant_route", {
+              toolId: typeof toolId === "string" ? toolId : null,
+            });
+          }
+          writer.write(chunk);
+        }
+
+        const finish = seen.failed
+          ? null
+          : await Promise.resolve(result.finishReason).catch(() => null);
+        const steps = await Promise.resolve(result.steps)
+          .then((s) => s.length)
+          .catch(() => 0);
+        if (finish === "content-filter")
+          deps.log("assistant_refusal", { conversationId: ctx.conversationId });
+        const parts =
+          finish === null
+            ? [AI_ERROR]
+            : finish === "content-filter"
+              ? [REFUSAL]
+              : await partsAfterStream(deps, {
+                  conversationId: ctx.conversationId,
+                  owner,
+                  history,
+                  events,
+                  approvalPending: seen.approvalPending,
+                }).catch(() => [AI_ERROR]);
+        writeParts(writer, parts, deps.newId);
+        deps.log("assistant_turn", {
+          path: "ai_done",
+          conversationId: ctx.conversationId,
+          steps,
+          approvalPending: seen.approvalPending,
+          ms: deps.now() - started,
+        });
+      },
+    });
+  };

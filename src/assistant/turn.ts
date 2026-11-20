@@ -9,15 +9,9 @@
  */
 import { createUIMessageStream, type UIMessageChunk } from "ai";
 import type { NewMessage } from "@/db/queries/messages";
-import type { CompleteError } from "@/db/queries/runs";
 import { err, ok, type Result } from "@/lib/result";
 import type { TurnLock } from "@/lib/turn-lock";
-import {
-  scoreRun,
-  type StoredAnswer,
-  type ToolModule,
-  type UnknownTool,
-} from "@/tools/registry";
+import type { StoredAnswer, ToolModule, UnknownTool } from "@/tools/registry";
 import {
   afterSave,
   answersFromRows,
@@ -30,6 +24,14 @@ import {
   openQuestion,
   questionPart,
 } from "./card-flow";
+import {
+  asOwner,
+  completeRun,
+  type NotFound,
+  type Owner,
+  type StepDeps,
+  type TurnRun,
+} from "./card-steps";
 import {
   classifyMessage,
   type AnswerData,
@@ -45,15 +47,7 @@ import {
 // Dependencies
 // ---------------------------------------------------------------------------
 
-type NotFound = { readonly code: "not_found" };
-
-/** The run fields the turn reads (a `tool_run` row satisfies it). */
-export type TurnRun = {
-  readonly id: string;
-  readonly toolId: string;
-  readonly toolVersion: string;
-  readonly status: string;
-};
+export type { TurnRun } from "./card-steps";
 
 /** `runs.getActive`: the chat's active run with its answers, plus its paused runs. */
 export type ActiveRead = {
@@ -69,6 +63,8 @@ export type AiTurnContext = {
   readonly conversationId: string;
   readonly message: UserMessage;
   readonly active: ActiveRead;
+  /** Free chat messages left today, when #7's route knows it (spec 0004). */
+  readonly freeMessagesLeft?: number;
   readonly turn:
     | { readonly kind: "text"; readonly text: string }
     | {
@@ -77,10 +73,7 @@ export type AiTurnContext = {
       };
 };
 
-export type TurnDeps = {
-  readonly ownerOf: (
-    conversationId: string,
-  ) => Promise<Result<string, NotFound>>;
+export type TurnDeps = StepDeps & {
   readonly lock: TurnLock;
   readonly appendMessage: (
     ownerId: string,
@@ -96,15 +89,6 @@ export type TurnDeps = {
     ownerId: string,
     conversationId: string,
   ) => Promise<readonly SavedMessage[]>;
-  readonly getRun: (
-    ownerId: string,
-    runId: string,
-  ) => Promise<
-    Result<
-      { readonly run: TurnRun; readonly answers: readonly StoredAnswer[] },
-      NotFound
-    >
-  >;
   readonly saveAnswer: (
     ownerId: string,
     runId: string,
@@ -114,13 +98,6 @@ export type TurnDeps = {
   ) => Promise<
     Result<unknown, { readonly code: "not_found_or_not_in_progress" }>
   >;
-  readonly complete: (
-    ownerId: string,
-    runId: string,
-    scores: unknown,
-    answerCount: number,
-    lastAnswerAt: string | null,
-  ) => Promise<Result<unknown, CompleteError>>;
   readonly getTool: (id: string) => Result<ToolModule, UnknownTool>;
   /** The AI turn (build plan task 3). Returns the model's UI message stream. */
   readonly aiTurn: (
@@ -128,10 +105,6 @@ export type TurnDeps = {
   ) => Promise<ReadableStream<UIMessageChunk>>;
   readonly newId: () => string;
   readonly now: () => number;
-  readonly log: (
-    event: string,
-    fields: Readonly<Record<string, string | number | boolean | null>>,
-  ) => void;
 };
 
 // ---------------------------------------------------------------------------
@@ -147,6 +120,7 @@ export type TurnInput = {
   readonly context?: {
     readonly ownerId: string;
     readonly active?: ActiveRead;
+    readonly freeMessagesLeft?: number;
   };
 };
 
@@ -222,35 +196,6 @@ const BUSY: ServerPart = {
 };
 
 // ---------------------------------------------------------------------------
-// Owner retry
-// ---------------------------------------------------------------------------
-
-const RETRY_CODES = new Set(["not_found", "not_found_or_not_in_progress"]);
-
-type Owner = { readonly current: string };
-
-/**
- * Runs a write as the owner resolved at turn start. If it comes back `not_found`, the
- * owner is read again; if a guest link moved the chat, the write is retried once as the
- * new owner (spec 0006, "Owner").
- */
-const asOwner = async <T, E extends { readonly code: string }>(
-  deps: TurnDeps,
-  conversationId: string,
-  owner: Owner,
-  write: (ownerId: string) => Promise<Result<T, E>>,
-): Promise<{ readonly owner: Owner; readonly result: Result<T, E> }> => {
-  const first = await write(owner.current);
-  if (first.ok || !RETRY_CODES.has(first.error.code))
-    return { owner, result: first };
-  const reread = await deps.ownerOf(conversationId);
-  if (!reread.ok || reread.value === owner.current)
-    return { owner, result: first };
-  const moved: Owner = { current: reread.value };
-  return { owner: moved, result: await write(moved.current) };
-};
-
-// ---------------------------------------------------------------------------
 // The card path
 // ---------------------------------------------------------------------------
 
@@ -306,71 +251,6 @@ const openCard = (
     : [questionPart(live.tool, live.run.id, answers, question, note)];
 };
 
-const COMPLETE_RETRY = (runId: string): ServerPart => ({
-  type: "data-error",
-  data: { kind: "complete_retry", retry: true, runId },
-});
-
-/**
- * Completion (AC-7): score from the stored answers and complete, once more on
- * `answers_changed`, then the view report card. A second failure shows the
- * `complete_retry` card, whose button sends `data-retry`.
- */
-const completeRun = async (
-  ctx: CardContext,
-  owner: Owner,
-  live: Pick<LiveRun, "run" | "tool">,
-  attemptsLeft = 2,
-): Promise<readonly ServerPart[]> => {
-  const { deps } = ctx;
-  const runId = live.run.id;
-  const read = await deps.getRun(owner.current, runId);
-  if (!read.ok) return [{ type: "text", text: CARD_REPLIES.noActiveRun }];
-
-  const report: ServerPart = {
-    type: "data-report",
-    data: { runId, toolId: live.tool.id, toolName: live.tool.name },
-  };
-  if (read.value.run.status === "completed") return [report];
-
-  const scored = scoreRun(live.tool, read.value.answers);
-  if (!scored.ok) {
-    // A missing answer (another tab hid or cleared one): ask it instead.
-    if (scored.error.code === "incomplete") {
-      const answers = answersFromRows(live.tool, read.value.answers);
-      const next = afterSave(live.tool, answers);
-      if (next.kind === "card")
-        return [questionPart(live.tool, runId, answers, next.question)];
-    }
-    deps.log("assistant_complete_failed", { runId, reason: scored.error.code });
-    return [COMPLETE_RETRY(runId)];
-  }
-
-  const { result } = await asOwner(deps, ctx.conversationId, owner, (id) =>
-    deps.complete(
-      id,
-      runId,
-      scored.value.scores,
-      scored.value.answerCount,
-      scored.value.lastAnswerAt,
-    ),
-  );
-  if (result.ok) return [report];
-  switch (result.error.code) {
-    case "answers_changed":
-      return attemptsLeft > 1
-        ? completeRun(ctx, owner, live, attemptsLeft - 1)
-        : [COMPLETE_RETRY(runId)];
-    case "not_found":
-    case "not_in_progress":
-      return [{ type: "text", text: CARD_REPLIES.noActiveRun }];
-    default: {
-      const unreachable: never = result.error;
-      return unreachable;
-    }
-  }
-};
-
 /** A tapped answer (AC-6): validate, save, then the next card or completion. */
 const handleAnswer = async (
   ctx: CardContext,
@@ -404,7 +284,7 @@ const handleAnswer = async (
   const next = afterSave(tool, after);
   return next.kind === "card"
     ? [questionPart(tool, run.id, after, next.question)]
-    : completeRun(ctx, owner, live.value);
+    : completeRun(ctx.deps, ctx.conversationId, owner, live.value);
 };
 
 /** A prefill card response (AC-5): save the accepted items, then the edit or next card. */
@@ -448,7 +328,7 @@ const handlePrefill = async (
   const next = afterSave(tool, saved.answers);
   return next.kind === "card"
     ? [questionPart(tool, run.id, saved.answers, next.question)]
-    : completeRun(ctx, saved.owner, live.value);
+    : completeRun(ctx.deps, ctx.conversationId, saved.owner, live.value);
 };
 
 /** The `complete_retry` button (AC-7): run completion again for the active run. */
@@ -458,7 +338,7 @@ const handleRetry = async (
 ): Promise<readonly ServerPart[]> => {
   const live = liveRun(ctx, runId);
   if (!live.ok) return live.error;
-  return completeRun(ctx, ctx.owner, live.value);
+  return completeRun(ctx.deps, ctx.conversationId, ctx.owner, live.value);
 };
 
 // ---------------------------------------------------------------------------
@@ -522,6 +402,9 @@ export const handleTurn = async (
         conversationId,
         message,
         active,
+        ...(input.context?.freeMessagesLeft === undefined
+          ? {}
+          : { freeMessagesLeft: input.context.freeMessagesLeft }),
         turn,
       });
       deps.log("assistant_turn", {

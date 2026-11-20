@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   classifyMessage,
+  foldToolCalls,
   MAX_TYPED_CHARS,
+  pendingApprovals,
   toModelMessages,
   toModelView,
   type SavedMessage,
@@ -178,5 +180,98 @@ describe("toModelView (history for the model)", () => {
   it("converts to model messages", async () => {
     const messages = await toModelMessages(history);
     expect(messages.map((m) => m.role)).toEqual(["user", "assistant", "user"]);
+  });
+});
+
+describe("approvals across messages (spec 0006, approval mechanics)", () => {
+  const requested = {
+    type: "tool-startRun",
+    toolCallId: "c1",
+    state: "approval-requested",
+    input: { toolId: "stellar", shownPrice: 30 },
+    approval: { id: "ap1" },
+  };
+  const tap = (approved: boolean) => ({
+    type: "tool-approval-response" as const,
+    approvalId: "ap1",
+    approved,
+  });
+  const history = (extra: SavedMessage[] = []): SavedMessage[] => [
+    { id: "u1", role: "user", parts: [{ type: "text", text: "idea" }] },
+    { id: "a1", role: "assistant", parts: [requested] },
+    { id: "u2", role: "user", parts: [tap(true)] },
+    ...extra,
+  ];
+
+  it("folds a tap into its call and drops the tap only message", () => {
+    expect(foldToolCalls(history())).toEqual([
+      history()[0],
+      {
+        id: "a1",
+        role: "assistant",
+        parts: [
+          {
+            ...requested,
+            state: "approval-responded",
+            approval: { id: "ap1", approved: true },
+          },
+        ],
+      },
+    ]);
+  });
+
+  it("moves a later saved output into the first part of the call", () => {
+    const output = {
+      type: "tool-startRun",
+      toolCallId: "c1",
+      state: "output-available",
+      input: requested.input,
+      output: { ok: true, runId: RUN },
+    };
+    const folded = foldToolCalls(
+      history([
+        {
+          id: "a2",
+          role: "assistant",
+          parts: [output, { type: "text", text: "Let's go." }],
+        },
+      ]),
+    );
+    expect(folded.map((m) => m.id)).toEqual(["u1", "a1", "a2"]);
+    expect(folded[1]?.parts).toEqual([
+      { ...output, approval: { id: "ap1", approved: true } },
+    ]);
+    expect(folded[2]?.parts).toEqual([{ type: "text", text: "Let's go." }]);
+  });
+
+  it("converts to a model history the AI SDK can continue", async () => {
+    const model = await toModelMessages(history());
+    expect(model.at(-1)).toMatchObject({
+      role: "tool",
+      content: [
+        { type: "tool-approval-response", approvalId: "ap1", approved: true },
+      ],
+    });
+  });
+
+  it("keeps only taps that answer a call still waiting", () => {
+    expect(pendingApprovals(history(), [tap(true)])).toEqual([tap(true)]);
+    expect(
+      pendingApprovals(history(), [{ ...tap(true), approvalId: "other" }]),
+    ).toEqual([]);
+    const answered = history([
+      {
+        id: "a2",
+        role: "assistant",
+        parts: [
+          {
+            ...requested,
+            state: "output-available",
+            output: { ok: true },
+          },
+        ],
+      },
+    ]);
+    expect(pendingApprovals(answered, [tap(true)])).toEqual([]);
   });
 });

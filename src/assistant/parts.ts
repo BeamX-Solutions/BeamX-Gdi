@@ -333,15 +333,187 @@ const answerText = (
 const cut = (text: string) =>
   text.length > MAX_TYPED_CHARS ? text.slice(0, MAX_TYPED_CHARS) : text;
 
+// ---------------------------------------------------------------------------
+// Tool calls across messages (approvals)
+// ---------------------------------------------------------------------------
+
+const TERMINAL_STATES = new Set([
+  "output-available",
+  "output-error",
+  "output-denied",
+]);
+
+type ToolPart = LoosePart & {
+  readonly toolCallId: string;
+  readonly state?: unknown;
+  readonly approval?: unknown;
+};
+
+const isToolPart = (p: LoosePart): p is ToolPart =>
+  p.type.startsWith("tool-") &&
+  p.type !== "tool-approval-response" &&
+  typeof p.toolCallId === "string";
+
+const approvalIdOf = (p: ToolPart): string | null => {
+  const approval = p.approval as { id?: unknown } | undefined;
+  return typeof approval?.id === "string" ? approval.id : null;
+};
+
+/** Every approval tap in the history, by approval id (the latest tap wins). */
+const approvalResponses = (
+  messages: readonly SavedMessage[],
+): ReadonlyMap<string, ApprovalResponse> =>
+  new Map(
+    messages
+      .filter((m) => m.role === "user")
+      .flatMap((m) => looseParts(m.parts))
+      .flatMap((p) => {
+        const parsed = approvalPart.safeParse(p);
+        return parsed.success ? [[parsed.data.approvalId, parsed.data]] : [];
+      }),
+  );
+
 /**
- * The parts the model may see. Typed text (cut to 4,000 characters) and tool parts stay;
- * a card answer becomes one short text line; every other data part, and anything
- * unknown, stays out of the model's view. Pure.
+ * The history with each tool call in one place (spec 0006, "Approval mechanics"). An
+ * approval tap arrives as its own user message and the tool's output is saved in a
+ * later assistant message, so both are folded into the first part of that call: a tap
+ * turns `approval-requested` into `approval-responded`, and a later terminal state
+ * replaces the part. Later copies of the call and the tap parts are dropped, and a
+ * message left with no parts disappears. Pure.
+ */
+export const foldToolCalls = (
+  messages: readonly SavedMessage[],
+): readonly SavedMessage[] => {
+  const responses = approvalResponses(messages);
+  const terminal = new Map(
+    messages
+      .flatMap((m) => looseParts(m.parts))
+      .filter(isToolPart)
+      .filter((p) => TERMINAL_STATES.has(String(p.state)))
+      .map((p) => [p.toolCallId, p] as const),
+  );
+  const fold = (p: ToolPart): ToolPart => {
+    const id = approvalIdOf(p);
+    const response = id === null ? undefined : responses.get(id);
+    const approval =
+      p.approval === undefined
+        ? undefined
+        : {
+            ...(p.approval as object),
+            ...(response === undefined
+              ? {}
+              : {
+                  approved: response.approved,
+                  ...(response.reason === undefined
+                    ? {}
+                    : { reason: response.reason }),
+                }),
+          };
+    const done = terminal.get(p.toolCallId);
+    if (done)
+      return {
+        ...p,
+        ...done,
+        ...(approval === undefined && done.approval === undefined
+          ? {}
+          : { approval: { ...approval, ...(done.approval as object) } }),
+      };
+    if (p.state !== "approval-requested" || !response) return p;
+    return { ...p, state: "approval-responded", approval };
+  };
+
+  // Walked in order, so the first part of each call is the one kept.
+  const seen = new Set<string>();
+  return messages.flatMap((m) => {
+    if (!Array.isArray(m.parts)) return [m];
+    const parts = looseParts(m.parts).flatMap((p): LoosePart[] => {
+      if (p.type === "tool-approval-response") return [];
+      if (!isToolPart(p)) return [p];
+      if (seen.has(p.toolCallId)) return [];
+      seen.add(p.toolCallId);
+      return [fold(p)];
+    });
+    return parts.length === 0 ? [] : [{ ...m, parts }];
+  });
+};
+
+/**
+ * The approval taps in `responses` that answer a call still waiting for approval in
+ * the history (unknown or already answered ids are left out).
+ */
+export const pendingApprovals = (
+  messages: readonly SavedMessage[],
+  responses: readonly ApprovalResponse[],
+): readonly ApprovalResponse[] => {
+  const waiting = new Set(
+    messages
+      .filter((m) => m.role === "assistant")
+      .flatMap((m) => looseParts(m.parts))
+      .filter(isToolPart)
+      .flatMap((p) => {
+        if (p.state !== "approval-requested") return [];
+        const id = approvalIdOf(p);
+        return id === null ? [] : [id];
+      }),
+  );
+  const answered = new Set(
+    messages
+      .flatMap((m) => looseParts(m.parts))
+      .filter(isToolPart)
+      .filter((p) => TERMINAL_STATES.has(String(p.state)))
+      .flatMap((p) => {
+        const id = approvalIdOf(p);
+        return id === null ? [] : [id];
+      }),
+  );
+  return responses.filter(
+    (r) => waiting.has(r.approvalId) && !answered.has(r.approvalId),
+  );
+};
+
+/**
+ * The tool calls the `responses` approve or decline, by tool call id, with their tool
+ * name and input from the history. The continuation stream starts with the call's
+ * output, so the turn writes the call's input first and the saved message stands on
+ * its own (spec 0007 saves each turn's reply as a new message).
+ */
+export const respondedCalls = (
+  messages: readonly SavedMessage[],
+  responses: readonly ApprovalResponse[],
+): ReadonlyMap<
+  string,
+  { readonly toolName: string; readonly input: unknown }
+> => {
+  const ids = new Set(responses.map((r) => r.approvalId));
+  return new Map(
+    messages
+      .filter((m) => m.role === "assistant")
+      .flatMap((m) => looseParts(m.parts))
+      .filter(isToolPart)
+      .flatMap((p) => {
+        const id = approvalIdOf(p);
+        return id !== null && ids.has(id)
+          ? [
+              [
+                p.toolCallId,
+                { toolName: p.type.slice("tool-".length), input: p.input },
+              ] as const,
+            ]
+          : [];
+      }),
+  );
+};
+
+/**
+ * The parts the model may see. Typed text (cut to 4,000 characters) and tool parts stay,
+ * with approvals folded into their calls; a card answer becomes one short text line;
+ * every other data part, and anything unknown, stays out of the model's view. Pure.
  */
 export const toModelView = (
-  messages: readonly SavedMessage[],
+  saved: readonly SavedMessage[],
 ): readonly UIMessage[] => {
-  const views = shownViews(messages);
+  const views = shownViews(saved);
+  const messages = foldToolCalls(saved);
   return messages.flatMap((m): UIMessage[] => {
     if (m.role === "system") return [];
     const parts = looseParts(m.parts).flatMap((p): UIMessage["parts"] => {
@@ -353,7 +525,13 @@ export const toModelView = (
         const text = answerText(views, p.data);
         return text === null ? [] : [{ type: "text", text }];
       }
-      if (p.type.startsWith("tool-"))
+      // Reasoning goes back with its tool call: Anthropic needs the thinking that led
+      // to a tool call when the call continues after an approval.
+      if (
+        m.role === "assistant" &&
+        (isToolPart(p) ||
+          (p.type === "reasoning" && typeof p.text === "string"))
+      )
         return [p as unknown as UIMessage["parts"][number]];
       return [];
     });
