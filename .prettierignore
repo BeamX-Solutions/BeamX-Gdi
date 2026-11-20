@@ -13,3 +13,4 @@ test-results/
 fixtures/parity/**/*.json
 fixtures/parity/**/*.md
 !fixtures/parity/README.md
+evals/assistant/results/

@@ -53,6 +53,16 @@ export type QuestionView =
       readonly maxValue?: number;
     };
 
+/** Where a card sits in its run, shown above it ("Question 4 of 7"). Counts start at 1. */
+export type QuestionProgress = {
+  readonly area?: {
+    readonly index: number;
+    readonly total: number;
+    readonly name: string;
+  };
+  readonly question: { readonly index: number; readonly total: number };
+};
+
 /** A text card's length limit when the question sets none. */
 export const DEFAULT_TEXT_MAX = 200;
 

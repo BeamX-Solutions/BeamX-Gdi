@@ -16,12 +16,14 @@
     "db:check": "drizzle-kit check",
     "test": "vitest run --project unit --passWithNoTests",
     "test:integration": "vitest run --project integration",
+    "eval:assistant": "tsx --env-file-if-exists=.env evals/assistant/run.ts",
     "check:colors": "bash scripts/check-raw-colors.sh",
     "e2e": "playwright test"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.106",
     "@neondatabase/serverless": "^1.2.1",
+    "@upstash/redis": "^1.41.0",
     "ai": "^7.0.177",
     "better-auth": "^1.7.25",
     "class-variance-authority": "^0.7.1",

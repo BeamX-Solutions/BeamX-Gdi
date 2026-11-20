@@ -349,3 +349,82 @@ describe("guest link (AC-12)", () => {
     await expectBooksBalance(account);
   });
 });
+
+describe("runQuote (spec 0006)", () => {
+  it("reads the run with its active hold, owner scoped", async () => {
+    const u = await funded(100);
+    const other = await t.guest();
+    const { run } = unwrap(await startPaid(u, 30));
+    expect(unwrap(await credits.runQuote(u, run.id))).toEqual({
+      toolId: "stellar",
+      toolVersion: "1",
+      status: "in_progress",
+      conversationId: run.conversationId,
+      heldAmount: 30,
+    });
+    expect(await credits.runQuote(other, run.id)).toEqual({
+      ok: false,
+      error: { code: "not_found" },
+    });
+
+    // Abandoning releases the hold: the quote shows no hold any more.
+    unwrap(await runs.abandon(u, run.id));
+    expect(unwrap(await credits.runQuote(u, run.id))).toMatchObject({
+      status: "abandoned",
+      heldAmount: null,
+    });
+  });
+});
+
+describe("startFromWithHold (spec 0006)", () => {
+  it("copies a completed run and holds the price in one batch", async () => {
+    const u = await funded(100);
+    const run = await claimedRun(u, 30);
+    const next = unwrap(await credits.startFromWithHold(u, run.id, "1", 30));
+    expect(next.run.basedOnRunId).toBe(run.id);
+    expect(next.run.status).toBe("in_progress");
+    expect(next.hold).toMatchObject({ runId: next.run.id, amount: 30 });
+    const copied = unwrap(await runs.get(u, next.run.id)).answers;
+    expect(copied.map((a) => [a.questionId, a.value, a.source])).toEqual([
+      ["q1", "a", "client"],
+    ]);
+    expect(await credits.getSummary(u)).toMatchObject({ held: 60 });
+    await expectBooksBalance(u);
+  });
+
+  it("creates nothing when the balance is short", async () => {
+    const u = await funded(40);
+    const run = await claimedRun(u, 30);
+    expect(await credits.startFromWithHold(u, run.id, "1", 30)).toEqual({
+      ok: false,
+      error: { code: "insufficient_credits", available: 10 },
+    });
+    const r = await db.execute(sql`
+      SELECT count(*)::int AS n FROM tool_run WHERE based_on_run_id = ${run.id}::uuid
+    `);
+    expect(Number((r.rows[0] as { n: number }).n)).toBe(0);
+    await expectBooksBalance(u);
+  });
+
+  it("refuses bad starts with typed errors and holds nothing", async () => {
+    const u = await funded(100);
+    const other = await funded(100);
+    const { run } = unwrap(await startPaid(u, 30));
+    expect(await credits.startFromWithHold(u, run.id, "1", 30)).toEqual({
+      ok: false,
+      error: { code: "previous_not_completed" },
+    });
+    unwrap(await runs.saveAnswer(u, run.id, "q1", "a", "client"));
+    unwrap(await completeFromAnswers(u, run.id));
+    expect(await credits.startFromWithHold(u, run.id, "2", 30)).toEqual({
+      ok: false,
+      error: { code: "version_changed" },
+    });
+    expect(await credits.startFromWithHold(other, run.id, "1", 30)).toEqual({
+      ok: false,
+      error: { code: "not_found" },
+    });
+    expect(await credits.getSummary(u)).toMatchObject({ held: 30 });
+    await expectBooksBalance(u);
+  });
+});

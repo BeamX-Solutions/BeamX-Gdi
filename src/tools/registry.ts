@@ -18,12 +18,20 @@ export const { toolIds, getTool, getReader } = registry;
 // folder or the kit directly.
 export type {
   Answers,
+  AnswerValue,
   ModelRole,
+  QuestionProgress,
+  QuestionView,
   ReportBlock,
   ReportPhase,
   ToolModule,
+  ToolQuestion,
   ToolReader,
 } from "./_contract";
 export { modelRoles } from "./_contract";
 export type { UnknownTool, UnsupportedVersion } from "./_kit/registry";
 export { scoreRun, toAnswers, type StoredAnswer } from "./_kit/readers";
+export { parseAnswer, type AnswerError } from "./_kit/answer-schema";
+export { nextQuestion, questionProgress, visibleQuestions } from "./_kit/flow";
+export { formatAnswer } from "./_kit/format-answer";
+export { DATA_BLOCK_RULE, fenceData } from "./_kit/prompt";

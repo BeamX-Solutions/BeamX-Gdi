@@ -192,13 +192,21 @@ export const resume = async (
  * "Change my answers": a new run in the same chat prefilled with copies of a completed
  * run's answers. The old run and its report stay untouched (AC-4).
  */
-export const startFrom = async (
+/** A completed run `startFrom` may copy: its chat and its answers. */
+export type StartFromSource = {
+  readonly conversationId: string;
+  readonly answers: readonly AnswerRow[];
+};
+
+/**
+ * Reads and checks the run `startFrom` copies (completed, in a chat, same tool version).
+ * Exported so `credits.startFromWithHold` checks it the same way.
+ */
+export const startFromSource = async (
   userId: string,
   previousRunId: string,
   toolVersion: string,
-): Promise<
-  Result<{ run: RunRow; pausedRunId: string | null }, StartFromError>
-> => {
+): Promise<Result<StartFromSource, StartFromError>> => {
   const prev = await get(userId, previousRunId);
   if (!prev.ok) return err({ code: "not_found" });
   const { run: old, answers } = prev.value;
@@ -206,49 +214,72 @@ export const startFrom = async (
     return err({ code: "previous_not_completed" });
   if (old.conversationId === null) return err({ code: "no_conversation" });
   if (old.toolVersion !== toolVersion) return err({ code: "version_changed" });
+  return ok({ conversationId: old.conversationId, answers });
+};
 
-  const conversationId = old.conversationId;
+/**
+ * The write statements of `startFrom` (pause the chat's active run, insert the new run,
+ * copy the answers with their sources), in batch order. Exported so
+ * `credits.startFromWithHold` can add the hold to the same batch.
+ */
+export const startFromStatements = (
+  userId: string,
+  previousRunId: string,
+  runId: string,
+  source: StartFromSource,
+) => {
+  const copy =
+    source.answers.length === 0
+      ? db.execute(sql`SELECT 1`)
+      : db.execute(sql`
+          INSERT INTO tool_run_answer (id, run_id, question_id, value, source)
+          SELECT v.id, ${runId}::uuid, v.question_id, v.value, v.source
+          FROM (VALUES ${sql.join(
+            source.answers.map(
+              (a) =>
+                sql`(${newId()}::uuid, ${a.questionId}, ${JSON.stringify(a.value)}::jsonb, ${a.source}::answer_source)`,
+            ),
+            sql`, `,
+          )}) AS v(id, question_id, value, source)
+          WHERE EXISTS (SELECT 1 FROM tool_run WHERE id = ${runId}::uuid)
+        `);
+  return [
+    db
+      .update(toolRun)
+      .set({ status: "paused" })
+      .where(
+        and(
+          eq(toolRun.conversationId, source.conversationId),
+          eq(toolRun.userId, userId),
+          eq(toolRun.status, "in_progress"),
+        ),
+      )
+      .returning({ id: toolRun.id }),
+    db.execute(sql`
+      INSERT INTO tool_run (id, user_id, conversation_id, tool_id, tool_version, based_on_run_id)
+      SELECT ${runId}::uuid, user_id, conversation_id, tool_id, tool_version, id
+      FROM tool_run
+      WHERE id = ${previousRunId}::uuid AND user_id = ${userId}::uuid
+        AND status = 'completed' AND conversation_id IS NOT NULL
+    `),
+    copy,
+  ] as const;
+};
+
+export const startFrom = async (
+  userId: string,
+  previousRunId: string,
+  toolVersion: string,
+): Promise<
+  Result<{ run: RunRow; pausedRunId: string | null }, StartFromError>
+> => {
+  const source = await startFromSource(userId, previousRunId, toolVersion);
+  if (!source.ok) return source;
   const runId = newId();
   const outcome = await withActiveRetry(async () => {
-    const copy =
-      answers.length === 0
-        ? db.execute(sql`SELECT 1`)
-        : db.execute(sql`
-            INSERT INTO tool_run_answer (id, run_id, question_id, value, source)
-            SELECT v.id, ${runId}::uuid, v.question_id, v.value, v.source
-            FROM (VALUES ${sql.join(
-              answers.map(
-                (a) =>
-                  sql`(${newId()}::uuid, ${a.questionId}, ${JSON.stringify(a.value)}::jsonb, ${a.source}::answer_source)`,
-              ),
-              sql`, `,
-            )}) AS v(id, question_id, value, source)
-            WHERE EXISTS (SELECT 1 FROM tool_run WHERE id = ${runId}::uuid)
-          `);
     const [paused, , , created] = await db.batch([
-      db
-        .update(toolRun)
-        .set({ status: "paused" })
-        .where(
-          and(
-            eq(toolRun.conversationId, conversationId),
-            eq(toolRun.userId, userId),
-            eq(toolRun.status, "in_progress"),
-          ),
-        )
-        .returning({ id: toolRun.id }),
-      db.execute(sql`
-        INSERT INTO tool_run (id, user_id, conversation_id, tool_id, tool_version, based_on_run_id)
-        SELECT ${runId}::uuid, user_id, conversation_id, tool_id, tool_version, id
-        FROM tool_run
-        WHERE id = ${previousRunId}::uuid AND user_id = ${userId}::uuid
-          AND status = 'completed' AND conversation_id IS NOT NULL
-      `),
-      copy,
-      db
-        .select()
-        .from(toolRun)
-        .where(and(eq(toolRun.id, runId), eq(toolRun.userId, userId))),
+      ...startFromStatements(userId, previousRunId, runId, source.value),
+      selectRun(userId, runId),
     ]);
     return { run: created[0], pausedRunId: paused[0]?.id ?? null };
   });

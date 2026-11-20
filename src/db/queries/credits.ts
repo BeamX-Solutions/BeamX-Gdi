@@ -6,6 +6,8 @@ import { creditAccount, creditHold, toolRun } from "../schema";
 import {
   resumeStatements,
   selectRun,
+  startFromSource,
+  startFromStatements,
   startStatements,
   withActiveRetry,
 } from "./runs";
@@ -101,6 +103,47 @@ export const activeRunHold = async (
       ),
     );
   return rows[0] ?? null;
+};
+
+/** What the assistant's money tools read before showing a card (spec 0006). */
+export type RunQuote = {
+  readonly toolId: string;
+  readonly toolVersion: string;
+  readonly status: RunRow["status"];
+  readonly conversationId: string | null;
+  /** The run's active hold amount, or null when it has none. */
+  readonly heldAmount: number | null;
+};
+
+/**
+ * One owner scoped read of a run and its active run hold (spec 0006, `credits.runQuote`).
+ * It feeds the server written `shownPrice` and `heldAmount` of the assistant's tools.
+ */
+export const runQuote = async (
+  userId: string,
+  runId: string,
+): Promise<Result<RunQuote, { readonly code: "not_found" }>> => {
+  const rows = await db
+    .select({
+      toolId: toolRun.toolId,
+      toolVersion: toolRun.toolVersion,
+      status: toolRun.status,
+      conversationId: toolRun.conversationId,
+      heldAmount: creditHold.amount,
+    })
+    .from(toolRun)
+    .leftJoin(
+      creditHold,
+      and(
+        eq(creditHold.runId, toolRun.id),
+        eq(creditHold.userId, userId),
+        eq(creditHold.status, "active"),
+        eq(creditHold.purpose, "run"),
+      ),
+    )
+    .where(and(eq(toolRun.id, runId), eq(toolRun.userId, userId)));
+  const row = rows[0];
+  return row ? ok(row) : err({ code: "not_found" });
 };
 
 /** Hold shape: raise `held` only if the run is the user's, live, and affordable. */
@@ -239,6 +282,58 @@ export const resumeRunWithHold = async (
       ]);
       const first = paused.rows[0] as { id: string } | undefined;
       return { run: current[0], hold: hold[0], pausedRunId: first?.id ?? null };
+    });
+    if (outcome.conflict) return err({ code: "run_in_progress" });
+    const { run, hold, pausedRunId } = outcome.value;
+    if (!run || !hold) return err({ code: "not_found" });
+    return ok({ run, hold, pausedRunId });
+  } catch (e) {
+    return err(await mapHoldFailure(e, userId));
+  }
+};
+
+export type StartFromHoldError =
+  | HoldError
+  | { readonly code: "previous_not_completed" }
+  | { readonly code: "no_conversation" }
+  | { readonly code: "version_changed" };
+
+/**
+ * "Change my answers" with money (spec 0006, `credits.startFromWithHold`): a new run
+ * prefilled from a completed run, plus a hold of today's price, all or nothing. It
+ * composes `runs.startFrom` and the hold the way `startRunWithHold` does. Call
+ * `ensureAccount` first.
+ */
+export const startFromWithHold = async (
+  userId: string,
+  previousRunId: string,
+  toolVersion: string,
+  price: number,
+): Promise<
+  Result<
+    { run: RunRow; hold: HoldRow; pausedRunId: string | null },
+    StartFromHoldError
+  >
+> => {
+  const source = await startFromSource(userId, previousRunId, toolVersion);
+  if (!source.ok) return err(source.error);
+  const runId = newId();
+  const holdId = newId();
+  try {
+    const outcome = await withActiveRetry(async () => {
+      const [paused, , , , , , created, hold] = await db.batch([
+        ...startFromStatements(userId, previousRunId, runId, source.value),
+        holdForRunStatement(userId, runId, holdId, price),
+        assertRunExists(userId, runId),
+        assertHoldPlaced(holdId),
+        selectRun(userId, runId),
+        selectHold(holdId),
+      ]);
+      return {
+        run: created[0],
+        hold: hold[0],
+        pausedRunId: paused[0]?.id ?? null,
+      };
     });
     if (outcome.conflict) return err({ code: "run_in_progress" });
     const { run, hold, pausedRunId } = outcome.value;

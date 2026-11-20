@@ -109,6 +109,7 @@ export const append = async (
     ON CONFLICT (id) DO UPDATE
       SET parts = excluded.parts, metadata = excluded.metadata, updated_at = now()
       WHERE message.conversation_id = excluded.conversation_id
+        AND message.role = excluded.role
     RETURNING id
   `);
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { formatAnswer } from "./format-answer";
-import type { QuestionView } from "./types";
+import type { QuestionView } from "../_contract";
 
 const options = [
   { value: "retail", label: "Retail, 6 to 20 staff" },
