@@ -7,6 +7,13 @@ const schema = z.object({
   NEXT_PUBLIC_APP_URL: z.url(),
   // "true" turns on the /design showcase. Read at build time (Cache Components).
   ENABLE_DESIGN_PAGE: z.stringbool().default(false),
+  // Claude access for the report runner (spec 0005). Optional at boot: a report fails
+  // with a logged error when it is missing, so dev and CI run without it.
+  // An empty `ANTHROPIC_API_KEY=` line (as in .env.example) counts as unset.
+  ANTHROPIC_API_KEY: z.preprocess(
+    (v) => (v === "" ? undefined : v),
+    z.string().min(1).optional(),
+  ),
 });
 
 export type Env = z.infer<typeof schema>;
@@ -33,5 +40,6 @@ export const env: Env = skip
       BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET ?? "",
       NEXT_PUBLIC_APP_URL: appUrl ?? "",
       ENABLE_DESIGN_PAGE: process.env.ENABLE_DESIGN_PAGE === "true",
+      ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || undefined,
     } satisfies Env)
   : schema.parse({ ...process.env, NEXT_PUBLIC_APP_URL: appUrl });

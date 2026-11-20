@@ -230,3 +230,132 @@ export const listForConversation = async (
   ]);
   return owned.length === 0 ? err({ code: "not_found" }) : ok(rows);
 };
+
+/**
+ * Server only (the report runner, spec 0005). Merges one finished phase output into
+ * `report.content` under `key`, fenced by `attempt`. Bumping `updated_at` keeps a long
+ * run from looking stale. Zero rows means a newer attempt owns the report.
+ */
+export const savePhase = async (
+  runId: string,
+  attempt: number,
+  key: string,
+  output: unknown,
+): Promise<Result<void, WriteError>> => {
+  const rows = await db.execute(sql`
+    UPDATE report
+    SET content = coalesce(content, '{}'::jsonb) || jsonb_build_object(${key}::text, ${JSON.stringify(output)}::jsonb),
+        updated_at = now()
+    WHERE run_id = ${runId}::uuid AND status = 'generating' AND attempts = ${attempt}
+    RETURNING run_id
+  `);
+  return rows.rows.length > 0 ? ok(undefined) : err({ code: "stale_attempt" });
+};
+
+const statusRowSchema = z.object({
+  tool_id: z.string(),
+  tool_version: z.string(),
+  status: z.enum(["pending", "generating", "ready", "failed"]),
+  attempts: z.number().int(),
+  updated_at: z.string(),
+  error: z.unknown(),
+  phase_keys: z.array(z.string()),
+  has_hold: z.boolean(),
+  stale: z.boolean(),
+});
+
+/** The light per poll read of a report (spec 0005): never the content itself. */
+export type ReportStatus = {
+  readonly toolId: string;
+  readonly toolVersion: string;
+  readonly status: "pending" | "generating" | "ready" | "failed";
+  readonly attempts: number;
+  /** Raw timestamp string, as stored. */
+  readonly updatedAt: string;
+  readonly error: ReportError | null;
+  /** The phase keys saved in `content`, sorted. */
+  readonly phaseKeys: readonly string[];
+  /** The run still has an active credit hold. */
+  readonly hasHold: boolean;
+  /** `generating` and not updated for `STALE_AFTER_MINUTES` (judged by the DB clock). */
+  readonly stale: boolean;
+};
+
+export type StatusError = { readonly code: "not_found" };
+
+/**
+ * One statement, owner scoped through `tool_run.user_id`. `not_found` for another
+ * user's run, an unknown run, or a run with no report row yet.
+ */
+export const status = async (
+  userId: string,
+  runId: string,
+): Promise<Result<ReportStatus, StatusError>> => {
+  const rows = await db.execute(sql`
+    SELECT t.tool_id, t.tool_version, r.status, r.attempts, r.updated_at::text AS updated_at,
+      r.error,
+      CASE WHEN jsonb_typeof(r.content) = 'object'
+        THEN coalesce((SELECT jsonb_agg(k ORDER BY k) FROM jsonb_object_keys(r.content) AS k), '[]'::jsonb)
+        ELSE '[]'::jsonb END AS phase_keys,
+      ${activeHoldExists(runId)} AS has_hold,
+      (r.status = 'generating'
+        AND r.updated_at < now() - make_interval(mins => ${STALE_AFTER_MINUTES})) AS stale
+    FROM tool_run t
+    JOIN report r ON r.run_id = t.id
+    WHERE t.id = ${runId}::uuid AND t.user_id = ${userId}::uuid
+  `);
+  const first = rows.rows[0];
+  if (!first) return err({ code: "not_found" });
+  const row = statusRowSchema.parse(first);
+  const storedError =
+    row.error === null ? null : reportErrorSchema.safeParse(row.error);
+  return ok({
+    toolId: row.tool_id,
+    toolVersion: row.tool_version,
+    status: row.status,
+    attempts: row.attempts,
+    updatedAt: row.updated_at,
+    error:
+      storedError === null
+        ? null
+        : storedError.success
+          ? storedError.data
+          : FALLBACK_ERROR,
+    phaseKeys: row.phase_keys,
+    hasHold: row.has_hold,
+    stale: row.stale,
+  });
+};
+
+const STALE_TIMEOUT_ERROR: ReportError = {
+  kind: "timeout",
+  message: "The last attempt stopped responding.",
+};
+
+/**
+ * A stale `generating` report on its last attempt can never be reclaimed, so it is
+ * failed with kind `timeout` and its hold released, in one statement (spec 0005,
+ * AC-15). Changes nothing unless the run is the user's, `generating`, at
+ * `MAX_ATTEMPTS`, and stale.
+ */
+export const failStale = async (
+  userId: string,
+  runId: string,
+): Promise<{ readonly failed: boolean }> => {
+  const rows = await db.execute(sql`
+    WITH r AS (
+      UPDATE report SET status = 'failed', error = ${JSON.stringify(STALE_TIMEOUT_ERROR)}::jsonb, updated_at = now()
+      WHERE run_id = ${runId}::uuid AND status = 'generating' AND attempts >= ${MAX_ATTEMPTS}
+        AND updated_at < now() - make_interval(mins => ${STALE_AFTER_MINUTES})
+        AND EXISTS (SELECT 1 FROM tool_run WHERE id = ${runId}::uuid AND user_id = ${userId}::uuid)
+      RETURNING run_id
+    ), ${releaseRunHoldCtes(sql`SELECT run_id FROM r`, "report_failed")}
+    SELECT run_id, (SELECT count(*)::int FROM rh) AS released FROM r
+  `);
+  const hit = rows.rows[0] as { released: number } | undefined;
+  if (!hit) return { failed: false };
+  logEvent("report_failed", { runId, kind: "timeout", stale: true });
+  if (Number(hit.released) > 0)
+    logEvent("credit_hold_released", { runId, reason: "report_failed" });
+  return { failed: true };
+};

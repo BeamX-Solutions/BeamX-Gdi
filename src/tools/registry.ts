@@ -6,10 +6,24 @@
  */
 import type { ToolModule } from "./_contract";
 import { makeRegistry } from "./_kit/registry";
+import { stellar } from "./stellar";
 
-// Stellar joins this list with its port (spec 0005, build plan task 2).
-export const tools: readonly ToolModule[] = [];
+export const tools: readonly ToolModule[] = [stellar];
 
 const registry = makeRegistry(tools);
 
 export const { toolIds, getTool, getReader } = registry;
+
+// The contract types and kit helpers the assistant uses, so it never imports a tool
+// folder or the kit directly.
+export type {
+  Answers,
+  ModelRole,
+  ReportBlock,
+  ReportPhase,
+  ToolModule,
+  ToolReader,
+} from "./_contract";
+export { modelRoles } from "./_contract";
+export type { UnknownTool, UnsupportedVersion } from "./_kit/registry";
+export { scoreRun, toAnswers, type StoredAnswer } from "./_kit/readers";
