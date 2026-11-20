@@ -6,6 +6,7 @@ import { errorCopy } from "@/components/feedback/error-copy";
 import {
   adviceItems,
   errorKinds,
+  panelPayloads,
   plainBars,
   reportFixtures,
   sectionMarkdown,
@@ -17,7 +18,12 @@ import { openingMessages } from "@/components/fixtures/chat";
 import { AdviceList } from "@/components/report/advice-list";
 import { CategoryBars } from "@/components/report/category-bars";
 import { ReportSection } from "@/components/report/report-section";
+import {
+  panelView,
+  type PanelView,
+} from "@/components/report/report-panel-state";
 import { ReportSkeleton } from "@/components/report/report-skeleton";
+import { ReportStatusView } from "@/components/report/report-status-view";
 import { ScoreHeader } from "@/components/report/score-header";
 import type { Verdict } from "@/components/report/types";
 import { VerdictBadge } from "@/components/report/verdict-badge";
@@ -73,12 +79,40 @@ function DemoError({ kind }: { readonly kind: ErrorKind }) {
   );
 }
 
-/** Report parts, skeleton, and error cards on fixture data (spec 0003). */
+/** One report panel state on fixture data (spec 0005, AC-11). */
+function PanelDemo({
+  testId,
+  title,
+  view,
+  onRetry = () => undefined,
+  onStartAgain = () => undefined,
+}: {
+  readonly testId: string;
+  readonly title: string;
+  readonly view: PanelView;
+  readonly onRetry?: () => void;
+  readonly onStartAgain?: () => void;
+}) {
+  return (
+    <div
+      data-testid={testId}
+      className="h-[28rem] min-w-0 overflow-hidden rounded-xl border"
+    >
+      <ReportPanel title={title}>
+        <ReportStatusView
+          view={view}
+          onRetry={onRetry}
+          onStartAgain={onStartAgain}
+        />
+      </ReportPanel>
+    </div>
+  );
+}
+
+/** Report parts, skeleton, error cards, and the panel states on fixture data. */
 export function ReportGallery() {
   const [retries, setRetries] = useState(0);
-  const [panelState, setPanelState] = useState<"failed" | "generating">(
-    "failed",
-  );
+  const [startAgain, setStartAgain] = useState(0);
 
   return (
     <div className="flex flex-col gap-10">
@@ -177,31 +211,44 @@ export function ReportGallery() {
         </div>
       </Block>
 
-      <Block title="Failed report in the panel">
-        <div
-          data-testid="report-panel-demo"
-          className="h-96 min-w-0 overflow-hidden rounded-xl border"
-        >
-          <ReportPanel title="Idea check report">
-            {panelState === "failed" ? (
-              <ErrorCard
-                kind="ai_error"
-                title="We could not write your report"
-                message="Your answers are safe. Try again and we will pick up where we stopped."
-                action={{
-                  label: "Retry",
-                  onAction: () => {
-                    setRetries((count) => count + 1);
-                    setPanelState("generating");
-                  },
-                }}
-              />
-            ) : (
-              <ReportSkeleton steps={skeletonSteps} />
-            )}
-          </ReportPanel>
+      <Block title="Report panel states">
+        <div className="grid min-w-0 gap-6 lg:grid-cols-2">
+          <PanelDemo
+            testId="panel-generating"
+            title="Generating"
+            view={panelView({
+              kind: "loaded",
+              payload: panelPayloads.generating,
+            })}
+          />
+          <PanelDemo
+            testId="panel-failed"
+            title="Failed, can retry"
+            view={panelView({
+              kind: "loaded",
+              payload:
+                retries === 0 ? panelPayloads.failed : panelPayloads.generating,
+            })}
+            onRetry={() => setRetries((count) => count + 1)}
+          />
+          <PanelDemo
+            testId="panel-exhausted"
+            title="Failed, credits returned"
+            view={panelView({
+              kind: "loaded",
+              payload: panelPayloads.exhausted,
+            })}
+            onStartAgain={() => setStartAgain((count) => count + 1)}
+          />
+          <PanelDemo
+            testId="panel-ready"
+            title="Ready"
+            view={panelView({ kind: "loaded", payload: panelPayloads.ready })}
+          />
         </div>
-        <p className="text-sm text-muted-foreground">Retries: {retries}</p>
+        <p className="text-sm text-muted-foreground">
+          Retries: {retries} · Start again: {startAgain}
+        </p>
       </Block>
     </div>
   );

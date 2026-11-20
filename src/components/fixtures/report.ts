@@ -1,10 +1,16 @@
 import type {
   AdviceItem,
   CategoryBarItem,
+  ReportBlock,
   SkeletonStep,
   Verdict,
 } from "@/components/report/types";
 import type { ErrorKind } from "@/components/feedback/error-card";
+import {
+  reportErrorCopy,
+  type ReportErrorViewKind,
+} from "@/components/feedback/error-copy";
+import type { ReportPayload } from "@/components/report/report-payload";
 
 export type ReportFixture = {
   readonly verdict: Verdict;
@@ -104,3 +110,129 @@ export const errorKinds: readonly ErrorKind[] = [
   "limit_reached",
   "spend_cap",
 ];
+
+// ---------------------------------------------------------------------------
+// Report panel states (spec 0005, AC-11): one status payload per state
+// ---------------------------------------------------------------------------
+
+/** A ready report using every block kind. Two resource links are unsafe on purpose. */
+export const allBlocksView: readonly ReportBlock[] = [
+  {
+    kind: "score_header",
+    title: "Promising, with a few gaps",
+    score: 74,
+    max: 100,
+    verdict: "caution",
+    summary: "People want this. Test delivery and costs before you spend more.",
+  },
+  {
+    kind: "category_bars",
+    title: "Your ten checks",
+    items: [
+      { label: "Market validation", score: 10, max: 10, verdict: "good" },
+      { label: "Skills", score: 0, max: 10, verdict: "risk" },
+    ],
+  },
+  {
+    kind: "advice_list",
+    title: "Your next steps",
+    items: [
+      { title: "Sell ten loaves to neighbours this week", priority: "high" },
+      { title: "Write down what each loaf costs", priority: "medium" },
+    ],
+  },
+  {
+    kind: "text",
+    title: "Your plan",
+    paragraphs: [
+      "Start small on one street and deliver by hand.",
+      "Read [this](https://example.com) as plain text, not a link.",
+    ],
+  },
+  {
+    kind: "bullets",
+    title: "Strengths",
+    items: ["You already have buyers", "You know the area well"],
+  },
+  {
+    kind: "timeline",
+    title: "Your roadmap",
+    steps: [
+      { label: "Week 1", items: ["Bake a test batch", "Ask five neighbours"] },
+      { label: "Week 2", items: ["Take ten orders"] },
+    ],
+  },
+  {
+    kind: "resources",
+    title: "Resources",
+    items: [
+      {
+        title: "Pricing guide",
+        description: "How to price from your real costs.",
+        url: "https://example.com/pricing",
+      },
+      {
+        title: "Plain http guide",
+        description: "Shown as text: not https.",
+        url: "http://example.com/guide",
+      },
+      {
+        title: "Script link",
+        description: "Shown as text: not a web link.",
+        url: "javascript:alert(1)",
+      },
+      { title: "Ask a mentor", description: "No link at all.", url: null },
+    ],
+  },
+];
+
+const stellarPhases = [{ label: "Writing your analysis" }] as const;
+
+const threePhases = [
+  { label: "Reading your answers" },
+  { label: "Writing your advice" },
+  { label: "Putting the report together" },
+] as const;
+
+const phases = (
+  list: readonly { readonly label: string }[],
+  done: number,
+): ReportPayload["phases"] =>
+  list.map((p, index) => ({ label: p.label, done: index < done }));
+
+const reportError = (kind: ReportErrorViewKind) => ({
+  kind,
+  ...reportErrorCopy[kind],
+});
+
+export const panelPayloads = {
+  generating: {
+    status: "generating",
+    phases: phases(threePhases, 1),
+    error: null,
+    canRetry: false,
+    stale: false,
+  },
+  failed: {
+    status: "failed",
+    phases: phases(threePhases, 1),
+    error: reportError("provider_overloaded"),
+    canRetry: true,
+    stale: false,
+  },
+  exhausted: {
+    status: "failed",
+    phases: phases(stellarPhases, 0),
+    error: reportError("exhausted"),
+    canRetry: false,
+    stale: false,
+  },
+  ready: {
+    status: "ready",
+    phases: phases(stellarPhases, 1),
+    error: null,
+    canRetry: false,
+    stale: false,
+    view: [...allBlocksView],
+  },
+} as const satisfies Readonly<Record<string, ReportPayload>>;

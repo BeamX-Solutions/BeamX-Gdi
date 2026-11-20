@@ -76,3 +76,39 @@ _Steps derived from spec 0005 acceptance criteria. `/check verify` runs these; `
 ## Acceptance criteria coverage (milestone 3)
 
 - AC-7: POST claim, 202/200/404/409, concurrency, overlap · AC-10: GET payload, owner only 404 · AC-13: old version reader, `stored_data_invalid` · AC-15: stale last attempt fails and releases the hold. AC-11 (the panel) comes in milestone 4.
+
+## Milestone 4: report blocks, renderer, panel states, contract test
+
+### Commands
+
+- [ ] `pnpm typecheck`, `pnpm lint`, `pnpm check:colors` and `pnpm test` → clean → AC-1, AC-11
+- [ ] `src/tools/contract.test.ts` passes: the production registry has no violations, and the test tools (sample, three phase, and the two module `pair/` folder) plug in with one list entry each → AC-1
+- [ ] In the same test, each broken module is caught: duplicate tool id, duplicate question id, `creditPrice` 0, negative, 2.5 or NaN, duplicate phase keys, a phase key missing from `contentSchema` (and a content key no phase writes), a non object `contentSchema`, a `when` that throws on empty answers, a phase `timeoutMs` over 240000, phases needing more than 780000ms → AC-1
+- [ ] `src/components/report/report-panel-state.test.ts` passes: poll 2s then 5s after 30s; polling stops on ready, failed and stale; stale always offers Retry; `exhausted`, `no_credit_hold` and `version_changed` are final; a ready report with no view is final → AC-11, AC-13
+- [ ] `src/components/report/safe-link.test.ts` passes: only `https:` survives (`http:`, `javascript:`, `data:`, relative and junk are dropped) → AC-11 (security model)
+- [ ] `SKIP_ENV_VALIDATION=1 ENABLE_DESIGN_PAGE=true pnpm build && pnpm e2e` → all pass in the four projects, including the axe scan of the report section → AC-11
+
+### UI / manual (on `/design`, section "Report panel states")
+
+- [ ] Generating → skeleton with three steps: one Done, one In progress, one Waiting → AC-11
+- [ ] Failed, can retry → friendly "That did not work" card; press Retry → the skeleton shows and "Retries: 1" appears → AC-11
+- [ ] Failed, credits returned → "We could not make this report" and "Your credits were returned", no Retry, one "Start again" button → AC-11
+- [ ] Ready → all seven block kinds drawn (score 74/100 with "Needs work", bars, next steps, plan, strengths, roadmap, resources) → AC-11
+- [ ] In the ready report, "[this](https://example.com)" in "Your plan" is plain text; in Resources only "Pricing guide" is a link (new tab, `rel="noopener noreferrer nofollow"`), the http and script items are plain text → AC-11
+- [ ] Repeat at 360px wide and in dark theme → no sideways scroll, every state readable → AC-11
+
+### Live panel (once #7 mounts `LiveReport` for a real run)
+
+- [ ] Start a report → the panel polls `GET /api/runs/<id>/report` about every 2s, slowing to 5s after 30s, and stops once ready or failed (watch the network tab) → AC-11
+- [ ] Turn the network off while generating → the "You look offline" card with Retry, never a blank panel → AC-11
+- [ ] A ready report whose stored content no longer parses → "We could not open this report" with Start again, no Retry → AC-13
+
+### Value sourcing
+
+- [ ] `phases[].done` → the skeleton ticks exactly the phases whose keys are saved in `report.content` (fail the 3 phase test tool at phase 2: step one Done, step two In progress) → value row "GET phases[].done"
+- [ ] Poll interval → constants `POLL_FAST_MS`, `POLL_SLOW_MS`, `POLL_SLOW_AFTER_MS` in `report-panel-state.ts` → value row "panel poll interval"
+- [ ] Error message → the card text always comes from `error-copy.ts` by kind, never the stored message (store a raw message, check it is not shown) → value row "GET error message"
+
+## Acceptance criteria coverage (milestone 4)
+
+- AC-1: contract test over the registry plus broken and plugged in test tools · AC-11: four panel states, polling, Retry and Start again, renderer, safe links, axe · AC-13: `stored_data_invalid` shown as a final card with no retry

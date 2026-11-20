@@ -3,6 +3,7 @@ export type {
   AdviceItem,
   AdvicePriority,
   CategoryBarItem,
+  ReportBlock,
   Verdict,
 } from "@/tools/_contract";
 
