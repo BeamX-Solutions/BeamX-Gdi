@@ -2,7 +2,7 @@
 
 _Steps derived from spec 0006 acceptance criteria. `/check verify` runs these; `/test` locks the durable ones._
 
-Milestones 1 and 2 are built (card path and AI turn). The chat route and screen are #7, so until #7 lands, the steps run through tests and a real model harness. The UI steps below apply once `POST /api/chat` renders these parts. Stop, resume, restart, extraction and evals (milestones 3 and 4) add their steps when they land.
+Milestones 1 and 2 are built (card path and AI turn). The chat route and screen are #7, so until #7 lands, the steps run through tests and a real model harness. The UI steps below apply once `POST /api/chat` renders these parts. Milestone 3 (stop, resume, restart, known facts prefill) has its steps in the section at the end. Evals (milestone 4) add theirs when they land.
 
 ## Commands
 
@@ -48,8 +48,38 @@ Milestones 1 and 2 are built (card path and AI turn). The chat route and screen 
 - AC-6 and AC-6b covered by the Neon turn test and the progress step
 - AC-7 covered by the completion steps
 - AC-8 covered by the typed answer, side question, reopen and note steps
-- AC-9 partly: reopening a card (`showQuestion`); stop, resume and restart come in milestone 3
+- AC-9 covered by the reopen step and the milestone 3 stop, resume and restart steps
 - AC-10, AC-11, AC-12 seen in the real model steps; the pass rates are measured by the eval harness (milestone 4)
 - AC-13 covered by the cache and model role steps
 - AC-14 covered by the failure step and the mock model failure tests
-- AC-5, AC-5b, AC-15: milestones 3 and 4
+- AC-5 and AC-5b covered by the milestone 3 prefill steps
+- AC-15: milestone 4
+
+## Milestone 3: stop, resume, restart and known facts (updated 2026-11-20)
+
+### Commands
+
+- [ ] `pnpm test -- src/assistant` → the resumeRun, stopRun, restartRun and known facts tests pass on the mock model → AC-3, AC-5, AC-5b, AC-9
+- [ ] `pnpm test:integration src/db/queries/credits.int.test.ts` on a throwaway Neon branch → `runQuote` returns the run with its hold amount (null after abandon, not_found for another user); `startFromWithHold` copies answers with sources and holds the price, creates nothing when credits are short, and refuses a not completed, old version or other user's run with no hold → AC-3, AC-9
+
+### Real model or UI (once #7 renders the parts)
+
+- [ ] Pause a Stellar run that still holds its credits, then type "continue my Stellar" → no card, the run resumes and its open card shows → AC-3, AC-9 (resumeRun whether to ask)
+- [ ] Release that run's hold (idle sweep, or a direct release on a test branch), then "continue" → an approval card at Stellar's `creditPrice`; approve → a new hold of that amount, then the open card → AC-3 (resume card price)
+- [ ] Show the resume card, then put a hold back on the run before tapping Approve → the approval is turned down, the assistant calls again and the run resumes free (no second hold) → AC-3
+- [ ] "Stop" a run holding 30 credits → the card says 30 credits come back; approve → run `abandoned`, available balance up by 30, no question card → AC-9 (stop card held amount)
+- [ ] "Stop" a run with no hold → the card shows 0 to return; decline → nothing changes → AC-9
+- [ ] "Stop" a completed run → no card, the assistant says it is already finished → AC-9
+- [ ] After a completed run, "change my channels answer" → a restart card at today's price; approve → a new run with every old answer copied (same sources) and the channels card open → AC-9 (restart price, copied answers)
+- [ ] Restart a completed run after bumping the tool's `version` → a fresh run, and a "From your last run" card listing only answers that still parse and are visible; Accept → saved with their old sources → AC-5b (offered answers)
+- [ ] Type a message of 40+ characters stating two answers, then approve a start → a "From our chat" card lists just those valid, visible answers, with labels from `formatAnswer`; nothing is saved until Accept → AC-5 (prefill label)
+- [ ] Same, with a message under 40 characters → no extraction call, and the first card shows → AC-5
+- [ ] Check `ai_usage` after an extraction → one row, purpose `extraction`, `call_key` `<runId>:extraction`, model from the `helper` role → AC-5, AC-13 (extraction model id, usage)
+- [ ] Make the helper model fail or take over 8 seconds → the first card shows, plus an `assistant_extract` log with `failed` → AC-5, AC-14
+
+### Coverage
+
+- AC-3 covered by the resume card steps and the turned down approval step
+- AC-5 covered by the prefill, short text, usage and failure steps
+- AC-5b covered by the version change restart step
+- AC-9 covered by the stop, resume and restart steps
