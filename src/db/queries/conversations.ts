@@ -2,9 +2,16 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "../client";
 import { newId } from "../id";
 import { conversation, toolRun } from "../schema";
-import { clampLimit, decodeCursor, pageQuery, toPage } from "./messages";
+import {
+  clampLimit,
+  decodeCursor,
+  pageQuery,
+  toPage,
+  typedUserCountSince,
+} from "./messages";
 import { releaseRunHolds } from "./credit-holds";
 import { runsWithReports } from "./reports";
+import { activeStatements, toActive } from "./runs";
 import { err, ok, type Result } from "@/lib/result";
 
 type ConversationRow = typeof conversation.$inferSelect;
@@ -52,6 +59,46 @@ export const ownerOf = async (
     .where(eq(conversation.id, conversationId));
   const row = rows[0];
   return row ? ok(row.userId) : err({ code: "not_found" });
+};
+
+export type TurnContext = {
+  readonly active: ReturnType<typeof toActive>;
+  /** Typed user messages since the active run started; 0 with no active run. */
+  readonly typedInRun: number;
+};
+
+/**
+ * The chat route's one round trip before a turn (spec 0007, step 4), one `db.batch`:
+ * create the chat under the client's id if absent, read its owner, the active and
+ * paused runs, and the typed message count since the active run started. The insert
+ * runs first, so the owner read always finds a row: the result is the context, or
+ * `other_owner` when the id belongs to someone else (nothing is written then).
+ */
+export const turnContext = async (
+  userId: string,
+  conversationId: string,
+): Promise<Result<TurnContext, { readonly code: "other_owner" }>> => {
+  const [, owner, live, answers, typed] = await db.batch([
+    db
+      .insert(conversation)
+      .values({ id: conversationId, userId })
+      .onConflictDoNothing({ target: conversation.id }),
+    db
+      .select({ userId: conversation.userId })
+      .from(conversation)
+      .where(eq(conversation.id, conversationId)),
+    ...activeStatements(userId, conversationId),
+    typedUserCountSince(
+      userId,
+      conversationId,
+      sql`SELECT created_at FROM tool_run WHERE conversation_id = ${conversationId}::uuid AND user_id = ${userId}::uuid AND status = 'in_progress' LIMIT 1`,
+    ),
+  ]);
+  if (owner[0]?.userId !== userId) return err({ code: "other_owner" });
+  return ok({
+    active: toActive(live, answers),
+    typedInRun: Number(typed.rows[0]?.n ?? 0),
+  });
 };
 
 const encodeListCursor = (c: { lastMessageAt: string; id: string }) =>

@@ -100,10 +100,8 @@ export type TurnDeps = StepDeps & {
     Result<unknown, { readonly code: "not_found_or_not_in_progress" }>
   >;
   readonly getTool: (id: string) => Result<ToolModule, UnknownTool>;
-  /** The AI turn (build plan task 3). Returns the model's UI message stream. */
-  readonly aiTurn: (
-    context: AiTurnContext,
-  ) => Promise<ReadableStream<UIMessageChunk>>;
+  /** The AI turn (build plan task 3). Returns the model's UI message stream and usage. */
+  readonly aiTurn: (context: AiTurnContext) => Promise<AiTurnResult>;
   readonly newId: () => string;
   readonly now: () => number;
 };
@@ -125,10 +123,40 @@ export type TurnInput = {
   };
 };
 
+/**
+ * The token totals of one AI turn (spec 0007, step 6): `model` is the model that answered
+ * the last step, so a provider fallback is priced as the model that ran.
+ */
+export type ChatUsage = {
+  readonly model: string;
+  readonly inputTokens: number;
+  readonly outputTokens: number;
+  readonly cacheReadTokens: number;
+  readonly cacheWriteTokens: number;
+};
+
+export type AiTurnResult = {
+  readonly stream: ReadableStream<UIMessageChunk>;
+  /**
+   * Settles once the turn ends (finish, approval request, error, cancel) to the totals of
+   * the steps that ran, or null when no step reported usage. Never rejects.
+   */
+  readonly usage: Promise<ChatUsage | null>;
+};
+
 export type TurnOutput = {
   readonly stream: ReadableStream<UIMessageChunk>;
   /** Whether this turn counts toward paid chat (spec 0004, AC-9). */
   readonly metered: boolean;
+  /** The lock was taken by another turn: the stream is the `busy` notice, saved nowhere. */
+  readonly busy: boolean;
+  /** The AI turn's token totals; null for card and busy turns. Never rejects. */
+  readonly usage: Promise<ChatUsage | null>;
+  /**
+   * Frees the turn lock. The route calls it after saving the reply (spec 0007), so the
+   * lock covers the whole turn. Idempotent and never throws; a no op on a busy turn.
+   */
+  readonly release: () => Promise<void>;
 };
 
 export type TurnError = NotFound | InvalidMessage;
@@ -157,39 +185,16 @@ export const partsStream = (
     },
   });
 
-/** Runs `onDone` once the stream ends, fails, or is cancelled (the AI turn's lock). */
-const whenDone = (
-  stream: ReadableStream<UIMessageChunk>,
-  onDone: () => Promise<void>,
-): ReadableStream<UIMessageChunk> => {
-  const reader = stream.getReader();
-  const done = { called: false };
-  const finish = async () => {
-    if (done.called) return;
-    done.called = true;
-    await onDone();
+/** Wraps `run` so only the first call does anything, and no call ever throws. */
+export const once = (run: () => Promise<void>): (() => Promise<void>) => {
+  const state: { done: Promise<void> | null } = { done: null };
+  return () => {
+    state.done ??= run().catch(() => {});
+    return state.done;
   };
-  return new ReadableStream<UIMessageChunk>({
-    pull: async (controller) => {
-      try {
-        const next = await reader.read();
-        if (next.done) {
-          await finish();
-          controller.close();
-        } else {
-          controller.enqueue(next.value);
-        }
-      } catch (e) {
-        await finish();
-        controller.error(e);
-      }
-    },
-    cancel: async (reason) => {
-      await finish();
-      await reader.cancel(reason);
-    },
-  });
 };
+
+const NO_USAGE: Promise<ChatUsage | null> = Promise.resolve(null);
 
 const BUSY: ServerPart = {
   type: "data-error",
@@ -376,9 +381,17 @@ export const handleTurn = async (
   const token = deps.newId();
   if (!(await deps.lock.acquire(conversationId, token))) {
     deps.log("assistant_turn", { path: "busy", conversationId });
-    return ok({ stream: partsStream([BUSY], deps.newId), metered: false });
+    return ok({
+      stream: partsStream([BUSY], deps.newId),
+      metered: false,
+      busy: true,
+      usage: NO_USAGE,
+      release: async () => {},
+    });
   }
-  const release = () => deps.lock.release(conversationId, token);
+  // From here the lock is held. Every path that returns a stream hands `release` to the
+  // caller, which frees it after saving the reply; every other path frees it here.
+  const release = once(() => deps.lock.release(conversationId, token));
 
   try {
     const saved = await asOwner(
@@ -410,7 +423,7 @@ export const handleTurn = async (
         (await deps.getActive(owner.current, conversationId));
       const metered =
         turn.kind === "text" && active.active?.run.status !== "in_progress";
-      const stream = await deps.aiTurn({
+      const { stream, usage } = await deps.aiTurn({
         ownerId: owner.current,
         conversationId,
         message,
@@ -425,7 +438,7 @@ export const handleTurn = async (
         conversationId,
         ms: deps.now() - started,
       });
-      return ok({ stream: whenDone(stream, release), metered });
+      return ok({ stream, metered, busy: false, usage, release });
     }
 
     const [active, recent] = await Promise.all([
@@ -447,13 +460,20 @@ export const handleTurn = async (
         }
       }
     })();
-    await release();
     deps.log("assistant_turn", {
       path: "card",
       conversationId,
       ms: deps.now() - started,
     });
-    return ok({ stream: partsStream(parts, deps.newId), metered: false });
+    // The lock stays held until the route has saved the reply, so a repeated tap sent
+    // before then gets `busy` and can't complete a run twice (spec 0007, AC-2).
+    return ok({
+      stream: partsStream(parts, deps.newId),
+      metered: false,
+      busy: false,
+      usage: NO_USAGE,
+      release,
+    });
   } catch (e) {
     await release();
     throw e;

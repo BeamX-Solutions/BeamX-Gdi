@@ -40,6 +40,14 @@ const ALL_BUT_TEAM = [
   row("confidence", 3, 3),
 ];
 
+const AI_USAGE = {
+  model: "claude-opus-5-5",
+  inputTokens: 10,
+  outputTokens: 5,
+  cacheReadTokens: 0,
+  cacheWriteTokens: 0,
+};
+
 const fakeDeps = (over: Partial<TurnDeps> = {}) => {
   const ids = { n: 0 };
   const saved: { questionId: string; value: unknown; source: string }[] = [];
@@ -73,13 +81,15 @@ const fakeDeps = (over: Partial<TurnDeps> = {}) => {
     },
     complete: async () => ok({}),
     getTool: registry.getTool,
-    aiTurn: async () =>
-      new ReadableStream<UIMessageChunk>({
+    aiTurn: async () => ({
+      stream: new ReadableStream<UIMessageChunk>({
         start: (c) => {
           c.enqueue({ type: "text-start", id: "t" });
           c.close();
         },
       }),
+      usage: Promise.resolve(AI_USAGE),
+    }),
     newId: () => `id-${++ids.n}`,
     now: () => 0,
     log: () => {},
@@ -156,11 +166,28 @@ describe("handleTurn: entry checks (AC-1)", () => {
     });
     if (!result.ok) throw new Error("expected ok");
     expect(result.value.metered).toBe(false);
+    expect(result.value.busy).toBe(true);
+    expect(await result.value.usage).toBeNull();
     expect(dataOf(await read(result.value.stream))).toEqual([
       { type: "data-error", data: { kind: "busy", retry: false } },
     ]);
     expect(appended).toEqual([]);
     expect(aiTurn).not.toHaveBeenCalled();
+  });
+
+  it("gives a busy turn a release that frees nothing (it never took the lock)", async () => {
+    const release = vi.fn(async () => {});
+    const { deps } = fakeDeps({
+      lock: { acquire: async () => false, release },
+    });
+    const result = await handleTurn(deps, {
+      userId: USER,
+      conversationId: CONV,
+      message: typed("hi"),
+    });
+    if (!result.ok) throw new Error("expected ok");
+    await result.value.release();
+    expect(release).not.toHaveBeenCalled();
   });
 
   it("refuses a message whose id saved nothing (another role's or chat's id), with no AI call", async () => {
@@ -194,7 +221,7 @@ describe("handleTurn: entry checks (AC-1)", () => {
 });
 
 describe("handleTurn: metering (AC-1)", () => {
-  it("meters typed text with no run in progress, and releases the lock when the stream ends", async () => {
+  it("meters typed text with no run in progress, and holds the lock until release", async () => {
     const { deps, lock } = fakeDeps({ getActive: async () => NO_RUN });
     const result = await handleTurn(deps, {
       userId: USER,
@@ -203,9 +230,32 @@ describe("handleTurn: metering (AC-1)", () => {
     });
     if (!result.ok) throw new Error("expected ok");
     expect(result.value.metered).toBe(true);
-    expect(lock.release).not.toHaveBeenCalled();
+    expect(result.value.busy).toBe(false);
+    expect(await result.value.usage).toEqual(AI_USAGE);
+    // The stream ending frees nothing: the route saves the reply first (spec 0007).
     await read(result.value.stream);
+    expect(lock.release).not.toHaveBeenCalled();
+    await result.value.release();
+    await result.value.release();
     expect(lock.release).toHaveBeenCalledTimes(1);
+  });
+
+  it("gives release that never throws, even when the lock release fails", async () => {
+    const { deps } = fakeDeps({
+      lock: {
+        acquire: async () => true,
+        release: async () => {
+          throw new Error("redis down");
+        },
+      },
+    });
+    const result = await handleTurn(deps, {
+      userId: USER,
+      conversationId: CONV,
+      message: typed("hi"),
+    });
+    if (!result.ok) throw new Error("expected ok");
+    await expect(result.value.release()).resolves.toBeUndefined();
   });
 
   it("does not meter typed text during a run, approvals, or card taps", async () => {
@@ -281,6 +331,10 @@ describe("handleTurn: card path (AC-6, AC-7)", () => {
       },
     });
     expect(aiTurn).not.toHaveBeenCalled();
+    expect(await result.value.usage).toBeNull();
+    // A card turn holds the lock until the route has saved its reply (spec 0007, AC-2).
+    expect(lock.release).not.toHaveBeenCalled();
+    await result.value.release();
     expect(lock.release).toHaveBeenCalledTimes(1);
   });
 

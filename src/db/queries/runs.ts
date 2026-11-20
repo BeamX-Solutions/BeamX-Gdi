@@ -454,8 +454,12 @@ export const ownerOf = async (
 };
 
 /** The chat's active run with its answers (or null), plus its paused runs. */
-export const getActive = async (userId: string, conversationId: string) => {
-  const [live, answers] = await db.batch([
+/**
+ * The two selects of `getActive` (the chat's live runs, the active run's answers), so
+ * `conversations.turnContext` can add them to its own batch. Pair with `toActive`.
+ */
+export const activeStatements = (userId: string, conversationId: string) =>
+  [
     db
       .select()
       .from(toolRun)
@@ -480,7 +484,13 @@ export const getActive = async (userId: string, conversationId: string) => {
         ),
       )
       .orderBy(asc(toolRunAnswer.createdAt), asc(toolRunAnswer.id)),
-  ]);
+  ] as const;
+
+/** The active run with its answers, plus the paused runs, from `activeStatements` rows. */
+export const toActive = (
+  live: readonly RunRow[],
+  answers: readonly { readonly answer: AnswerRow }[],
+) => {
   const active = live.find((r) => r.status === "in_progress");
   return {
     active: active
@@ -488,4 +498,11 @@ export const getActive = async (userId: string, conversationId: string) => {
       : null,
     paused: live.filter((r) => r.status === "paused"),
   };
+};
+
+export const getActive = async (userId: string, conversationId: string) => {
+  const [live, answers] = await db.batch(
+    activeStatements(userId, conversationId),
+  );
+  return toActive(live, answers);
 };

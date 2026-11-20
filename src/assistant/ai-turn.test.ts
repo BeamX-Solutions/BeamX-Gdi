@@ -14,6 +14,7 @@ import {
   AI_REPLIES,
   createAiTurn,
   INSTRUCTIONS_MESSAGE,
+  sumUsage,
   type AiTurnDeps,
 } from "./ai-turn";
 import type { RunQuote, StartFromHoldError } from "@/db/queries/credits";
@@ -21,7 +22,7 @@ import type { UsageInput } from "@/db/queries/usage";
 import type { OldAnswer } from "./ai-turn";
 import type { SavedMessage } from "./parts";
 import { startRunDescription, startRunInput } from "./tools/start-run";
-import type { ActiveRead, AiTurnContext } from "./turn";
+import type { ActiveRead, AiTurnContext, AiTurnResult } from "./turn";
 
 // Spec 0006, AC-2, AC-3, AC-8, AC-13, AC-14: the AI turn on the AI SDK mock model, with
 // fake queries. No network, no database.
@@ -310,9 +311,9 @@ const approvalTurn = (
   };
 };
 
-const read = async (stream: ReadableStream<UIMessageChunk>) => {
+const read = async (input: ReadableStream<UIMessageChunk> | AiTurnResult) => {
   const chunks: UIMessageChunk[] = [];
-  const reader = stream.getReader();
+  const reader = ("stream" in input ? input.stream : input).getReader();
   for (;;) {
     const next = await reader.read();
     if (next.done) return chunks;
@@ -1479,5 +1480,70 @@ describe("known facts extraction (AC-5)", () => {
       event: "assistant_extract",
       fields: expect.objectContaining({ failed: true }),
     });
+  });
+});
+
+describe("sumUsage (spec 0007, step 6)", () => {
+  const step = (
+    modelId: string,
+    usage: {
+      inputTokens?: number;
+      outputTokens?: number;
+      inputTokenDetails?: {
+        cacheReadTokens?: number;
+        cacheWriteTokens?: number;
+      };
+    },
+  ) => ({ usage, response: { modelId } });
+
+  it("is null when no step ran", () => {
+    expect(sumUsage([])).toBeNull();
+  });
+
+  it("adds every step, counts a missing number as 0, and names the last step's model", () => {
+    expect(
+      sumUsage([
+        step("claude-opus-5-5", {
+          inputTokens: 100,
+          outputTokens: 10,
+          inputTokenDetails: { cacheReadTokens: 80 },
+        }),
+        step("fallback-model", {
+          inputTokens: 50,
+          inputTokenDetails: { cacheWriteTokens: 5 },
+        }),
+      ]),
+    ).toEqual({
+      model: "fallback-model",
+      inputTokens: 150,
+      outputTokens: 10,
+      cacheReadTokens: 80,
+      cacheWriteTokens: 5,
+    });
+  });
+});
+
+describe("createAiTurn: usage", () => {
+  it("settles to the turn's totals once the stream ends", async () => {
+    const world = makeWorld();
+    const { model } = scriptedModel([{ text: "Hi there." }]);
+    const turn = await createAiTurn(fakeDeps(world, model))(
+      textTurn(world, "m1", "hello"),
+    );
+    await read(turn);
+    expect(await turn.usage).toMatchObject({
+      inputTokens: 10,
+      outputTokens: 5,
+    });
+  });
+
+  it("settles to null when the chat can't be opened (no model call)", async () => {
+    const world = makeWorld();
+    const { model } = scriptedModel([]);
+    const turn = await createAiTurn({
+      ...fakeDeps(world, model),
+      openChat: async () => err({ code: "not_found" }),
+    })(textTurn(world, "m1", "hello"));
+    expect(await turn.usage).toBeNull();
   });
 });

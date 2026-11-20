@@ -1,4 +1,4 @@
-import { and, desc, eq, lt, sql } from "drizzle-orm";
+import { and, desc, eq, lt, sql, type SQL } from "drizzle-orm";
 import { db } from "../client";
 import { conversation, message } from "../schema";
 import { err, ok, type Result } from "@/lib/result";
@@ -146,3 +146,24 @@ export const listRecent = async (
   if (owned.length === 0) return err({ code: "not_found" });
   return ok(toPage(rows, size));
 };
+
+/**
+ * Statement builder: how many of the owner's user messages in the chat carry a typed
+ * `text` part and were written after `since` (spec 0007, AC-8). Card and approval taps
+ * have no text part, so they never count. `since` is a SQL expression, so a caller can
+ * pass a subquery (the active run's `created_at`); a null `since` counts nothing.
+ */
+export const typedUserCountSince = (
+  userId: string,
+  conversationId: string,
+  since: SQL,
+) =>
+  db.execute<{ n: number }>(sql`
+    SELECT count(*)::int AS n
+    FROM message m
+    JOIN conversation c ON c.id = m.conversation_id AND c.user_id = ${userId}::uuid
+    WHERE m.conversation_id = ${conversationId}::uuid
+      AND m.role = 'user'
+      AND m.parts @> '[{"type":"text"}]'::jsonb
+      AND m.created_at > (${since})
+  `);

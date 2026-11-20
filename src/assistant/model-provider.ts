@@ -3,7 +3,8 @@
  */
 import { createAnthropic } from "@ai-sdk/anthropic";
 import type { LanguageModel } from "ai";
-import { env } from "@/lib/env";
+import { env, fakeAiEnabled } from "@/lib/env";
+import { fakeModel } from "@/lib/fake-model";
 import { modelConfigs, type AssistantRole, type Effort } from "./models";
 
 /** What a call needs to use a role: the model, its id for records, and its options. */
@@ -19,9 +20,13 @@ const anthropic = createAnthropic({ apiKey: env.ANTHROPIC_API_KEY });
 
 export const resolveModel = (role: AssistantRole): ResolvedModel => {
   const config = modelConfigs[role];
+  // E2E only (spec 0007): scripted models, never on a production deploy.
+  const fake = fakeAiEnabled()
+    ? fakeModel(role === "chat" || role === "helper" ? role : "report")
+    : null;
   return {
     id: config.id,
-    model: anthropic(config.id),
+    model: fake ?? anthropic(config.id),
     providerOptions: { anthropic: { effort: config.effort } },
   };
 };
