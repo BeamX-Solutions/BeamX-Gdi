@@ -58,7 +58,10 @@ const answerValue = z.union([
 
 export type SaveAnswerOutput =
   | { readonly ok: true; readonly next: string | null }
-  | { readonly ok: false; readonly error: RunError | "not_visible" }
+  | {
+      readonly ok: false;
+      readonly error: RunError | "not_visible" | "run_just_started";
+    }
   | {
       readonly ok: false;
       readonly error: "invalid_answer";
@@ -86,6 +89,11 @@ export const saveAnswerTool = (env: ToolEnv) =>
         });
         return output;
       };
+      // A run started this turn has no card the client has seen yet, so the message
+      // can't be a direct reply to one. Facts from earlier chat go on the prefill card
+      // after the stream, saved only once the client accepts them (AC-5).
+      if (env.recorded().some((e) => e.kind === "started" && e.runId === runId))
+        return done({ ok: false, error: "run_just_started" });
       const run = await liveRun(env, runId);
       if (!run.ok) return done({ ok: false, error: run.error });
       const { live } = run;

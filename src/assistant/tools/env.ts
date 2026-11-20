@@ -114,4 +114,6 @@ export type ToolEnv = {
   readonly conversationId: string;
   readonly owner: OwnerBox;
   readonly record: (event: ToolEvent) => void;
+  /** What the tools did so far this turn, oldest first. */
+  readonly recorded: () => readonly ToolEvent[];
 };

@@ -1208,6 +1208,77 @@ describe("restartRun (AC-5b, AC-9)", () => {
     ]);
   });
 
+  it("a saveAnswer in the turn a version change restart starts saves nothing, and the old answers are offered", async () => {
+    // covers: AC-5b
+    const world = makeWorld({
+      quotes: { [OLD]: quote({ status: "completed", toolVersion: "1" }) },
+      startFromError: { code: "version_changed" },
+      oldAnswers: [{ questionId: "stage", value: "idea", source: "client" }],
+    });
+    const { chunks, calls } = await proposeAndTap(
+      world,
+      [restart],
+      [
+        {
+          calls: [
+            {
+              toolName: "saveAnswer",
+              input: { runId: RUN, questionId: "stage", value: "growing" },
+            },
+          ],
+        },
+        { text: "Check these." },
+      ],
+    );
+    expect(world.saved).toEqual([]);
+    expect(seen(calls)).toContain("run_just_started");
+    expect(dataOf(chunks)).toEqual([
+      expect.objectContaining({
+        type: "data-prefill",
+        data: expect.objectContaining({
+          title: "From your last run",
+          items: [
+            expect.objectContaining({ questionId: "stage", value: "idea" }),
+          ],
+        }),
+      }),
+    ]);
+  });
+
+  it("a saveAnswer in the turn a copy restart starts saves nothing, and the asked card opens", async () => {
+    // covers: AC-9 (the changed answer goes through the reopened card)
+    const world = makeWorld({
+      quotes: { [OLD]: quote({ status: "completed" }) },
+    });
+    const { chunks, calls } = await proposeAndTap(
+      world,
+      [restart],
+      [
+        {
+          calls: [
+            {
+              toolName: "saveAnswer",
+              input: { runId: RUN, questionId: "channels", value: ["online"] },
+            },
+            {
+              toolName: "showQuestion",
+              input: { runId: RUN, questionId: "channels" },
+            },
+          ],
+        },
+        { text: "Change it here." },
+      ],
+    );
+    expect(world.saved).toEqual([]);
+    expect(seen(calls)).toContain("run_just_started");
+    expect(dataOf(chunks)).toEqual([
+      expect.objectContaining({
+        type: "data-question",
+        data: expect.objectContaining({ questionId: "channels" }),
+      }),
+    ]);
+  });
+
   it("an unknown previous run shows no card and is not found", async () => {
     const world = makeWorld();
     const { chunks, calls } = await proposeAndTap(
@@ -1284,6 +1355,7 @@ describe("known facts extraction (AC-5)", () => {
     world: World,
     text: string,
     helper: ReturnType<typeof helperReplying>,
+    after: readonly Reply[] = [{ text: "Started." }],
   ) => {
     const first = scriptedModel([
       { calls: [{ toolName: "startRun", input: { toolId: "sample" } }] },
@@ -1294,7 +1366,7 @@ describe("known facts extraction (AC-5)", () => {
       ),
     );
     world.history.push(await asMessage("a1", proposed));
-    const second = scriptedModel([{ text: "Started." }]);
+    const second = scriptedModel(after);
     return read(
       await createAiTurn(
         fakeDeps(world, second.model, { helperModel: helper.helperModel }),
@@ -1348,6 +1420,39 @@ describe("known facts extraction (AC-5)", () => {
     ]);
     // Client text goes in the fenced data block.
     expect(helper.prompts[0]).toContain("<client_data>");
+  });
+
+  it("a saveAnswer in the turn the run starts saves nothing, and the prefill card shows", async () => {
+    // covers: AC-5 (nothing from the chat is saved without the client's confirmation)
+    const world = makeWorld();
+    const helper = helperReplying(
+      JSON.stringify({ answers: [{ questionId: "stage", value: "idea" }] }),
+    );
+    const chunks = await startAndApprove(world, LONG, helper, [
+      {
+        calls: [
+          {
+            toolName: "saveAnswer",
+            input: { runId: RUN, questionId: "stage", value: "idea" },
+          },
+        ],
+      },
+      { text: "Started." },
+    ]);
+    // Facts from earlier chat are saved only after the client confirms them.
+    expect(world.saved).toEqual([]);
+    expect(dataOf(chunks)).toEqual([
+      expect.objectContaining({
+        type: "data-prefill",
+        data: expect.objectContaining({
+          items: [expect.objectContaining({ questionId: "stage" })],
+        }),
+      }),
+    ]);
+    expect(world.logs).toContainEqual({
+      event: "assistant_tool",
+      fields: { name: "saveAnswer", outcome: "run_just_started" },
+    });
   });
 
   it("skips the call for short client text and shows the first card", async () => {

@@ -456,6 +456,7 @@ export const createAiTurn =
       record: (event: ToolEvent) => {
         events.push(event);
       },
+      recorded: (): readonly ToolEvent[] => events,
     };
     const model = deps.model();
     // The note as of the last tool event. An approved call runs before the first step
