@@ -16,7 +16,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 3 | Data model | Foundation | done |
 | 4 | Design system & UI foundation | Foundation | done |
 | 20 | Tool source access & parity fixtures | Foundation | in-progress |
-| 5 | Tool module contract & registry | Foundation | planned |
+| 5 | Tool module contract & registry | Foundation | in-progress |
 | 6 | Assistant brain | Foundation | planned |
 | 7 | Validate an idea in chat (Stellar) | Slice 1 | planned |
 | 22 | Credits & billing | Slice 1 | in-progress |
@@ -81,10 +81,17 @@ Fixtures are captured (PR #5; Luna has no scoring, so it carries its question se
 code in `fixtures/parity`, `scripts/parity`
 - [x] Gather access and capture fixtures: `/develop tool source access & parity fixtures`
 
-### 5. Tool module contract & registry · needs a decision
+### 5. Tool module contract & registry · in-progress
 The tools are rebuilt inside the workspace, ported from their source (spec 0001). This is the one typed contract every tool implements (its questions, a pure scoring function, its report prompt, its report view, its credit price) and the registry the assistant reaches tools through, so a new tool is added by adding one folder. The contract has to fit three real shapes found in the sources: fixed scoring plus one AI call (Stellar), one scoring engine with two report styles (Beacon and Beacon Pro), and a plan written by AI in phases with no scoring (Luna).
 **Done when:** a sample tool plugs in by adding one folder and one registry line, its scoring is tested against fixtures, and a failed report step shows a clear, retryable error.
-- [ ] Design it (spec): `/architect tool module contract & registry`
+spec [0005](../specs/0005-tool-module-contract/index.md) · code in `src/tools`, `src/assistant`, `src/db/queries/reports.ts`, `src/components/report`
+- [x] Design it (spec): `/architect tool module contract & registry`
+- [ ] Build it: `/develop tool module contract & registry`
+  - [ ] Contract, kit, registry and the Stellar pure port with parity tests (AC-2, AC-3, AC-4, AC-5, AC-6, AC-14, AC-16)
+  - [ ] AI SDK 7, models, cost and spend cap hook, report queries, and the runner with a mock model (AC-8, AC-9, AC-10, AC-12, AC-15)
+  - [ ] Report routes with after() and polling status, version and stale handling (AC-7, AC-10, AC-13, AC-15)
+  - [ ] Report blocks, renderer, panel states on /design, and the contract test over the registry (AC-1, AC-11, AC-13)
+- [ ] Verify it: `/check verify tool module contract & registry`
 
 ### 6. Assistant brain · needs a decision
 How the assistant understands what the client wants, picks the right tool, asks the questions as answer cards, skips anything it already knows, and stays on BeamX topics.
