@@ -16,8 +16,14 @@ import {
   type SystemModelMessage,
   type UIMessageChunk,
 } from "ai";
+import type { UsageInput } from "@/db/queries/usage";
 import type { Result } from "@/lib/result";
-import type { ToolModule } from "@/tools/registry";
+import {
+  formatAnswer,
+  visibleQuestions,
+  type AnswerValue,
+  type ToolModule,
+} from "@/tools/registry";
 import {
   afterSave,
   answersFromRows,
@@ -31,12 +37,14 @@ import {
   type StepDeps,
   type TurnRun,
 } from "./card-steps";
+import { extractKnownFacts, usableFacts } from "./extract";
 import { INSTRUCTIONS } from "./instructions";
 import type { ResolvedModel } from "./model-provider";
 import {
   pendingApprovals,
   respondedCalls,
   toModelMessages,
+  type AnswerSource,
   type SavedMessage,
   type ServerPart,
 } from "./parts";
@@ -78,9 +86,30 @@ export type AiTurnDeps = StepDeps &
       >
     >;
     readonly model: () => ResolvedModel;
+    /** The `helper` role, for known facts extraction (AC-5). */
+    readonly helperModel: () => ResolvedModel;
+    readonly recordUsage: (input: UsageInput) => Promise<unknown>;
+    /** A run's saved answers with their sources (the version change offer, AC-5b). */
+    readonly oldAnswers: (
+      ownerId: string,
+      runId: string,
+    ) => Promise<Result<readonly OldAnswer[], NotFound>>;
     readonly newId: () => string;
     readonly now: () => number;
   };
+
+/** A saved answer of an earlier run, offered again after a version change (AC-5b). */
+export type OldAnswer = {
+  readonly questionId: string;
+  readonly value: unknown;
+  readonly source: AnswerSource;
+};
+
+/** The prefill card titles (AC-5, AC-5b). */
+export const PREFILL_TITLES = {
+  chat: "From our chat",
+  lastRun: "From your last run",
+} as const;
 
 export const AI_REPLIES = {
   approvalExpired:
@@ -168,11 +197,121 @@ const lastOf = <K extends ToolEvent["kind"]>(
     .filter((e): e is Extract<ToolEvent, { kind: K }> => e.kind === kind)
     .at(-1);
 
+/** The prefill card for these items, or null when none has a known question. */
+const prefillPart = (
+  tool: ToolModule,
+  runId: string,
+  title: string,
+  items: readonly {
+    readonly questionId: string;
+    readonly value: AnswerValue;
+    readonly source?: AnswerSource;
+  }[],
+): ServerPart | null => {
+  const shown = items.flatMap((item) => {
+    const question = tool.questions.find((q) => q.id === item.questionId);
+    return question
+      ? [
+          {
+            questionId: item.questionId,
+            prompt: question.prompt,
+            value: item.value,
+            label: formatAnswer(question, item.value),
+            ...(item.source === undefined ? {} : { source: item.source }),
+          },
+        ]
+      : [];
+  });
+  return shown.length === 0
+    ? null
+    : { type: "data-prefill", data: { runId, title, items: shown } };
+};
+
+/**
+ * The card after a run started this turn: known facts from the chat on the prefill card
+ * (a new run, AC-5), the old run's answers on it (a restart after a version change,
+ * AC-5b), or, for a restart with copied answers, the card the client asked to change.
+ * With nothing to offer, the first open card.
+ */
+const startedParts = async (
+  deps: AiTurnDeps,
+  turn: {
+    readonly conversationId: string;
+    readonly owner: OwnerBox;
+    readonly history: readonly SavedMessage[];
+  },
+  live: Live,
+  started: Extract<ToolEvent, { kind: "started" }>,
+  shown: Extract<ToolEvent, { kind: "show" }> | undefined,
+): Promise<readonly ServerPart[]> => {
+  const { run, tool, answers } = live;
+  const firstCard = (): readonly ServerPart[] => {
+    const first = openQuestion(tool, answers, null);
+    return first === null ? [] : [questionPart(tool, run.id, answers, first)];
+  };
+  switch (started.from.kind) {
+    case "new": {
+      const facts = await extractKnownFacts(
+        {
+          model: deps.helperModel,
+          recordUsage: deps.recordUsage,
+          log: deps.log,
+          now: deps.now,
+        },
+        {
+          tool,
+          history: turn.history,
+          answers,
+          ownerId: turn.owner.current,
+          conversationId: turn.conversationId,
+          runId: run.id,
+        },
+      );
+      const card = prefillPart(tool, run.id, PREFILL_TITLES.chat, facts);
+      return card === null ? firstCard() : [card];
+    }
+    case "offer": {
+      const old = await deps
+        .oldAnswers(turn.owner.current, started.from.previousRunId)
+        .catch(() => null);
+      const rows = old?.ok ? old.value : [];
+      const sourceOf = new Map(rows.map((r) => [r.questionId, r.source]));
+      const facts = usableFacts(tool, answers, rows).map((f) => ({
+        ...f,
+        source: sourceOf.get(f.questionId) ?? "chat",
+      }));
+      const card = prefillPart(tool, run.id, PREFILL_TITLES.lastRun, facts);
+      return card === null ? firstCard() : [card];
+    }
+    case "copy": {
+      // The client restarted to change an answer: open that card if the model named it.
+      const asked =
+        shown?.runId === run.id
+          ? visibleQuestions(tool, answers).find(
+              (q) => q.id === shown.questionId,
+            )
+          : undefined;
+      // Every answer was copied, so there may be no open card: start from the first.
+      const question =
+        asked ??
+        openQuestion(tool, answers, null) ??
+        visibleQuestions(tool, answers)[0];
+      return question === undefined
+        ? []
+        : [questionPart(tool, run.id, answers, question)];
+    }
+    default: {
+      const unreachable: never = started.from;
+      return unreachable;
+    }
+  }
+};
+
 /**
  * The card the turn ends with (spec 0006, "AI turn", AC-8), in this order: a run started
- * this turn shows its first card (extraction joins in build plan task 5); a typed answer
- * that finished the run completes it; otherwise, unless an approval is pending, the
- * reopened card, the next card after a typed answer, or the open card again.
+ * this turn shows its prefill or first card; a typed answer that finished the run
+ * completes it; otherwise, unless an approval is pending, the reopened card, the next
+ * card after a typed answer, or the open card again (also after a resume).
  */
 export const partsAfterStream = async (
   deps: AiTurnDeps,
@@ -196,10 +335,8 @@ export const partsAfterStream = async (
   if (live === null) return [];
   const { run, tool, answers } = live;
 
-  if (started?.runId === run.id) {
-    const first = openQuestion(tool, answers, null);
-    return first === null ? [] : [questionPart(tool, run.id, answers, first)];
-  }
+  if (started?.runId === run.id)
+    return startedParts(deps, turn, live, started, shown);
   if (saved?.complete && saved.runId === run.id)
     return completeRun(deps, turn.conversationId, turn.owner, { run, tool });
   if (turn.approvalPending) return [];
@@ -333,7 +470,7 @@ export const createAiTurn =
       tools: assistantTools(env),
       toolOrder: [...TOOL_ORDER],
       toolApproval: TOOL_APPROVAL,
-      experimental_refineToolInput: toolInputRefinement(deps),
+      experimental_refineToolInput: toolInputRefinement(env),
       prepareStep: async ({ messages: stepMessages }) => ({
         messages: withNote(stepMessages, await currentNote()),
       }),

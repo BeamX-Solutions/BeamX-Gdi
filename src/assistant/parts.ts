@@ -110,6 +110,8 @@ export const prefillData = z.object({
         prompt: z.string(),
         value: answerValue,
         label: z.string(),
+        /** Kept when accepted (AC-5b, "From your last run"); `chat` when absent. */
+        source: z.enum(["client", "chat", "profile", "file"]).optional(),
       }),
     )
     .readonly(),
@@ -150,6 +152,8 @@ export const retryData = z.object({
 export type QuestionData = z.infer<typeof questionData>;
 export type AnswerData = z.infer<typeof answerData>;
 export type PrefillData = z.infer<typeof prefillData>;
+/** Where a saved answer came from (`tool_run_answer.source`). */
+export type AnswerSource = "client" | "chat" | "profile" | "file";
 export type PrefillResponseData = z.infer<typeof prefillResponseData>;
 export type ReportData = z.infer<typeof reportData>;
 export type ErrorData = z.infer<typeof errorData>;
@@ -332,6 +336,23 @@ const answerText = (
 
 const cut = (text: string) =>
   text.length > MAX_TYPED_CHARS ? text.slice(0, MAX_TYPED_CHARS) : text;
+
+/**
+ * The client's typed text in these messages, oldest first, each cut to 4,000 characters
+ * (known facts extraction, spec 0006 AC-5). Card answers and every other part are left
+ * out. Pure.
+ */
+export const clientTexts = (
+  messages: readonly SavedMessage[],
+): readonly string[] =>
+  messages
+    .filter((m) => m.role === "user")
+    .flatMap((m) => looseParts(m.parts))
+    .flatMap((p) =>
+      p.type === "text" && typeof p.text === "string" && p.text.trim() !== ""
+        ? [cut(p.text)]
+        : [],
+    );
 
 // ---------------------------------------------------------------------------
 // Tool calls across messages (approvals)

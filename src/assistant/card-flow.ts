@@ -18,6 +18,7 @@ import {
   prefillData,
   questionData,
   type AnswerData,
+  type AnswerSource,
   type PrefillData,
   type PrefillResponseData,
   type SavedMessage,
@@ -250,6 +251,8 @@ export type PrefillDecision = {
   readonly saves: readonly {
     readonly questionId: string;
     readonly value: AnswerValue;
+    /** The item's own source (AC-5b), else `chat`. */
+    readonly source: AnswerSource;
   }[];
   /** The question whose card the client asked to edit, if it is visible after saving. */
   readonly edit: string | null;
@@ -272,7 +275,13 @@ export const decidePrefill = (
     if (answers[item.questionId] !== undefined) return [];
     const parsed = parseAnswer(tool, item.questionId, item.value);
     return parsed.ok
-      ? [{ questionId: item.questionId, value: parsed.value }]
+      ? [
+          {
+            questionId: item.questionId,
+            value: parsed.value,
+            source: item.source ?? "chat",
+          },
+        ]
       : [];
   });
   const merged: Answers = {

@@ -34,6 +34,7 @@ import {
 } from "./card-steps";
 import {
   classifyMessage,
+  type AnswerSource,
   type AnswerData,
   type ApprovalResponse,
   type InvalidMessage,
@@ -94,7 +95,7 @@ export type TurnDeps = StepDeps & {
     runId: string,
     questionId: string,
     value: unknown,
-    source: "client" | "chat",
+    source: AnswerSource,
   ) => Promise<
     Result<unknown, { readonly code: "not_found_or_not_in_progress" }>
   >;
@@ -313,7 +314,13 @@ const handlePrefill = async (
       ctx.conversationId,
       saved.owner,
       (id) =>
-        ctx.deps.saveAnswer(id, run.id, item.questionId, item.value, "chat"),
+        ctx.deps.saveAnswer(
+          id,
+          run.id,
+          item.questionId,
+          item.value,
+          item.source,
+        ),
     );
     if (!result.ok) return [{ type: "text", text: CARD_REPLIES.noActiveRun }];
     saved.owner = owner;

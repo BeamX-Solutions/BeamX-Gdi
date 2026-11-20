@@ -6,6 +6,7 @@ import * as conversations from "@/db/queries/conversations";
 import * as credits from "@/db/queries/credits";
 import * as messages from "@/db/queries/messages";
 import * as runs from "@/db/queries/runs";
+import * as usage from "@/db/queries/usage";
 import { newId } from "@/db/id";
 import { logEvent } from "@/lib/log";
 import { turnLock } from "@/lib/turn-lock";
@@ -86,6 +87,39 @@ const aiTurnDeps: AiTurnDeps = {
       price,
     );
     return started.ok ? ok({ runId: started.value.run.id }) : started;
+  },
+  runQuote: credits.runQuote,
+  resumeRun: async (ownerId, runId) => {
+    const resumed = await runs.resume(ownerId, runId);
+    return resumed.ok ? ok({ runId: resumed.value.run.id }) : resumed;
+  },
+  resumeRunWithHold: async (ownerId, runId, price) => {
+    const resumed = await credits.resumeRunWithHold(ownerId, runId, price);
+    return resumed.ok ? ok({ runId: resumed.value.run.id }) : resumed;
+  },
+  startFromWithHold: async (ownerId, previousRunId, version, price) => {
+    const started = await credits.startFromWithHold(
+      ownerId,
+      previousRunId,
+      version,
+      price,
+    );
+    return started.ok ? ok({ runId: started.value.run.id }) : started;
+  },
+  abandonRun: runs.abandon,
+  helperModel: () => resolveModel("helper"),
+  recordUsage: usage.record,
+  oldAnswers: async (ownerId, runId) => {
+    const read = await runs.get(ownerId, runId);
+    return read.ok
+      ? ok(
+          read.value.answers.map((a) => ({
+            questionId: a.questionId,
+            value: a.value,
+            source: a.source,
+          })),
+        )
+      : read;
   },
 };
 

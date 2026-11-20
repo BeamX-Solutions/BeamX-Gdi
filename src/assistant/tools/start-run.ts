@@ -7,10 +7,11 @@
 import { tool } from "ai";
 import { z } from "zod";
 import { billingConfig } from "@/billing/config";
-import { priceStillValid, shortfall } from "@/billing/pricing";
+import { priceStillValid } from "@/billing/pricing";
 import type { ToolModule } from "@/tools/registry";
 import { asOwner } from "../card-steps";
 import type { ToolEnv } from "./env";
+import { holdFailure, serverField, type HoldFailure } from "./money";
 
 /** The description lists each tool's name and when to use it, in registry order. */
 export const startRunDescription = (tools: readonly ToolModule[]): string =>
@@ -22,11 +23,7 @@ export const startRunDescription = (tools: readonly ToolModule[]): string =>
 export const startRunInput = (tools: readonly ToolModule[]) =>
   z.strictObject({
     toolId: z.enum(tools.map((t) => t.id)).describe("The tool to start."),
-    shownPrice: z
-      .int()
-      .nonnegative()
-      .optional()
-      .describe("Leave this out; the server fills it in."),
+    shownPrice: serverField("The price on the approval card."),
   });
 
 export type StartRunInput = z.infer<ReturnType<typeof startRunInput>>;
@@ -35,25 +32,21 @@ export type StartRunInput = z.infer<ReturnType<typeof startRunInput>>;
  * Writes today's price into the call before the approval card is streamed, and again
  * when the approval comes back. If the price changed in between, the two differ and the
  * AI SDK refuses the approval, so the model calls `startRun` again for a fresh card.
+ * The model's own `shownPrice` is always replaced.
  */
 export const refineStartRun =
-  (getPrice: (toolId: string) => number) =>
-  (input: StartRunInput): StartRunInput => ({
-    ...input,
-    shownPrice: getPrice(input.toolId),
-  });
+  (env: Pick<ToolEnv, "deps">) =>
+  (input: StartRunInput): StartRunInput => {
+    const found = env.deps.getTool(input.toolId);
+    return found.ok
+      ? { toolId: input.toolId, shownPrice: found.value.creditPrice }
+      : { toolId: input.toolId };
+  };
 
 export type StartRunOutput =
   | { readonly ok: true; readonly runId: string; readonly toolName: string }
   | { readonly ok: false; readonly error: "unknown_tool" | "price_changed" }
-  | { readonly ok: false; readonly error: "run_in_progress" | "not_found" }
-  | {
-      readonly ok: false;
-      readonly error: "insufficient_credits";
-      readonly price: number;
-      readonly available: number;
-      readonly shortfall: number;
-    };
+  | HoldFailure;
 
 export const startRunTool = (env: ToolEnv) =>
   tool({
@@ -92,33 +85,19 @@ export const startRunTool = (env: ToolEnv) =>
       );
       env.owner.current = owner.current;
       if (result.ok) {
-        env.record({ kind: "started", runId: result.value.runId, toolId });
+        env.record({
+          kind: "started",
+          runId: result.value.runId,
+          toolId,
+          from: { kind: "new" },
+        });
         return done({
           ok: true,
           runId: result.value.runId,
           toolName: picked.name,
         });
       }
-      switch (result.error.code) {
-        case "insufficient_credits":
-          return done({
-            ok: false,
-            error: "insufficient_credits",
-            price,
-            available: result.error.available,
-            shortfall: shortfall(price, result.error.available),
-          });
-        case "run_in_progress":
-          return done({ ok: false, error: "run_in_progress" });
-        case "not_found":
-        case "not_paused":
-        case "already_held":
-          return done({ ok: false, error: "not_found" });
-        default: {
-          const unreachable: never = result.error;
-          return unreachable;
-        }
-      }
+      return done(holdFailure(result.error, price));
     },
   });
 

@@ -34,3 +34,4 @@ export { scoreRun, toAnswers, type StoredAnswer } from "./_kit/readers";
 export { parseAnswer, type AnswerError } from "./_kit/answer-schema";
 export { nextQuestion, questionProgress, visibleQuestions } from "./_kit/flow";
 export { formatAnswer } from "./_kit/format-answer";
+export { DATA_BLOCK_RULE, fenceData } from "./_kit/prompt";

@@ -232,11 +232,43 @@ describe("decidePrefill (AC-5)", () => {
       }),
     ).toEqual({
       saves: [
-        { questionId: "stage", value: "selling" },
-        { questionId: "monthly_sales", value: 5000 },
+        { questionId: "stage", value: "selling", source: "chat" },
+        { questionId: "monthly_sales", value: 5000, source: "chat" },
       ],
       edit: null,
     });
+  });
+
+  it("keeps each item's own source from the last run (AC-5b)", () => {
+    const lastRun: PrefillData = {
+      runId: RUN,
+      title: "From your last run",
+      items: [
+        {
+          questionId: "stage",
+          prompt: "Where?",
+          value: "idea",
+          label: "I",
+          source: "client",
+        },
+        {
+          questionId: "channels",
+          prompt: "Where?",
+          value: ["market"],
+          label: "M",
+          source: "profile",
+        },
+      ],
+    };
+    expect(
+      decidePrefill(sampleTool, {}, lastRun, {
+        accept: ["stage", "channels"],
+        edit: null,
+      }).saves,
+    ).toEqual([
+      { questionId: "stage", value: "idea", source: "client" },
+      { questionId: "channels", value: ["market"], source: "profile" },
+    ]);
   });
 
   it("drops items that are no longer visible or already answered", () => {

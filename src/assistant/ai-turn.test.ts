@@ -16,6 +16,9 @@ import {
   INSTRUCTIONS_MESSAGE,
   type AiTurnDeps,
 } from "./ai-turn";
+import type { RunQuote, StartFromHoldError } from "@/db/queries/credits";
+import type { UsageInput } from "@/db/queries/usage";
+import type { OldAnswer } from "./ai-turn";
 import type { SavedMessage } from "./parts";
 import { startRunDescription, startRunInput } from "./tools/start-run";
 import type { ActiveRead, AiTurnContext } from "./turn";
@@ -125,6 +128,15 @@ type World = {
   saved: { questionId: string; value: unknown; source: string }[];
   completed: string[];
   logs: { event: string; fields: Record<string, unknown> }[];
+  /** `runQuote` answers by run id, read in order when a list is given. */
+  quotes: Record<string, RunQuote | (RunQuote | "throw" | "missing")[]>;
+  resumed: { runId: string; price: number | null }[];
+  restarted: { previousRunId: string; version: string; price: number }[];
+  stopped: string[];
+  usage: UsageInput[];
+  oldAnswers: OldAnswer[];
+  /** What `startFromWithHold` returns when set (otherwise a copied run). */
+  startFromError: StartFromHoldError | null;
 };
 
 const makeWorld = (over: Partial<World> = {}): World => ({
@@ -134,7 +146,39 @@ const makeWorld = (over: Partial<World> = {}): World => ({
   saved: [],
   completed: [],
   logs: [],
+  quotes: {},
+  resumed: [],
+  restarted: [],
+  stopped: [],
+  usage: [],
+  oldAnswers: [],
+  startFromError: null,
   ...over,
+});
+
+const quote = (over: Partial<RunQuote> = {}): RunQuote => ({
+  toolId: "sample",
+  toolVersion: "2",
+  status: "paused",
+  conversationId: CONV,
+  heldAmount: null,
+  ...over,
+});
+
+/** The next scripted quote for a run: a list is consumed, its last entry repeats. */
+const nextQuote = (world: World, runId: string) => {
+  const entry = world.quotes[runId];
+  if (entry === undefined) return "missing" as const;
+  if (!Array.isArray(entry)) return entry;
+  const head = entry.length > 1 ? entry.shift() : entry[0];
+  return head ?? ("missing" as const);
+};
+
+/** A helper model that fails, so extraction falls back unless a test sets one. */
+const failingHelper = new MockLanguageModelV4({
+  doGenerate: async () => {
+    throw new Error("helper not expected");
+  },
 });
 
 const activeOf = (world: World): ActiveRead => ({
@@ -178,12 +222,48 @@ const fakeDeps = (
     world.answers = [];
     return ok({ runId: RUN });
   },
+  runQuote: async (_o, runId) => {
+    const next = nextQuote(world, runId);
+    if (next === "throw") throw new Error("db down");
+    return next === "missing" ? err({ code: "not_found" }) : ok(next);
+  },
+  resumeRun: async (_o, runId) => {
+    world.resumed.push({ runId, price: null });
+    world.answers = [];
+    return ok({ runId });
+  },
+  resumeRunWithHold: async (_o, runId, price) => {
+    world.resumed.push({ runId, price });
+    world.answers = [];
+    return ok({ runId });
+  },
+  startFromWithHold: async (_o, previousRunId, version, price) => {
+    if (world.startFromError) return err(world.startFromError);
+    world.restarted.push({ previousRunId, version, price });
+    world.answers = [row("stage", "idea"), row("channels", ["market"], 2)];
+    return ok({ runId: RUN });
+  },
+  abandonRun: async (_o, runId) => {
+    world.stopped.push(runId);
+    world.answers = null;
+    return ok({});
+  },
   openChat: async () => ok({ messages: [...world.history], runs: [] }),
   model: () => ({
     id: "mock",
     model,
     providerOptions: { anthropic: { effort: "low" } },
   }),
+  helperModel: () => ({
+    id: "mock-helper",
+    model: failingHelper,
+    providerOptions: { anthropic: { effort: "low" } },
+  }),
+  recordUsage: async (input) => {
+    world.usage.push(input);
+    return { status: "recorded", id: "u1" };
+  },
+  oldAnswers: async () => ok([...world.oldAnswers]),
   newId: (() => {
     const n = { i: 0 };
     return () => `gen-${++n.i}`;
@@ -779,5 +859,482 @@ describe("failures (AC-14)", () => {
     );
     expect(JSON.stringify(calls[1]?.prompt)).toContain("db down");
     expect(textOf(chunks)).toBe("Something went wrong saving that.");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AC-3, AC-9: resume, stop and restart with server written fields
+// ---------------------------------------------------------------------------
+
+const USER2 = "0190a000-0000-7000-8000-0000000000u2";
+const OLD = "0190a000-0000-7000-8000-000000000009";
+
+/** One typed turn, then (when given) the approval tap and its continuation. */
+const proposeAndTap = async (
+  world: World,
+  first: readonly Reply[],
+  second: readonly Reply[] | null,
+  over: Partial<AiTurnDeps> = {},
+  approved = true,
+) => {
+  const one = scriptedModel(first);
+  const proposed = await read(
+    await createAiTurn(fakeDeps(world, one.model, over))(
+      textTurn(world, "m1", "please do it"),
+    ),
+  );
+  if (second === null) return { proposed, chunks: proposed, calls: one.calls };
+  world.history.push(await asMessage("a1", proposed));
+  const two = scriptedModel(second);
+  const chunks = await read(
+    await createAiTurn(fakeDeps(world, two.model, over))(
+      approvalTurn(world, "m2", approvalOf(proposed)[0] ?? "missing", approved),
+    ),
+  );
+  return { proposed, chunks, calls: two.calls };
+};
+
+/** Every prompt the model saw (tool results included), as one string. */
+const seen = (calls: readonly { prompt: unknown }[]) =>
+  calls.map((c) => JSON.stringify(c.prompt)).join("\n");
+
+describe("resumeRun (AC-3, AC-9)", () => {
+  const resume = { calls: [{ toolName: "resumeRun", input: { runId: RUN } }] };
+
+  it("a run that still holds its credits resumes with no card, then the open card", async () => {
+    const world = makeWorld({ quotes: { [RUN]: quote({ heldAmount: 5 }) } });
+    const { chunks } = await proposeAndTap(
+      world,
+      [resume, { text: "Back." }],
+      null,
+    );
+    expect(approvalOf(chunks)).toEqual([]);
+    expect(inputOf(chunks, "resumeRun")[0]).toEqual({ runId: RUN });
+    expect(world.resumed).toEqual([{ runId: RUN, price: null }]);
+    expect(dataOf(chunks)).toEqual([
+      expect.objectContaining({
+        type: "data-question",
+        data: expect.objectContaining({ questionId: "stage" }),
+      }),
+    ]);
+  });
+
+  it("a run whose hold was released shows a card at the tool's price, and approving holds it", async () => {
+    const world = makeWorld({ quotes: { [RUN]: quote() } });
+    const { proposed, chunks } = await proposeAndTap(
+      world,
+      [resume],
+      [{ text: "Back." }],
+    );
+    expect(inputOf(proposed, "resumeRun")[0]).toEqual({
+      runId: RUN,
+      shownPrice: 5,
+    });
+    expect(approvalOf(proposed)).toHaveLength(1);
+    expect(world.resumed).toEqual([{ runId: RUN, price: 5 }]);
+    expect(dataOf(chunks)).toContainEqual(
+      expect.objectContaining({ type: "data-question" }),
+    );
+  });
+
+  it("a hold placed between card and tap turns the approval down, and the next call resumes free", async () => {
+    const world = makeWorld({ quotes: { [RUN]: quote() } });
+    const one = scriptedModel([resume]);
+    const proposed = await read(
+      await createAiTurn(fakeDeps(world, one.model))(
+        textTurn(world, "m1", "continue"),
+      ),
+    );
+    world.history.push(await asMessage("a1", proposed));
+    world.quotes[RUN] = quote({ heldAmount: 5 });
+    const two = scriptedModel([resume, { text: "Back." }]);
+    const chunks = await read(
+      await createAiTurn(fakeDeps(world, two.model))(
+        approvalTurn(world, "m2", approvalOf(proposed)[0] ?? "", true),
+      ),
+    );
+    expect(seen(two.calls)).toContain("does not match");
+    expect(approvalOf(chunks)).toEqual([]);
+    expect(world.resumed).toEqual([{ runId: RUN, price: null }]);
+  });
+
+  it("a hold found at execute with a price on the card resumes free", async () => {
+    // Refinement on the card, refinement on the tap, then execute's own read.
+    const world = makeWorld({
+      quotes: { [RUN]: [quote(), quote(), quote({ heldAmount: 5 })] },
+    });
+    await proposeAndTap(world, [resume], [{ text: "Back." }]);
+    expect(world.resumed).toEqual([{ runId: RUN, price: null }]);
+  });
+
+  it("a failed refinement read shows no card, and execute holds nothing without one", async () => {
+    const world = makeWorld({ quotes: { [RUN]: ["throw", quote()] } });
+    const { chunks, calls } = await proposeAndTap(
+      world,
+      [resume, { text: "Try again." }],
+      null,
+    );
+    expect(approvalOf(chunks)).toEqual([]);
+    expect(seen(calls)).toContain("approval_required");
+    expect(world.resumed).toEqual([]);
+  });
+
+  it("a paused run on an old tool version returns version_changed", async () => {
+    const world = makeWorld({
+      quotes: { [RUN]: quote({ toolVersion: "1", heldAmount: 5 }) },
+    });
+    const { chunks, calls } = await proposeAndTap(
+      world,
+      [resume, { text: "That tool changed." }],
+      null,
+    );
+    expect(approvalOf(chunks)).toEqual([]);
+    expect(seen(calls)).toContain("version_changed");
+    expect(world.resumed).toEqual([]);
+  });
+
+  it("a run of another chat is not found", async () => {
+    const world = makeWorld({
+      quotes: { [RUN]: quote({ conversationId: "other" }) },
+    });
+    const { calls } = await proposeAndTap(world, [resume, { text: "?" }], null);
+    expect(seen(calls)).toContain("not_found");
+    expect(world.resumed).toEqual([]);
+  });
+
+  it("a guest link before the read retries it as the new owner", async () => {
+    const world = makeWorld();
+    const owners: string[] = [];
+    const over: Partial<AiTurnDeps> = {
+      ownerOf: async () => ok(USER2),
+      runQuote: async (ownerId) => {
+        owners.push(ownerId);
+        return ownerId === USER2
+          ? ok(quote({ heldAmount: 5 }))
+          : err({ code: "not_found" });
+      },
+      resumeRun: async (ownerId, runId) => {
+        owners.push(`resume:${ownerId}`);
+        world.resumed.push({ runId, price: null });
+        return ok({ runId });
+      },
+    };
+    await proposeAndTap(world, [resume, { text: "Back." }], null, over);
+    expect(owners).toContain(USER2);
+    expect(owners).toContain(`resume:${USER2}`);
+    expect(world.resumed).toHaveLength(1);
+  });
+});
+
+describe("stopRun (AC-9)", () => {
+  const stop = { calls: [{ toolName: "stopRun", input: { runId: RUN } }] };
+
+  it("the card carries the held amount; approving stops the run and shows no card", async () => {
+    const world = makeWorld({
+      answers: [],
+      quotes: { [RUN]: quote({ status: "in_progress", heldAmount: 30 }) },
+    });
+    const { proposed, chunks } = await proposeAndTap(
+      world,
+      [stop],
+      [{ text: "Stopped." }],
+    );
+    expect(inputOf(proposed, "stopRun")[0]).toEqual({
+      runId: RUN,
+      heldAmount: 30,
+    });
+    expect(world.stopped).toEqual([RUN]);
+    expect(dataOf(chunks)).toEqual([]);
+  });
+
+  it("a run with no hold still asks, with 0 credits to return", async () => {
+    const world = makeWorld({ quotes: { [RUN]: quote() } });
+    const { proposed } = await proposeAndTap(world, [stop], [{ text: "Ok." }]);
+    expect(inputOf(proposed, "stopRun")[0]).toEqual({
+      runId: RUN,
+      heldAmount: 0,
+    });
+    expect(approvalOf(proposed)).toHaveLength(1);
+  });
+
+  it("a declined card stops nothing", async () => {
+    const world = makeWorld({ quotes: { [RUN]: quote() } });
+    await proposeAndTap(world, [stop], [{ text: "Kept." }], {}, false);
+    expect(world.stopped).toEqual([]);
+  });
+
+  it("a completed run shows no card and says already_completed", async () => {
+    const world = makeWorld({
+      quotes: { [RUN]: quote({ status: "completed" }) },
+    });
+    const { chunks, calls } = await proposeAndTap(
+      world,
+      [stop, { text: "It's done." }],
+      null,
+    );
+    expect(approvalOf(chunks)).toEqual([]);
+    expect(seen(calls)).toContain("already_completed");
+    expect(world.stopped).toEqual([]);
+  });
+
+  it("a failed read shows no card and changes nothing", async () => {
+    const world = makeWorld({ quotes: { [RUN]: ["throw", quote()] } });
+    const { chunks, calls } = await proposeAndTap(
+      world,
+      [stop, { text: "Try again." }],
+      null,
+    );
+    expect(approvalOf(chunks)).toEqual([]);
+    expect(seen(calls)).toContain("try_again");
+    expect(world.stopped).toEqual([]);
+  });
+});
+
+describe("restartRun (AC-5b, AC-9)", () => {
+  const restart = {
+    calls: [{ toolName: "restartRun", input: { previousRunId: OLD } }],
+  };
+
+  it("a completed run restarts at today's price with the answers copied, then the asked card opens", async () => {
+    const world = makeWorld({
+      quotes: { [OLD]: quote({ status: "completed" }) },
+    });
+    const { proposed, chunks } = await proposeAndTap(
+      world,
+      [restart],
+      [
+        {
+          calls: [
+            {
+              toolName: "showQuestion",
+              input: { runId: RUN, questionId: "channels" },
+            },
+          ],
+        },
+        { text: "Change it here." },
+      ],
+    );
+    expect(inputOf(proposed, "restartRun")[0]).toEqual({
+      previousRunId: OLD,
+      shownPrice: 5,
+    });
+    expect(world.restarted).toEqual([
+      { previousRunId: OLD, version: "2", price: 5 },
+    ]);
+    expect(dataOf(chunks)).toEqual([
+      expect.objectContaining({
+        type: "data-question",
+        data: expect.objectContaining({ questionId: "channels" }),
+      }),
+    ]);
+  });
+
+  it("after a version change, a fresh run starts and the old answers are offered with their sources", async () => {
+    const world = makeWorld({
+      quotes: { [OLD]: quote({ status: "completed", toolVersion: "1" }) },
+      startFromError: { code: "version_changed" },
+      oldAnswers: [
+        { questionId: "stage", value: "idea", source: "client" },
+        { questionId: "channels", value: ["market"], source: "profile" },
+        { questionId: "team_size", value: 13, source: "client" },
+        { questionId: "monthly_sales", value: 10, source: "client" },
+      ],
+    });
+    const { chunks } = await proposeAndTap(
+      world,
+      [restart],
+      [{ text: "The tool changed; check these." }],
+    );
+    expect(world.started).toEqual([{ toolId: "sample", price: 5 }]);
+    // 13 fails the tool's refine; monthly_sales is hidden for "idea".
+    expect(dataOf(chunks)).toEqual([
+      {
+        type: "data-prefill",
+        data: {
+          runId: RUN,
+          title: "From your last run",
+          items: [
+            expect.objectContaining({
+              questionId: "stage",
+              value: "idea",
+              source: "client",
+            }),
+            expect.objectContaining({
+              questionId: "channels",
+              value: ["market"],
+              source: "profile",
+            }),
+          ],
+        },
+      },
+    ]);
+  });
+
+  it("an unknown previous run shows no card and is not found", async () => {
+    const world = makeWorld();
+    const { chunks, calls } = await proposeAndTap(
+      world,
+      [restart, { text: "Can't find it." }],
+      null,
+    );
+    expect(approvalOf(chunks)).toEqual([]);
+    expect(seen(calls)).toContain("not_found");
+    expect(world.restarted).toEqual([]);
+  });
+
+  it("a failed read shows no card and holds nothing", async () => {
+    const world = makeWorld({
+      quotes: { [OLD]: ["throw", quote({ status: "completed" })] },
+    });
+    const { chunks, calls } = await proposeAndTap(
+      world,
+      [restart, { text: "Try again." }],
+      null,
+    );
+    expect(approvalOf(chunks)).toEqual([]);
+    expect(seen(calls)).toContain("try_again");
+    expect(world.restarted).toEqual([]);
+  });
+
+  it("a run that isn't completed yet shows no card", async () => {
+    const world = makeWorld({
+      quotes: { [OLD]: quote({ status: "in_progress" }) },
+    });
+    const { chunks, calls } = await proposeAndTap(
+      world,
+      [restart, { text: "Not done yet." }],
+      null,
+    );
+    expect(approvalOf(chunks)).toEqual([]);
+    expect(seen(calls)).toContain("previous_not_completed");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AC-5: known facts on the prefill card
+// ---------------------------------------------------------------------------
+
+const helperReplying = (text: string | Error) => {
+  const prompts: string[] = [];
+  const model = new MockLanguageModelV4({
+    doGenerate: async (options) => {
+      prompts.push(JSON.stringify(options.prompt));
+      if (text instanceof Error) throw text;
+      return {
+        content: [{ type: "text" as const, text }],
+        finishReason: { unified: "stop" as const, raw: undefined },
+        usage,
+        warnings: [],
+      };
+    },
+  });
+  return {
+    prompts,
+    helperModel: () => ({
+      id: "mock-helper",
+      model,
+      providerOptions: { anthropic: { effort: "low" as const } },
+    }),
+  };
+};
+
+describe("known facts extraction (AC-5)", () => {
+  const LONG =
+    "I sell zobo on WhatsApp and Instagram to offices in Lekki, still just an idea really";
+
+  const startAndApprove = async (
+    world: World,
+    text: string,
+    helper: ReturnType<typeof helperReplying>,
+  ) => {
+    const first = scriptedModel([
+      { calls: [{ toolName: "startRun", input: { toolId: "sample" } }] },
+    ]);
+    const proposed = await read(
+      await createAiTurn(fakeDeps(world, first.model))(
+        textTurn(world, "m1", text),
+      ),
+    );
+    world.history.push(await asMessage("a1", proposed));
+    const second = scriptedModel([{ text: "Started." }]);
+    return read(
+      await createAiTurn(
+        fakeDeps(world, second.model, { helperModel: helper.helperModel }),
+      )(approvalTurn(world, "m2", approvalOf(proposed)[0] ?? "", true)),
+    );
+  };
+
+  it("lists only valid, visible proposals on the prefill card and records usage", async () => {
+    const world = makeWorld();
+    const helper = helperReplying(
+      JSON.stringify({
+        answers: [
+          { questionId: "stage", value: "idea" },
+          { questionId: "channels", value: ["whatsapp", "instagram"] },
+          { questionId: "team_size", value: 13 },
+          { questionId: "monthly_sales", value: 50000 },
+        ],
+      }),
+    );
+    const chunks = await startAndApprove(world, LONG, helper);
+    expect(dataOf(chunks)).toEqual([
+      {
+        type: "data-prefill",
+        data: {
+          runId: RUN,
+          title: "From our chat",
+          items: [
+            {
+              questionId: "stage",
+              prompt: "Where are you?",
+              value: "idea",
+              label: "Just an idea",
+            },
+            {
+              questionId: "channels",
+              prompt: "Where do you sell?",
+              value: ["whatsapp", "instagram"],
+              label: "WhatsApp, Instagram",
+            },
+          ],
+        },
+      },
+    ]);
+    expect(world.saved).toEqual([]);
+    expect(world.usage).toEqual([
+      expect.objectContaining({
+        callKey: `${RUN}:extraction`,
+        purpose: "extraction",
+        runId: RUN,
+      }),
+    ]);
+    // Client text goes in the fenced data block.
+    expect(helper.prompts[0]).toContain("<client_data>");
+  });
+
+  it("skips the call for short client text and shows the first card", async () => {
+    const world = makeWorld();
+    const helper = helperReplying(JSON.stringify({ answers: [] }));
+    const chunks = await startAndApprove(world, "an idea", helper);
+    expect(helper.prompts).toEqual([]);
+    expect(dataOf(chunks)).toEqual([
+      expect.objectContaining({
+        type: "data-question",
+        data: expect.objectContaining({ questionId: "stage" }),
+      }),
+    ]);
+  });
+
+  it("a failing helper falls back to the first card", async () => {
+    const world = makeWorld();
+    const helper = helperReplying(new Error("timeout"));
+    const chunks = await startAndApprove(world, LONG, helper);
+    expect(dataOf(chunks)).toEqual([
+      expect.objectContaining({ type: "data-question" }),
+    ]);
+    expect(world.logs).toContainEqual({
+      event: "assistant_extract",
+      fields: expect.objectContaining({ failed: true }),
+    });
   });
 });
