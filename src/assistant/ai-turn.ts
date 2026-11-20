@@ -365,6 +365,20 @@ export const partsAfterStream = async (
 // The turn
 // ---------------------------------------------------------------------------
 
+/**
+ * The text a failed tool call is saved with: the same text the model received (the AI
+ * SDK's `error.toString()`), so the next turn replays an identical, non empty tool
+ * result. Anthropic rejects an empty error result, and with thinking it also rejects a
+ * changed one, either way on every later turn. Stream errors never get here: the loop
+ * below drops them and shows the try again card.
+ */
+export const toolErrorText = (error: unknown): string => {
+  if (error == null) return "unknown error";
+  if (typeof error === "string") return error;
+  if (error instanceof Error) return error.toString();
+  return JSON.stringify(error);
+};
+
 const writeParts = (
   writer: { write: (chunk: UIMessageChunk) => void },
   parts: readonly ServerPart[],
@@ -487,7 +501,7 @@ export const createAiTurn =
         for await (const chunk of result.toUIMessageStream({
           sendStart: false,
           sendFinish: false,
-          onError: () => "",
+          onError: toolErrorText,
         })) {
           if (chunk.type === "error") {
             seen.failed = true;

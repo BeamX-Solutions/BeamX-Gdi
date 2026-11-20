@@ -527,6 +527,44 @@ describe("startRun approval (AC-3)", () => {
     expect(approvalOf(chunks)).toHaveLength(1);
   });
 
+  it("a turned down approval leaves a history the next turn can send", async () => {
+    const world = makeWorld();
+    const { chunks, calls } = await proposeThen(
+      world,
+      { first: 5, later: 7 },
+      true,
+      [{ calls: [{ toolName: "startRun", input: { toolId: "sample" } }] }],
+    );
+    // #7 saves the reply, then the client types again.
+    world.history.push(await asMessage("a2", chunks));
+    const third = scriptedModel([{ text: "Okay." }]);
+    await read(
+      await createAiTurn(fakeDeps(world, third.model))(
+        textTurn(world, "m3", "What happened?"),
+      ),
+    );
+    type Prompt = {
+      role: string;
+      content: { type: string; output?: { type: string; value?: unknown } }[];
+    }[];
+    const errorTexts = (prompt: unknown) =>
+      (prompt as Prompt)
+        .filter((m) => m.role === "tool")
+        .flatMap((m) => m.content)
+        .flatMap((c) =>
+          c.type === "tool-result" && c.output?.type === "error-text"
+            ? [String(c.output.value)]
+            : [],
+        );
+    const seen = errorTexts(calls[0]?.prompt);
+    const replayed = errorTexts(third.calls[0]?.prompt);
+    expect(seen).toHaveLength(1);
+    expect(seen[0]).toContain("does not match");
+    // Anthropic rejects an empty error result, and with thinking a changed one: the
+    // next turn must replay exactly what the model received.
+    expect(replayed).toEqual(seen);
+  });
+
   it("a declined card does nothing and the assistant acknowledges it", async () => {
     const world = makeWorld();
     const { chunks } = await proposeThen(world, { first: 5, later: 5 }, false, [
