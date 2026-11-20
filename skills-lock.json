@@ -190,6 +190,13 @@
       "skillPath": "skills/upstash-redis-js/SKILL.md",
       "computedHash": "7a3a07efc480ba8c99736e50caf8b8248785ae082d2d2c49a25d9ae7b6db456f"
     },
+    "vercel-schedules": {
+      "source": "vercel/vercel-plugin",
+      "commit": "250769d9353c3f38a7c41ce9b908d3ca80ab19db",
+      "sourceType": "github",
+      "skillPath": "skills/vercel-schedules/SKILL.md",
+      "computedHash": "facae23bf4a18a45073c7fb4b08899990403eeb519416879b1370059d119e89e"
+    },
     "vitest": {
       "source": "antfu/skills",
       "commit": "4a6bb39e7b45e26402eb215393c51ccf5df1ca4c",

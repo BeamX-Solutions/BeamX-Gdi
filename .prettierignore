@@ -10,3 +10,6 @@ docs/
 skills-lock.json
 playwright-report/
 test-results/
+fixtures/parity/**/*.json
+fixtures/parity/**/*.md
+!fixtures/parity/README.md

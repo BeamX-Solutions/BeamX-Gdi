@@ -1,0 +1,93 @@
+{
+  "source": {
+    "remote": "https://github.com/chimaobi-ibeh/biv.git",
+    "commit": "a5b4c4bc988e923961873d096a02844b384b8a60",
+    "commitDate": "2026-09-15",
+    "uncommittedChanges": false
+  },
+  "originalModel": "claude-sonnet-5",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "strengths": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "gaps": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "personalizedPlan": {
+        "type": "string"
+      },
+      "weeklyRoadmap": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "week": {
+              "type": "integer"
+            },
+            "tasks": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "week",
+            "tasks"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "resources": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "link": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "title",
+            "description",
+            "link"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "riskAssessment": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "strengths",
+      "gaps",
+      "personalizedPlan",
+      "weeklyRoadmap",
+      "resources",
+      "riskAssessment"
+    ],
+    "additionalProperties": false
+  }
+}

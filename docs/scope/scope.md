@@ -1,6 +1,6 @@
 # Scope: BeamX Workspace (working name)
 
-One chat workspace where a business owner says what they want done, and an AI assistant runs the right BeamX tool for them (Beacon, Beacon Pro, Luna, Stellar), collects the answers in conversation, shows the report beside the chat, and then talks it through with them. It is free and works as a lead funnel: the goal is to get clients to book a BeamX consultation. The four standalone tools keep running, and this workspace rebuilds their questions, scoring, and report logic inside one app (ported from their source, spec 0001), with room to plug in more tools later.
+One chat workspace where a business owner says what they want done, and an AI assistant runs the right BeamX tool for them (Beacon, Beacon Pro, Luna, Stellar), collects the answers in conversation, shows the report beside the chat, and then talks it through with them. It runs on credits, like an AI platform with tools: each client holds one credit balance, and each tool run (or longer chat) uses a set number of credits. New accounts get starter credits so they see a real report first, and top ups are paid in naira. Booking a BeamX consultation stays the main outcome, with credit sales alongside it. The four standalone tools keep running, and this workspace rebuilds their questions, scoring, and report logic inside one app (ported from their source, spec 0001), with room to plug in more tools later.
 
 **Build approach:** Tracer Bullet (get one real thread working end to end through every layer first, then thicken it one strand at a time).
 **Workflow:** Alpha (after `/develop`, run `/check verify` on the real app). This is the default level of rigor for the project. `/architect` is the recommended first stop for any feature with a real decision, but you can skip it when you already know how to build the feature. Any feature can carry its own tag (for example `· Beta`) to get more or less rigor.
@@ -15,10 +15,11 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 2 | Coding standards & tooling | Foundation | done |
 | 3 | Data model | Foundation | done |
 | 4 | Design system & UI foundation | Foundation | done |
-| 20 | Tool source access & parity fixtures | Foundation | planned |
+| 20 | Tool source access & parity fixtures | Foundation | in-progress |
 | 5 | Tool module contract & registry | Foundation | planned |
 | 6 | Assistant brain | Foundation | planned |
 | 7 | Validate an idea in chat (Stellar) | Slice 1 | planned |
+| 22 | Credits & billing | Slice 1 | in-progress |
 | 21 | Abuse & AI cost guards | Slice 1 | planned |
 | 8 | Accounts & sign up to save | Slice 2 | planned |
 | 9 | Shared business profile | Slice 2 | planned |
@@ -73,13 +74,15 @@ spec [0003](../specs/0003-design-system-ui-foundation/index.md) · code in `src/
   - [x] Report parts, errors, and the finished `DESIGN.md`: score, bars, advice, sections, skeleton, error card, full axe pass (AC-1, AC-3, AC-11, AC-12, AC-15)
 - [x] Verify it: `/check verify design system & UI foundation`
 
-### 20. Tool source access & parity fixtures
+### 20. Tool source access & parity fixtures · in-progress
 Get read access to the source code of Beacon, Beacon Pro, Luna, and Stellar, and capture real answer sets with the scores and verdicts the live tools give them. The rebuilt tools are tested against these so they score the same way (from spec 0001).
 **Done when:** all four source repos are readable by the team, and each tool has at least 5 fixture answer sets with its original scores, verdict, and report captured in the repo.
-- [ ] Gather access and capture fixtures: `/develop tool source access & parity fixtures`
+Fixtures are captured (PR #5; Luna has no scoring, so it carries its question set and plan shape). Still owed: team read access to Stellar's repo, which lives on a personal account (`chimaobi-ibeh/biv`).
+code in `fixtures/parity`, `scripts/parity`
+- [x] Gather access and capture fixtures: `/develop tool source access & parity fixtures`
 
 ### 5. Tool module contract & registry · needs a decision
-The tools are rebuilt inside the workspace, ported from their source (spec 0001). This is the one typed contract every tool implements (its questions, a pure scoring function, its report prompt, its report view) and the registry the assistant reaches tools through, so a new tool is added by adding one folder.
+The tools are rebuilt inside the workspace, ported from their source (spec 0001). This is the one typed contract every tool implements (its questions, a pure scoring function, its report prompt, its report view, its credit price) and the registry the assistant reaches tools through, so a new tool is added by adding one folder. The contract has to fit three real shapes found in the sources: fixed scoring plus one AI call (Stellar), one scoring engine with two report styles (Beacon and Beacon Pro), and a plan written by AI in phases with no scoring (Luna).
 **Done when:** a sample tool plugs in by adding one folder and one registry line, its scoring is tested against fixtures, and a failed report step shows a clear, retryable error.
 - [ ] Design it (spec): `/architect tool module contract & registry`
 
@@ -95,8 +98,21 @@ The walking skeleton. A guest types an idea, the assistant routes to Stellar, co
 **Done when:** a guest goes from first message to a saved Stellar report on screen, using real data and real AI, and a refresh keeps the report.
 - [ ] Design it (spec): `/architect validate an idea in chat`
 
+### 22. Credits & billing · Beta · in-progress
+Clients pay for tool runs with credits from one balance. Each tool has a fixed price per run, and chat beyond a small daily free allowance costs a little. The assistant always confirms before spending ("this uses 30 credits, go ahead?"). Credits are held when a run starts, charged when the report arrives, and released if it fails; Luna's phased plan resumes without charging twice. New accounts get starter credits, top ups are paid through Paystack in naira, credits expire after 12 months of inactivity (with a reminder first), and existing Luna credit balances move in. Comes right after the first Stellar thread and before any public link.
+**Done when:** a client sees a tool's price, confirms, and is charged only when the report arrives (a failed run costs nothing), can buy credits with Paystack, and sees their balance and history; prices and the free chat allowance come from config.
+spec [0004](../specs/0004-credits-billing/index.md) · code in `src/billing`, `src/db`
+- [x] Design it (spec): `/architect credits & billing`
+- [ ] Build it: `/develop credits & billing`
+  - [ ] Thin thread: a guest pays for a Stellar run with starter credits (config, ledger and holds migration, hold on approve, charge on report ready, release on failure, confirm card, header chip) (AC-1, AC-2, AC-3, AC-4, AC-5, AC-8, AC-11, AC-14, AC-18, AC-20, AC-21)
+  - [ ] Hold lifecycle and paid chat: resume and reconfirm, daily cron with idle and chat hold sweeps, free allowance and metered chat, guest grant IP cap, charge once across phases (AC-2, AC-6, AC-7, AC-9, AC-10, AC-11, AC-21)
+  - [ ] Buying credits, after #8 sign up: payment table, Paystack client, checkout, callback, webhook, pending sweep, buy from the card, `/credits` page (AC-8, AC-13, AC-14, AC-21)
+  - [ ] Accounts and money operations, after #8: sign up grant, Luna import and claim, guest link merge, deletion, adjust script, expiry (behind a flag) and drift check (AC-11, AC-12, AC-15, AC-16, AC-17, AC-19, AC-20)
+- [ ] Verify it: `/check verify credits & billing`
+- [ ] Test it: `/test credits & billing`
+
 ### 21. Abuse & AI cost guards · Beta
-Guests trigger paid AI calls for free, so cap abuse and spend before any public link: per guest and per IP rate limits, a bot check on guest start and chat, input and output size limits, and a daily AI spend cap (rules and defaults decided in spec 0001).
+Guest chat and starter credits still trigger paid AI calls, so cap abuse and spend before any public link: per guest and per IP rate limits, a bot check on guest start and chat, input and output size limits, and a daily AI spend cap (rules and defaults decided in spec 0001).
 **Done when:** a guest over a limit, or any guest after the daily spend cap trips, gets a friendly message instead of an AI call, and the limits come from config.
 - [ ] Build it: `/develop abuse & ai cost guards`
 
@@ -115,18 +131,18 @@ One profile (name, industry, size, location, goals, and so on) built from answer
 ## Slice 3: The other tools
 
 ### 10. Beacon health check in chat
-Run the Beacon business health check through chat, using the same thread as Stellar.
-**Done when:** a client gets a Beacon score with category breakdown and advice in the report panel, matching what the standalone Beacon gives for the same answers.
+Run the Beacon business health check through chat, using the same thread as Stellar. Beacon and Beacon Pro share one questionnaire (22 questions) and one scoring engine, so this builds the shared Beacon module; its advice is the rule based advisory, polished by Claude (the standalone used OpenAI).
+**Done when:** a client gets a Beacon score with category breakdown and advice in the report panel, matching what the standalone Beacon gives for the same answers (scores, grades, flags, and rule based advice; the AI wording is not compared).
 - [ ] Build it: `/develop beacon health check in chat`
 
 ### 11. Beacon Pro in chat
-Run the deeper Beacon Pro assessment, with its report streaming in live. The assistant suggests Pro when a client wants more depth than Beacon.
-**Done when:** a client gets a Beacon Pro report that streams into the panel, and the assistant can explain how Pro differs from Beacon.
+Run the deeper Beacon Pro assessment, with its report streaming in live. It is a second report style on the Beacon module (Claude writes the full advisory), so a client who already finished Beacon answers no new questions. The assistant suggests Pro when a client wants more depth than Beacon.
+**Done when:** a client gets a Beacon Pro report that streams into the panel, a client who already ran Beacon gets Pro without answering again, and the assistant can explain how Pro differs from Beacon.
 - [ ] Build it: `/develop beacon pro in chat`
 
 ### 12. Luna marketing plan in chat · needs a decision
-Run Luna's long questionnaire (60+ questions, 9 areas) in chat without wearing the client out. Progress is shown, the client can stop and resume, and the plan is generated at the end.
-**Done when:** a client can pause midway, come back, finish, and get the full marketing plan in the panel.
+Run Luna's long questionnaire (50 questions: 12 about the business, 38 across 9 marketing areas) in chat without wearing the client out. Progress is shown, the client can stop and resume, and the plan is generated at the end. Luna has no scoring: the plan is written by Claude in five phases in a row, which won't fit in one request, so each finished phase is saved and a failure resumes from the phase that broke.
+**Done when:** a client can pause midway, come back, finish, and get the full marketing plan in the panel, and a plan that fails partway resumes from the failed phase.
 - [ ] Design it (spec): `/architect luna marketing plan in chat`
 
 ## Slice 4: Conversation around results
@@ -149,7 +165,7 @@ Download any report as a branded PDF, or have it emailed, as the standalone tool
 - [ ] Design it (spec): `/architect report pdf & email`
 
 ### 16. Book a consultation · needs a decision
-After a report, the assistant offers BeamX's free 30 minute consultation and books it in chat. BeamX staff get the client's context and reports. This is the main success measure.
+After a report, the assistant offers BeamX's free 30 minute consultation and books it in chat. BeamX staff get the client's context and reports. This is the main success measure. All four standalone tools book through BeamX's Calendly today (`calendly.com/beamxsolutions`).
 **Done when:** a client books a consultation from chat, gets a confirmation, and BeamX receives the booking with the related reports.
 - [ ] Design it (spec): `/architect book a consultation`
 
@@ -178,7 +194,6 @@ Left out of the current build pass, kept here so the plan stays honest.
 - **Staff console**: an internal BeamX view of clients, reports, and bookings · needs a decision · Beta (needs a durable audit table for staff access, guest links, and deletions first, from spec 0002)
 - **Analytics & error monitoring**: measure signups, completed runs, and bookings, and catch failures · needs a decision
 - **Accessibility audit (WCAG AA)**: a full pass beyond the base components' keyboard support
-- **Paid tier & billing**: premium reports or deeper follow up · needs a decision · GA
 - **General business advisor**: open business questions beyond the four tools · needs a decision
 - **More languages**: localized interface and reports
 

@@ -1,4 +1,5 @@
 import * as conversations from "../queries/conversations";
+import * as credits from "../queries/credits";
 import * as runs from "../queries/runs";
 import { eq } from "drizzle-orm";
 import { db } from "../client";
@@ -43,7 +44,23 @@ export const unwrap = <T, E>(
   return r.value;
 };
 
-/** A guest with a conversation and an in_progress run holding the given answers. */
+/** The price test runs hold; well under the starter grant used by `fundRun`. */
+export const TEST_RUN_PRICE = 10;
+
+/**
+ * Gives the user a credit account (100 credit grant) and holds `price` for an existing
+ * run, like approving a paid run would (spec 0004). Reports need the hold to be claimed.
+ */
+export const fundRun = async (
+  userId: string,
+  runId: string,
+  price = TEST_RUN_PRICE,
+) => {
+  await credits.ensureAccount(userId, 100);
+  return unwrap(await credits.holdExistingRun(userId, runId, price));
+};
+
+/** A guest with a conversation and a funded in_progress run holding the given answers. */
 export const runWithAnswers = async (
   userId: string,
   toolId = "stellar",
@@ -54,6 +71,7 @@ export const runWithAnswers = async (
   const { run } = unwrap(
     await runs.start(userId, conv.id, toolId, toolVersion),
   );
+  await fundRun(userId, run.id);
   for (const [q, v] of Object.entries(answers))
     unwrap(await runs.saveAnswer(userId, run.id, q, v, "client"));
   return { conv, run };

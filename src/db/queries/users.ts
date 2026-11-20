@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { db } from "../client";
 import { aiUsage, conversation, toolRun, user } from "../schema";
+import { linkGuestCreditStatements } from "./credits";
 import { logEvent } from "@/lib/log";
 
 /**
@@ -9,7 +10,14 @@ import { logEvent } from "@/lib/log";
  * A test reads the real foreign keys and fails if one is missing from both lists.
  * Features #9, #16, #17 and #18 add their tables here.
  */
-export const LINKED_TABLES = ["conversation", "tool_run", "ai_usage"] as const;
+export const LINKED_TABLES = [
+  "conversation",
+  "tool_run",
+  "ai_usage",
+  "credit_account",
+  "credit_ledger",
+  "credit_hold",
+] as const;
 /** Better Auth owns these; its own link flow deals with the guest's session. */
 export const LINK_EXCLUDED_TABLES = ["session", "account"] as const;
 
@@ -17,6 +25,8 @@ export type LinkCounts = {
   readonly conversation: number;
   readonly toolRun: number;
   readonly aiUsage: number;
+  readonly creditLedger: number;
+  readonly creditHolds: number;
 };
 
 /**
@@ -28,7 +38,7 @@ export const linkGuest = async (
   guestUserId: string,
   newUserId: string,
 ): Promise<LinkCounts> => {
-  const [conversations, runs, usage] = await db.batch([
+  const [conversations, runs, usage, , , , ledger, holds] = await db.batch([
     db
       .update(conversation)
       .set({ userId: newUserId })
@@ -44,11 +54,14 @@ export const linkGuest = async (
       .set({ userId: newUserId })
       .where(eq(aiUsage.userId, guestUserId))
       .returning({ id: aiUsage.id }),
+    ...linkGuestCreditStatements(guestUserId, newUserId),
   ]);
   const counts = {
     conversation: conversations.length,
     toolRun: runs.length,
     aiUsage: usage.length,
+    creditLedger: ledger.rows.length,
+    creditHolds: holds.rows.length,
   };
   logEvent("guest_linked", {
     guestUserId,
@@ -56,6 +69,8 @@ export const linkGuest = async (
     conversations: counts.conversation,
     toolRuns: counts.toolRun,
     aiUsage: counts.aiUsage,
+    creditLedger: counts.creditLedger,
+    creditHolds: counts.creditHolds,
   });
   return counts;
 };

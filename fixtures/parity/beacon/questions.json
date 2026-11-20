@@ -1,0 +1,330 @@
+{
+  "source": {
+    "beacon": {
+      "remote": "https://github.com/BeamX-Solutions/beamx-scorecard.git",
+      "commit": "576aab7deacd0f21847ce9d8e09592be7397b4b6",
+      "commitDate": "2026-06-14",
+      "uncommittedChanges": false
+    },
+    "beaconPro": {
+      "remote": "https://github.com/BeamX-Solutions/beamx-scorecard-v2.git",
+      "commit": "08a8b33f365f226d4bef2cb5ad9d5294034b25ec",
+      "commitDate": "2026-03-02",
+      "uncommittedChanges": false
+    }
+  },
+  "note": "Field order is the form order. Option strings are the exact values the API accepts.",
+  "fields": {
+    "fullName": {
+      "type": "free text"
+    },
+    "email": {
+      "type": "free text"
+    },
+    "businessName": {
+      "type": "free text"
+    },
+    "industry": [
+      "Retail/Trade",
+      "Food & Beverage",
+      "Professional Services",
+      "Beauty & Personal Care",
+      "Logistics & Transportation",
+      "Manufacturing/Production",
+      "Hospitality",
+      "Construction/Trades",
+      "Healthcare Services",
+      "Education/Training",
+      "Agriculture",
+      "Other"
+    ],
+    "yearsInBusiness": [
+      "Less than 1 year",
+      "1-3 years",
+      "3-5 years",
+      "5-10 years",
+      "10+ years"
+    ],
+    "cashFlow": [
+      "Consistent surplus",
+      "Breaking even",
+      "Unpredictable (some surplus, some deficit)",
+      "Burning cash consistently",
+      "Don't know"
+    ],
+    "profitMargin": [
+      "30%+",
+      "20-30%",
+      "10-20%",
+      "5-10%",
+      "Less than 5% or negative",
+      "Don't know"
+    ],
+    "cashRunway": [
+      "6+ months",
+      "3-6 months",
+      "1-3 months",
+      "Less than 1 month",
+      "Would close immediately"
+    ],
+    "paymentSpeed": [
+      "Same day (cash/instant)",
+      "1-7 days",
+      "8-30 days",
+      "31-60 days",
+      "60+ days"
+    ],
+    "repeatCustomerRate": [
+      "70%+ repeat customers",
+      "50-70% repeat",
+      "30-50% repeat",
+      "10-30% repeat",
+      "Less than 10% repeat"
+    ],
+    "acquisitionChannel": [
+      "Referrals/word-of-mouth",
+      "Walk-ins/location visibility",
+      "Organic social media",
+      "Repeat business relationships",
+      "Paid advertising",
+      "Cold outreach",
+      "Don't know"
+    ],
+    "pricingPower": [
+      "Tested increases successfully",
+      "Most customers would stay",
+      "Some would leave but still profitable",
+      "Would lose most customers",
+      "Don't know"
+    ],
+    "founderDependency": [
+      "Runs 2+ weeks without me",
+      "Can step away 1 week",
+      "2-3 days max",
+      "Can't miss even 1 day",
+      "Must be there daily"
+    ],
+    "processDocumentation": [
+      "Comprehensive written processes",
+      "Some key processes documented",
+      "Trained others, mostly in my head",
+      "Everything in my head only",
+      "No consistent processes"
+    ],
+    "inventoryTracking": [
+      "Digital real-time system",
+      "Regular manual/spreadsheet",
+      "Weekly physical count",
+      "Only when running low",
+      "Don't track",
+      "Not applicable (service business)"
+    ],
+    "expenseAwareness": [
+      "Know exact amounts and percentages",
+      "Know roughly",
+      "General idea",
+      "Would have to look up",
+      "No idea"
+    ],
+    "profitPerProduct": [
+      "Know margins on each offering",
+      "Good sense of what's profitable",
+      "Know revenue only, not profit",
+      "Haven't analyzed",
+      "All seem about the same"
+    ],
+    "pricingStrategy": [
+      "Cost + margin + market research",
+      "Match competitors",
+      "Cost + markup (no market analysis)",
+      "What feels right",
+      "No strategy"
+    ],
+    "businessTrajectory": [
+      "Growing 20%+",
+      "Growing 5-20%",
+      "Stable (±5%)",
+      "Declining 5-20%",
+      "Declining 20%+",
+      "Less than 1 year old"
+    ],
+    "revenueDiversification": [
+      "4+ streams/customer types",
+      "2-3 streams",
+      "Primary + side income",
+      "Single product/customer type",
+      "Dependent on 1-2 major customers"
+    ],
+    "digitalPayments": [
+      "80%+ digital",
+      "50-80% digital",
+      "20-50% digital",
+      "Less than 20% digital"
+    ],
+    "formalRegistration": [
+      "Fully registered and tax compliant",
+      "Registered, behind on taxes",
+      "In process of registering",
+      "Not registered"
+    ],
+    "infrastructure": [
+      "Consistent power/internet/supply",
+      "Mostly reliable with backups",
+      "Frequent disruptions",
+      "Major challenges daily"
+    ],
+    "bankingRelationship": [
+      "Strong, accessed loans/credit",
+      "Accounts but no credit",
+      "Minimal interaction",
+      "No bank relationship"
+    ],
+    "primaryPainPoint": [
+      "Getting more customers/sales",
+      "Managing cash flow/getting paid",
+      "Hiring or managing staff",
+      "Keeping costs under control",
+      "Too busy/overwhelmed",
+      "Inconsistent quality/delivery",
+      "Don't know where to focus",
+      "Competition/market changes",
+      "Actually doing well, want to optimize"
+    ]
+  },
+  "scoreMaps": {
+    "cashFlow": {
+      "Consistent surplus": 5,
+      "Breaking even": 3,
+      "Unpredictable (some surplus, some deficit)": 2,
+      "Burning cash consistently": 0,
+      "Don't know": 0
+    },
+    "profitMargin": {
+      "30%+": 5,
+      "20-30%": 4,
+      "10-20%": 3,
+      "5-10%": 2,
+      "Less than 5% or negative": 1,
+      "Don't know": 0
+    },
+    "cashRunway": {
+      "6+ months": 5,
+      "3-6 months": 4,
+      "1-3 months": 2,
+      "Less than 1 month": 1,
+      "Would close immediately": 0
+    },
+    "paymentSpeed": {
+      "Same day (cash/instant)": 5,
+      "1-7 days": 4,
+      "8-30 days": 3,
+      "31-60 days": 1,
+      "60+ days": 0
+    },
+    "repeatCustomerRate": {
+      "70%+ repeat customers": 5,
+      "50-70% repeat": 4,
+      "30-50% repeat": 3,
+      "10-30% repeat": 2,
+      "Less than 10% repeat": 0
+    },
+    "acquisitionChannel": {
+      "Referrals/word-of-mouth": 5,
+      "Repeat business relationships": 5,
+      "Walk-ins/location visibility": 3,
+      "Organic social media": 3,
+      "Paid advertising": 2,
+      "Cold outreach": 1,
+      "Don't know": 0
+    },
+    "pricingPower": {
+      "Tested increases successfully": 5,
+      "Most customers would stay": 4,
+      "Some would leave but still profitable": 3,
+      "Would lose most customers": 1,
+      "Don't know": 1
+    },
+    "founderDependency": {
+      "Runs 2+ weeks without me": 5,
+      "Can step away 1 week": 4,
+      "2-3 days max": 3,
+      "Can't miss even 1 day": 1,
+      "Must be there daily": 0
+    },
+    "processDocumentation": {
+      "Comprehensive written processes": 5,
+      "Some key processes documented": 4,
+      "Trained others, mostly in my head": 2,
+      "Everything in my head only": 1,
+      "No consistent processes": 0
+    },
+    "inventoryTracking": {
+      "Digital real-time system": 5,
+      "Regular manual/spreadsheet": 4,
+      "Weekly physical count": 3,
+      "Only when running low": 1,
+      "Don't track": 0,
+      "Not applicable (service business)": 4
+    },
+    "expenseAwareness": {
+      "Know exact amounts and percentages": 5,
+      "Know roughly": 4,
+      "General idea": 3,
+      "Would have to look up": 1,
+      "No idea": 0
+    },
+    "profitPerProduct": {
+      "Know margins on each offering": 5,
+      "Good sense of what's profitable": 4,
+      "Know revenue only, not profit": 2,
+      "Haven't analyzed": 1,
+      "All seem about the same": 1
+    },
+    "pricingStrategy": {
+      "Cost + margin + market research": 5,
+      "Match competitors": 3,
+      "Cost + markup (no market analysis)": 2,
+      "What feels right": 1,
+      "No strategy": 0
+    },
+    "businessTrajectory": {
+      "Growing 20%+": 5,
+      "Growing 5-20%": 4,
+      "Stable (±5%)": 3,
+      "Declining 5-20%": 1,
+      "Declining 20%+": 0,
+      "Less than 1 year old": 2
+    },
+    "revenueDiversification": {
+      "4+ streams/customer types": 5,
+      "2-3 streams": 4,
+      "Primary + side income": 3,
+      "Single product/customer type": 2,
+      "Dependent on 1-2 major customers": 0
+    },
+    "digitalPayments": {
+      "80%+ digital": 5,
+      "50-80% digital": 4,
+      "20-50% digital": 2,
+      "Less than 20% digital": 1
+    },
+    "formalRegistration": {
+      "Fully registered and tax compliant": 5,
+      "Registered, behind on taxes": 3,
+      "In process of registering": 2,
+      "Not registered": 0
+    },
+    "infrastructure": {
+      "Consistent power/internet/supply": 5,
+      "Mostly reliable with backups": 4,
+      "Frequent disruptions": 2,
+      "Major challenges daily": 0
+    },
+    "bankingRelationship": {
+      "Strong, accessed loans/credit": 5,
+      "Accounts but no credit": 3,
+      "Minimal interaction": 1,
+      "No bank relationship": 0
+    }
+  }
+}

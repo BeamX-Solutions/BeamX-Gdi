@@ -3,6 +3,7 @@ import { db } from "../client";
 import { isUniqueViolation } from "../errors";
 import { newId } from "../id";
 import { report, toolRun, toolRunAnswer } from "../schema";
+import { releaseRunHolds } from "./credit-holds";
 import { err, ok, type Result } from "@/lib/result";
 
 type RunRow = typeof toolRun.$inferSelect;
@@ -40,7 +41,7 @@ export type GetRunError = { readonly code: "not_found" };
  * Two parallel writers can both see "no active run" and race to the partial unique
  * index (AC-3). The loser retries once (it then pauses the winner), then gives up.
  */
-const withActiveRetry = async <T>(
+export const withActiveRetry = async <T>(
   run: () => Promise<T>,
 ): Promise<
   { readonly conflict: false; readonly value: T } | { readonly conflict: true }
@@ -55,6 +56,44 @@ const withActiveRetry = async <T>(
   return { conflict: true };
 };
 
+/** The owner scoped read of one run, used to end every run batch. */
+export const selectRun = (userId: string, runId: string) =>
+  db
+    .select()
+    .from(toolRun)
+    .where(and(eq(toolRun.id, runId), eq(toolRun.userId, userId)));
+
+/**
+ * The write statements of `start` (pause the chat's active run, insert the new one).
+ * Exported so `credits.startRunWithHold` can add the hold to the same batch.
+ */
+export const startStatements = (
+  userId: string,
+  conversationId: string,
+  runId: string,
+  toolId: string,
+  toolVersion: string,
+) =>
+  [
+    db
+      .update(toolRun)
+      .set({ status: "paused" })
+      .where(
+        and(
+          eq(toolRun.conversationId, conversationId),
+          eq(toolRun.userId, userId),
+          eq(toolRun.status, "in_progress"),
+        ),
+      )
+      .returning({ id: toolRun.id }),
+    db.execute(sql`
+      INSERT INTO tool_run (id, user_id, conversation_id, tool_id, tool_version)
+      SELECT ${runId}::uuid, c.user_id, c.id, ${toolId}, ${toolVersion}
+      FROM conversation c
+      WHERE c.id = ${conversationId}::uuid AND c.user_id = ${userId}::uuid
+    `),
+  ] as const;
+
 /** Pauses the active run in the chat and starts a new one, atomically (one batch). */
 export const start = async (
   userId: string,
@@ -65,27 +104,8 @@ export const start = async (
   const runId = newId();
   const outcome = await withActiveRetry(async () => {
     const [paused, , created] = await db.batch([
-      db
-        .update(toolRun)
-        .set({ status: "paused" })
-        .where(
-          and(
-            eq(toolRun.conversationId, conversationId),
-            eq(toolRun.userId, userId),
-            eq(toolRun.status, "in_progress"),
-          ),
-        )
-        .returning({ id: toolRun.id }),
-      db.execute(sql`
-        INSERT INTO tool_run (id, user_id, conversation_id, tool_id, tool_version)
-        SELECT ${runId}::uuid, c.user_id, c.id, ${toolId}, ${toolVersion}
-        FROM conversation c
-        WHERE c.id = ${conversationId}::uuid AND c.user_id = ${userId}::uuid
-      `),
-      db
-        .select()
-        .from(toolRun)
-        .where(and(eq(toolRun.id, runId), eq(toolRun.userId, userId))),
+      ...startStatements(userId, conversationId, runId, toolId, toolVersion),
+      selectRun(userId, runId),
     ]);
     return { run: created[0], pausedRunId: paused[0]?.id ?? null };
   });
@@ -120,6 +140,32 @@ export const pause = async (
   return err({ code: "not_in_progress" });
 };
 
+/**
+ * The write statements of `resume` (pause whatever else is active in the chat, resume
+ * the target). Exported so `credits.resumeRunWithHold` can add the hold to the batch.
+ */
+export const resumeStatements = (userId: string, runId: string) =>
+  [
+    db.execute(sql`
+      UPDATE tool_run o SET status = 'paused', updated_at = now()
+      FROM tool_run t
+      WHERE t.id = ${runId}::uuid AND t.user_id = ${userId}::uuid AND t.status = 'paused'
+        AND o.conversation_id = t.conversation_id AND o.user_id = ${userId}::uuid
+        AND o.status = 'in_progress' AND o.id <> t.id
+      RETURNING o.id
+    `),
+    db
+      .update(toolRun)
+      .set({ status: "in_progress" })
+      .where(
+        and(
+          eq(toolRun.id, runId),
+          eq(toolRun.userId, userId),
+          eq(toolRun.status, "paused"),
+        ),
+      ),
+  ] as const;
+
 /** Pauses whatever is active in the same chat, then resumes the target, in one batch. */
 export const resume = async (
   userId: string,
@@ -129,28 +175,8 @@ export const resume = async (
 > => {
   const outcome = await withActiveRetry(async () => {
     const [paused, , current] = await db.batch([
-      db.execute(sql`
-        UPDATE tool_run o SET status = 'paused', updated_at = now()
-        FROM tool_run t
-        WHERE t.id = ${runId}::uuid AND t.user_id = ${userId}::uuid AND t.status = 'paused'
-          AND o.conversation_id = t.conversation_id AND o.user_id = ${userId}::uuid
-          AND o.status = 'in_progress' AND o.id <> t.id
-        RETURNING o.id
-      `),
-      db
-        .update(toolRun)
-        .set({ status: "in_progress" })
-        .where(
-          and(
-            eq(toolRun.id, runId),
-            eq(toolRun.userId, userId),
-            eq(toolRun.status, "paused"),
-          ),
-        ),
-      db
-        .select()
-        .from(toolRun)
-        .where(and(eq(toolRun.id, runId), eq(toolRun.userId, userId))),
+      ...resumeStatements(userId, runId),
+      selectRun(userId, runId),
     ]);
     const first = paused.rows[0] as { id: string } | undefined;
     return { run: current[0], pausedRunId: first?.id ?? null };
@@ -312,7 +338,7 @@ export const abandon = async (
   userId: string,
   runId: string,
 ): Promise<Result<RunRow, AbandonError>> => {
-  const [, current] = await db.batch([
+  const [, , current] = await db.batch([
     db
       .update(toolRun)
       .set({ status: "abandoned" })
@@ -323,10 +349,12 @@ export const abandon = async (
           sql`${toolRun.status} IN ('in_progress', 'paused')`,
         ),
       ),
-    db
-      .select()
-      .from(toolRun)
-      .where(and(eq(toolRun.id, runId), eq(toolRun.userId, userId))),
+    // Spec 0004, AC-5: an abandoned run's credit hold is released in the same batch.
+    releaseRunHolds(
+      sql`SELECT id FROM tool_run WHERE id = ${runId}::uuid AND user_id = ${userId}::uuid AND status = 'abandoned'`,
+      "abandoned",
+    ),
+    selectRun(userId, runId),
   ]);
   const run = current[0];
   if (!run) return err({ code: "not_found" });

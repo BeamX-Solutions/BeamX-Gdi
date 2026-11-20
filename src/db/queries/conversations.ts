@@ -3,6 +3,7 @@ import { db } from "../client";
 import { newId } from "../id";
 import { conversation, toolRun } from "../schema";
 import { clampLimit, decodeCursor, pageQuery, toPage } from "./messages";
+import { releaseRunHolds } from "./credit-holds";
 import { runsWithReports } from "./reports";
 import { err, ok, type Result } from "@/lib/result";
 
@@ -146,7 +147,7 @@ export const remove = async (
   userId: string,
   conversationId: string,
 ): Promise<Result<true, ConversationError>> => {
-  const [, deleted] = await db.batch([
+  const [, , deleted] = await db.batch([
     db
       .update(toolRun)
       .set({ status: "abandoned" })
@@ -157,6 +158,11 @@ export const remove = async (
           sql`${toolRun.status} IN ('in_progress', 'paused')`,
         ),
       ),
+    // Spec 0004, AC-5: release the abandoned runs' credit holds before the chat goes.
+    releaseRunHolds(
+      sql`SELECT id FROM tool_run WHERE conversation_id = ${conversationId}::uuid AND user_id = ${userId}::uuid AND status = 'abandoned'`,
+      "abandoned",
+    ),
     db
       .delete(conversation)
       .where(
