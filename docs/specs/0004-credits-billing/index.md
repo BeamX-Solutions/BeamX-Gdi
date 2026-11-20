@@ -95,7 +95,7 @@ Reasoning and options: see [rationale.md](rationale.md).
 | `credit_hold` | `id` | uuid | no | PK |
 | | `user_id` | uuid | no | FK `user.id` ON DELETE CASCADE |
 | | `purpose` | `hold_purpose` enum (`run`, `chat`) | no | |
-| | `run_id` | uuid | yes | FK `tool_run.id` ON DELETE SET NULL |
+| | `run_id` | uuid | yes | FK `tool_run.id` ON DELETE CASCADE (a hold is deleted with its run; see the note under Indexes and constraints) |
 | | `message_id` | uuid | yes | the assistant message id (chat holds) |
 | | `amount` | integer | no | CHECK `amount > 0`; the price locked at hold time |
 | | `status` | `hold_status` enum (`active`, `charged`, `released`) | no | default `active` |
@@ -127,7 +127,7 @@ Indexes and constraints:
 - `credit_ledger` index `(user_id, created_at desc, id desc)` for the history page (keyset pagination).
 - `credit_hold_one_active_per_run`: unique `(run_id)` WHERE `status = 'active' AND purpose = 'run'`.
 - `credit_hold_one_per_message`: unique `(message_id)` WHERE `purpose = 'chat'`.
-- `credit_hold_target`: CHECK `purpose <> 'run' OR run_id IS NOT NULL OR status <> 'active'` and CHECK `(purpose = 'chat') = (message_id IS NOT NULL)`. An active run hold always has its run; a settled one may outlive it (SET NULL).
+- `credit_hold_target`: CHECK `purpose <> 'run' OR run_id IS NOT NULL OR status <> 'active'` and CHECK `(purpose = 'chat') = (message_id IS NOT NULL)`. A run hold never outlives its run: `credit_hold.run_id` is ON DELETE CASCADE, not SET NULL. Today a run is deleted only by the user cascade (a conversation delete sets `tool_run.conversation_id` to null and keeps the run). In that cascade, SET NULL could clear `run_id` on an active hold before the hold's own `user_id` cascade removes it, trip this CHECK, and abort the account deletion (AC-19). The money record is unaffected: `credit_ledger.hold_id` and `credit_ledger.run_id` stay SET NULL, so ledger entries survive their hold and run. Any future path that deletes a run alone must first release its active hold in the same batch (with `releaseRunHolds`), or `held` drifts; the daily drift check (task 19) would flag it.
 - `credit_hold_settled`: CHECK `(status = 'active') = (settled_at IS NULL)`, `(status = 'released') = (release_reason IS NOT NULL)`, `(status = 'charged') = (charged_amount IS NOT NULL)`.
 - `credit_hold` index `(status, purpose)` WHERE `status = 'active'` for the idle sweep.
 - `payment` index `(status, created_at)` WHERE `status = 'pending'` for the sweep; index `(user_id)`.
@@ -298,6 +298,7 @@ Ordered Tracer Bullet: milestone 1 is one thin, real thread (a guest pays for a 
 **Negative / tradeoffs**:
 - Holds add a second number to keep in step (`held`), and every money path must use the provided statement builders; a hand written `UPDATE credit_account` breaks the invariants.
 - `billing_assert` is a raised error used for control flow, a small, deliberate oddity that the query layer must map carefully.
+- Holds are deleted with their run (CASCADE), so a settled hold leaves no row once its run is gone; the ledger entry (with `hold_id` and `run_id` set to null) is the lasting record. Deleting a run on its own, which nothing does today, must release its hold first.
 - Metered chat means the exact chat price isn't known before sending (only the ceiling).
 - Price changes need a deploy (about 2 minutes); there is no admin UI until the staff console.
 - Expiry is not enforced until the email reminder ships, so inactive balances linger until slice 5.

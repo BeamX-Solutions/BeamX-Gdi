@@ -75,3 +75,7 @@ The supporting choices follow the same forces. The hosted Paystack redirect keep
 - Luna import by verified email, freezing Luna credits at cutover.
 - Staff adjustments through a guarded script; money refunds by hand in the Paystack dashboard.
 - Account deletion: ledger and holds cascade, payments kept unlinked, email hash kept.
+
+### Update 2026-11-20: `credit_hold.run_id` cascades on run delete
+
+The first draft had `credit_hold.run_id` ON DELETE SET NULL, so a settled hold could outlive its run. Building task 2 showed this breaks account deletion. Deleting a user cascades through both `tool_run` and `credit_hold`, and Postgres may apply the SET NULL to an active hold before removing the hold itself. That trips `credit_hold_target` (an active run hold must have a run) and aborts the whole delete. Options were: CASCADE (chosen), keep SET NULL and relax the CHECK (loses the guarantee that an active hold always has a run), or delete holds explicitly before the user in app code (fragile, and Better Auth's own delete would bypass it). CASCADE costs nothing real: runs are only deleted with their user today, the holds go in that cascade anyway, and the ledger keeps the money history with its own SET NULL links. The deletion test in `src/db/queries/link.int.test.ts` covers it (a user with an active hold is deleted, and no credit rows remain).
