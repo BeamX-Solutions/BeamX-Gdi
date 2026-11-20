@@ -16,7 +16,7 @@ const schema = z.object({
   ),
   // Upstash Redis (spec 0001): the chat turn lock now, rate limits and resumable streams
   // later. Optional at boot: without them the turn lock is off (logged), so dev and CI
-  // run without Redis. Production must set both.
+  // run without Redis. A production deploy fails without both (`envSchema`).
   UPSTASH_REDIS_REST_URL: z.preprocess(
     (v) => (v === "" ? undefined : v),
     z.url().optional(),
@@ -28,6 +28,25 @@ const schema = z.object({
 });
 
 export type Env = z.infer<typeof schema>;
+
+/**
+ * The schema for this deploy. In production the turn lock must be real, so a missing
+ * Upstash variable fails loudly instead of quietly turning the lock off. Pure.
+ */
+export const envSchema = (production: boolean) =>
+  schema.superRefine((value, ctx) => {
+    if (!production) return;
+    for (const name of [
+      "UPSTASH_REDIS_REST_URL",
+      "UPSTASH_REDIS_REST_TOKEN",
+    ] as const)
+      if (value[name] === undefined)
+        ctx.addIssue({
+          code: "custom",
+          path: [name],
+          message: `${name} is required in production (the chat turn lock)`,
+        });
+  });
 
 const skip = process.env.SKIP_ENV_VALIDATION === "1";
 
@@ -56,4 +75,7 @@ export const env: Env = skip
       UPSTASH_REDIS_REST_TOKEN:
         process.env.UPSTASH_REDIS_REST_TOKEN || undefined,
     } satisfies Env)
-  : schema.parse({ ...process.env, NEXT_PUBLIC_APP_URL: appUrl });
+  : envSchema(process.env.VERCEL_ENV === "production").parse({
+      ...process.env,
+      NEXT_PUBLIC_APP_URL: appUrl,
+    });

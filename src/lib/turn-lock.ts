@@ -4,14 +4,15 @@
  * turn never frees a lock a later turn took after this one expired.
  *
  * Without the Upstash variables the lock is off: every acquire succeeds and a
- * `turn_lock_disabled` line is logged once, so dev and CI run without Redis.
+ * `turn_lock_disabled` line is logged once, so dev and CI run without Redis. Production
+ * requires both (`env.ts`).
  */
 import { Redis } from "@upstash/redis";
 import { env } from "./env";
 import { logEvent } from "./log";
 
 export type TurnLock = {
-  /** True when this turn now holds the lock. */
+  /** True when this turn now holds the lock. Never throws: a Redis error counts as taken. */
   readonly acquire: (conversationId: string, token: string) => Promise<boolean>;
   /** Frees the lock only if `token` still holds it. Never throws. */
   readonly release: (conversationId: string, token: string) => Promise<void>;
@@ -25,11 +26,21 @@ const key = (conversationId: string) => `turn:${conversationId}`;
 const RELEASE = `if redis.call("get", KEYS[1]) == ARGV[1] then return redis.call("del", KEYS[1]) else return 0 end`;
 
 export const redisTurnLock = (redis: Redis): TurnLock => ({
-  acquire: async (conversationId, token) =>
-    (await redis.set(key(conversationId), token, {
-      nx: true,
-      ex: TURN_LOCK_TTL_S,
-    })) === "OK",
+  acquire: async (conversationId, token) => {
+    try {
+      return (
+        (await redis.set(key(conversationId), token, {
+          nx: true,
+          ex: TURN_LOCK_TTL_S,
+        })) === "OK"
+      );
+    } catch {
+      // Fail closed: the client sees the "one moment" notice and can send again,
+      // rather than a 500, and two turns never run at once.
+      logEvent("turn_lock_acquire_failed", { conversationId });
+      return false;
+    }
+  },
   release: async (conversationId, token) => {
     try {
       await redis.eval(RELEASE, [key(conversationId)], [token]);
