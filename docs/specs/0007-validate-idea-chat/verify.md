@@ -45,3 +45,50 @@ Run against a production build: `SKIP_ENV_VALIDATION=1 pnpm build`, then `E2E_FA
 - AC-5: reload keeps the thread, page shows `conversations.open` rows
 - AC-7: other owner 404 (page and POST), unknown uuid empty, bad uuid 404, BotID 403
 - AC-3, AC-4, AC-6, AC-8 (notices), AC-9 to AC-12: later milestones
+
+## Milestone 2: chat client, part renderers, report panel, credit cards, chip
+
+Same setup: a production build with `E2E_FAKE_AI=true pnpm start`, a fresh browser (no cookies) for each guest. Updated 2026-11-21.
+
+### UI / manual
+
+- [ ] On `/`, tap "I have a business idea" → the confirm card reads "Start Stellar?", "This uses 30 credits." and "You have 30 credits available.", with Approve and Not now; no chip shows yet (no account) → AC-3, AC-9
+- [ ] Tap Not now → the card says "Not started", no `tool_run` and no `credit_hold` row exist, and the chip stays hidden → AC-3
+- [ ] In a new chat, tap Approve → the card says "Approved", one `credit_account` with the 30 starter grant and one active 30 credit hold exist, the chip shows "0 credits", and the first card (or the "From our chat" prefill card) shows → AC-3, AC-9
+- [ ] Answer a card → it collapses into your answer bubble with Edit; Edit reopens it with the old answer picked, and a new answer replaces it (only the newest bubble per question keeps Edit) → AC-3
+- [ ] On a prefill card, Accept all saves the listed answers (`source = 'chat'`) and shows the next card; Edit on one item keeps the others and opens that question's card → AC-3
+- [ ] Answer all 11 cards → the "View report" card shows, the panel opens beside the chat with the generating skeleton, then the green, yellow or red Stellar report; the hold becomes `charged` and the chip still shows "0 credits" → AC-4, AC-9
+- [ ] At 390px wide, finish a run → the report opens as a full screen sheet by itself; close it and the "View report" card opens it again with focus returned on close → AC-4
+- [ ] Reload `/c/<uuid>` after the report → the thread, the answer bubbles (no Edit) and the report panel show; the chip is seeded from the server with the right number → AC-5, AC-9
+- [ ] Reload `/c/<uuid>` while the report is still generating → the panel resumes the skeleton and turns into the report without a second claim (one `report_claimed` log per attempt) → AC-5
+- [ ] Set the guest's `credit_account.balance` to 0 (no holds), ask for Stellar and approve → the short balance card says "You need 30 credits more for this run." with the guest line and no button → AC-10
+- [ ] With a run in progress, type "stop" → the stop card reads "Stop this run? Your 30 credits held will be returned."; Stop the run releases the hold and the chip goes back up → AC-9
+- [ ] Force a `complete_retry` (change an answer row between the last tap and completion) → the "Something changed while saving" card's Try again completes the run → AC-11
+- [ ] Tap a card twice fast while the first tap is in flight → the second tap is ignored (cards are off while a turn runs); if the server still answers `busy`, the "One moment" card's Send again resends the tap → AC-11
+- [ ] Make the report fail (stop the network during generation) → the panel shows the friendly Retry card, never a blank panel → AC-11
+
+### Commands
+
+- [ ] `pnpm test` → `chat-view.test.ts`, `credit-copy.test.ts`, `chat-copy.test.ts` and the new `ai-turn.test.ts` cases (account balance on the card, failed balance read shows no card, summary on the approved start) pass → AC-3, AC-9, AC-10
+- [ ] `pnpm test:integration` on a throwaway Neon branch → `report-api.int.test.ts` passes, including the GET's `summary` and the failed summary read that leaves it out → AC-9
+- [ ] `SKIP_ENV_VALIDATION=1 ENABLE_DESIGN_PAGE=true pnpm build && pnpm e2e` → axe passes on `/design` with the confirm, stop, short balance, prefill cards and the chip, in both themes at 360 and 1280px → AC-11
+
+### Value sourcing
+
+- [ ] Confirm card available balance: with no account it is `billingConfig.grants.starter` (30); give an account 12 available and it shows 12; with `credits.getSummary` failing, no card shows and nothing is held → AC-3
+- [ ] Confirm card price: change Stellar's `creditPrice` between the card and the tap → the approval is refused and nothing is held → AC-3
+- [ ] Chip seed: the header's server read (`credits.getSummary`) matches `credit_account.balance - held` on both `/` and `/c/<uuid>` → AC-9
+- [ ] Chip updates: the number changes from the approval result's `summary`, the stop result's `summary`, and the report GET's `summary`, each without a reload → AC-9
+- [ ] Short balance card: the shortfall equals the `insufficient_credits` result's `shortfall` (price minus available) → AC-10
+- [ ] Stop card held amount: equals the run's active hold (`credits.runQuote`), and the plain "Stop this run?" shows when there is none → AC-9
+- [ ] Report panel: shows the newest `data-report` run; the status is the report GET for that run → AC-4, AC-5
+
+### Acceptance-criteria coverage (milestone 2)
+
+- AC-3: confirm card price and balance, approve holds and shows the first or prefill card, decline starts nothing, card answers and edits
+- AC-4: all cards to the report, panel and phone sheet, charge on ready
+- AC-5: reload with a report and while generating
+- AC-9: chip hidden with no account, seeded on the server, updated from approval, stop and report status
+- AC-10: guest short balance card
+- AC-11: complete_retry, busy, report failure cards
+- AC-6, AC-8, AC-12: later milestones

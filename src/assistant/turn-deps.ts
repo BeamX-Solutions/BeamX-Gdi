@@ -7,6 +7,7 @@ import * as credits from "@/db/queries/credits";
 import * as messages from "@/db/queries/messages";
 import * as runs from "@/db/queries/runs";
 import * as usage from "@/db/queries/usage";
+import { toCreditSummary } from "@/billing/summary";
 import { newId } from "@/db/id";
 import { logEvent } from "@/lib/log";
 import { turnLock } from "@/lib/turn-lock";
@@ -88,6 +89,8 @@ const aiTurnDeps: AiTurnDeps = {
     );
     return started.ok ? ok({ runId: started.value.run.id }) : started;
   },
+  getSummary: async (ownerId) =>
+    toCreditSummary(await credits.getSummary(ownerId)),
   runQuote: credits.runQuote,
   resumeRun: async (ownerId, runId) => {
     const resumed = await runs.resume(ownerId, runId);

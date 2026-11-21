@@ -77,3 +77,30 @@ export const reportErrorCopy: Readonly<
     message: "Your credits were returned.",
   },
 };
+
+/** The `data-error` kinds the chat can show (spec 0006, "Message parts"). */
+export type ChatErrorKind = "ai_error" | "refusal" | "complete_retry" | "busy";
+
+/**
+ * Chat error card copy (spec 0006, AC-7, AC-14; spec 0007, AC-11). The action label is
+ * the one button: Retry sends the turn again, `complete_retry` runs completion again,
+ * and `busy` sends the message that was not taken.
+ */
+export const chatErrorCopy: Readonly<Record<ChatErrorKind, ErrorCopy>> = {
+  ai_error: errorCopy.ai_error,
+  refusal: {
+    title: "I can't help with that one",
+    message: "Try asking in a different way.",
+    actionLabel: "Try again",
+  },
+  complete_retry: {
+    title: "Something changed while saving",
+    message: "Tap to try again. Your answers are safe.",
+    actionLabel: "Try again",
+  },
+  busy: {
+    title: "One moment",
+    message: "I'm still on your last message.",
+    actionLabel: "Send again",
+  },
+};

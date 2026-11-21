@@ -5,6 +5,7 @@
  */
 import type { UIMessage } from "ai";
 import type { Result } from "@/lib/result";
+import { tools } from "@/tools/registry";
 import type { ChatDataParts } from "./parts";
 
 export type ChatUIMessage = UIMessage<unknown, ChatDataParts>;
@@ -59,3 +60,7 @@ export const loadChat = async (
   const owner = await deps.ownerOf(conversationId);
   return owner.ok ? { kind: "not_found" } : { kind: "chat", messages: [] };
 };
+
+/** Every registered tool's name by id, for the confirm card ("Start Stellar?"). Pure. */
+export const toolNames = (): Readonly<Record<string, string>> =>
+  Object.fromEntries(tools.map((t) => [t.id, t.name]));

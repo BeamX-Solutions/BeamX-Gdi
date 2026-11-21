@@ -223,6 +223,7 @@ const fakeDeps = (
     world.answers = [];
     return ok({ runId: RUN });
   },
+  getSummary: async () => null,
   runQuote: async (_o, runId) => {
     const next = nextQuote(world, runId);
     if (next === "throw") throw new Error("db down");
@@ -413,6 +414,7 @@ describe("startRun approval (AC-3)", () => {
     expect(inputOf(chunks, "startRun")[0]).toEqual({
       toolId: "sample",
       shownPrice: 5,
+      availableBalance: 30,
     });
     expect(world.started).toEqual([]);
     // A pending approval adds no question card (AC-8).
@@ -428,6 +430,7 @@ describe("startRun approval (AC-3)", () => {
     price: { first: number; later: number },
     approved: boolean,
     after: readonly Reply[],
+    over: Partial<AiTurnDeps> = {},
   ) => {
     const tool = { current: { ...sampleTool, creditPrice: price.first } };
     const getTool = (id: string) =>
@@ -436,7 +439,7 @@ describe("startRun approval (AC-3)", () => {
       { calls: [{ toolName: "startRun", input: { toolId: "sample" } }] },
     ]);
     const proposed = await read(
-      await createAiTurn(fakeDeps(world, first.model, { getTool }))(
+      await createAiTurn(fakeDeps(world, first.model, { ...over, getTool }))(
         textTurn(world, "m1", "I have a business idea"),
       ),
     );
@@ -446,7 +449,7 @@ describe("startRun approval (AC-3)", () => {
     tool.current = { ...sampleTool, creditPrice: price.later };
     const second = scriptedModel(after);
     const chunks = await read(
-      await createAiTurn(fakeDeps(world, second.model, { getTool }))(
+      await createAiTurn(fakeDeps(world, second.model, { ...over, getTool }))(
         approvalTurn(world, "m2", approvalId, approved),
       ),
     );
@@ -466,6 +469,65 @@ describe("startRun approval (AC-3)", () => {
         data: expect.objectContaining({ runId: RUN, questionId: "stage" }),
       }),
     ]);
+  });
+
+  it("the card shows the account's available credits when an account exists (spec 0007)", async () => {
+    const world = makeWorld();
+    const { model } = scriptedModel([
+      { calls: [{ toolName: "startRun", input: { toolId: "sample" } }] },
+    ]);
+    const chunks = await read(
+      await createAiTurn(
+        fakeDeps(world, model, {
+          getSummary: async () => ({ available: 12, held: 30 }),
+        }),
+      )(textTurn(world, "m1", "I have a business idea")),
+    );
+    expect(inputOf(chunks, "startRun")[0]).toEqual({
+      toolId: "sample",
+      shownPrice: 5,
+      availableBalance: 12,
+    });
+  });
+
+  it("a failed balance read shows no card and starts nothing (fail closed)", async () => {
+    const world = makeWorld();
+    const { model } = scriptedModel([
+      { calls: [{ toolName: "startRun", input: { toolId: "sample" } }] },
+      { text: "Sorry, try again." },
+    ]);
+    const chunks = await read(
+      await createAiTurn(
+        fakeDeps(world, model, {
+          getSummary: async () => {
+            throw new Error("db down");
+          },
+        }),
+      )(textTurn(world, "m1", "I have a business idea")),
+    );
+    expect(approvalOf(chunks)).toEqual([]);
+    expect(inputOf(chunks, "startRun")[0]).toEqual({ toolId: "sample" });
+    expect(world.started).toEqual([]);
+  });
+
+  it("an approved start returns the credit summary for the chip (spec 0007, AC-9)", async () => {
+    const world = makeWorld();
+    const { chunks } = await proposeThen(
+      world,
+      { first: 5, later: 5 },
+      true,
+      [{ text: "Started." }],
+      { getSummary: async () => ({ available: 25, held: 5 }) },
+    );
+    const outputs = chunks.flatMap((c) =>
+      c.type === "tool-output-available" ? [c.output] : [],
+    );
+    expect(outputs).toContainEqual(
+      expect.objectContaining({
+        ok: true,
+        summary: { available: 25, held: 5 },
+      }),
+    );
   });
 
   it("an approved run carries on into the next typed turn (saved as new messages)", async () => {
@@ -524,6 +586,7 @@ describe("startRun approval (AC-3)", () => {
     expect(inputOf(chunks, "startRun").at(-1)).toEqual({
       toolId: "sample",
       shownPrice: 7,
+      availableBalance: 30,
     });
     expect(approvalOf(chunks)).toHaveLength(1);
   });
@@ -968,6 +1031,7 @@ describe("resumeRun (AC-3, AC-9)", () => {
     expect(inputOf(proposed, "resumeRun")[0]).toEqual({
       runId: RUN,
       shownPrice: 5,
+      availableBalance: 30,
     });
     expect(approvalOf(proposed)).toHaveLength(1);
     expect(world.resumed).toEqual([{ runId: RUN, price: 5 }]);
@@ -1156,6 +1220,7 @@ describe("restartRun (AC-5b, AC-9)", () => {
     expect(inputOf(proposed, "restartRun")[0]).toEqual({
       previousRunId: OLD,
       shownPrice: 5,
+      availableBalance: 30,
     });
     expect(world.restarted).toEqual([
       { previousRunId: OLD, version: "2", price: 5 },

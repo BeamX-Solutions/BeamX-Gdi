@@ -9,7 +9,15 @@ import { z } from "zod";
 import { priceStillValid } from "@/billing/pricing";
 import { asOwner } from "../card-steps";
 import type { ToolEnv } from "./env";
-import { holdFailure, quoteRun, serverField, type HoldFailure } from "./money";
+import {
+  cardBalance,
+  holdFailure,
+  quoteRun,
+  serverField,
+  withSummary,
+  type HoldFailure,
+  type WithSummary,
+} from "./money";
 
 export const restartRunInput = z.strictObject({
   previousRunId: z
@@ -17,13 +25,15 @@ export const restartRunInput = z.strictObject({
     .max(100)
     .describe("The completed run to start again, from the run state note."),
   shownPrice: serverField("The price on the approval card."),
+  availableBalance: serverField("The balance on the approval card."),
 });
 
 export type RestartRunInput = z.infer<typeof restartRunInput>;
 
 /**
- * Writes `shownPrice` only for a completed run of this chat whose tool is registered.
- * The price is the tool's current one, also after a version change (the fresh run).
+ * Writes `shownPrice` and `availableBalance` only for a completed run of this chat whose
+ * tool is registered. The price is the tool's current one, also after a version change
+ * (the fresh run). A failed balance read leaves both out.
  */
 export const refineRestartRun =
   (env: ToolEnv) =>
@@ -32,10 +42,19 @@ export const refineRestartRun =
     const read = await quoteRun(env, input.previousRunId);
     if (!read.ok || read.quote.status !== "completed") return bare;
     const found = env.deps.getTool(read.quote.toolId);
-    return found.ok ? { ...bare, shownPrice: found.value.creditPrice } : bare;
+    if (!found.ok) return bare;
+    try {
+      return {
+        ...bare,
+        shownPrice: found.value.creditPrice,
+        availableBalance: await cardBalance(env),
+      };
+    } catch {
+      return bare;
+    }
   };
 
-export type RestartRunOutput =
+export type RestartRunOutput = WithSummary<
   | {
       readonly ok: true;
       readonly runId: string;
@@ -47,7 +66,8 @@ export type RestartRunOutput =
       readonly ok: false;
       readonly error: "previous_not_completed" | "price_changed";
     }
-  | HoldFailure;
+  | HoldFailure
+>;
 
 export const restartRunTool = (env: ToolEnv) =>
   tool({
@@ -59,12 +79,17 @@ export const restartRunTool = (env: ToolEnv) =>
       shownPrice,
     }): Promise<RestartRunOutput> => {
       const { deps, conversationId } = env;
-      const done = (output: RestartRunOutput) => {
+      // A hold or a refused hold changes what the chip should show (spec 0007, AC-9).
+      const done = async (
+        output: RestartRunOutput,
+      ): Promise<RestartRunOutput> => {
         deps.log("assistant_tool", {
           name: "restartRun",
           outcome: output.ok ? "ok" : output.error,
         });
-        return output;
+        return output.ok || output.error === "insufficient_credits"
+          ? withSummary(env, output)
+          : output;
       };
       const read = await quoteRun(env, previousRunId);
       if (!read.ok) return done({ ok: false, error: read.error });

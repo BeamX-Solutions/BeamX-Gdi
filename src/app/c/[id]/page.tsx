@@ -3,9 +3,12 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { z } from "zod";
-import { loadChat } from "@/assistant/chat-page";
+import { loadChat, toolNames } from "@/assistant/chat-page";
 import { sessionUserId } from "@/auth/session";
+import { toCreditSummary } from "@/billing/summary";
+import { CreditChip } from "@/components/credits/credit-chip";
 import * as conversations from "@/db/queries/conversations";
+import * as credits from "@/db/queries/credits";
 import { Chat } from "@/components/workspace/chat";
 
 /**
@@ -15,7 +18,7 @@ import { Chat } from "@/components/workspace/chat";
  */
 export default function SavedChatPage({ params }: PageProps<"/c/[id]">) {
   return (
-    <Suspense fallback={<Chat loading />}>
+    <Suspense fallback={<Chat loading toolNames={toolNames()} />}>
       <SavedChat params={params} />
     </Suspense>
   );
@@ -28,11 +31,22 @@ async function SavedChat({ params }: Pick<PageProps<"/c/[id]">, "params">) {
   // session and DB reads start (an aborted read logs a Better Auth error).
   await connection();
   const userId = await sessionUserId(await headers());
-  const page = await loadChat(
-    { open: conversations.open, ownerOf: conversations.ownerOf },
-    userId,
-    id,
-  );
+  // The thread and the chip's credits in parallel: Frankfurt is far from Nigeria.
+  const [page, summary] = await Promise.all([
+    loadChat(
+      { open: conversations.open, ownerOf: conversations.ownerOf },
+      userId,
+      id,
+    ),
+    userId === null ? null : credits.getSummary(userId),
+  ]);
   if (page.kind === "not_found") notFound();
-  return <Chat conversationId={id} initialMessages={page.messages} />;
+  return (
+    <Chat
+      conversationId={id}
+      initialMessages={page.messages}
+      toolNames={toolNames()}
+      chip={<CreditChip initial={toCreditSummary(summary)} />}
+    />
+  );
 }

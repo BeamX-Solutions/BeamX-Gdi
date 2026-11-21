@@ -114,7 +114,7 @@ spec [0007](../specs/0007-validate-idea-chat/index.md) · code in `src/app`, `sr
 - [x] Design it (spec): `/architect validate an idea in chat`
 - [ ] Build it: `/develop validate an idea in chat`
   - [x] Chat screens, auth route and client with BotID, POST /api/chat with one writer per turn and the fake model (AC-1, AC-2, AC-5, AC-7)
-  - [ ] useChat client, part renderers, report panel wiring, credit cards and the client chip (AC-3, AC-4, AC-9, AC-10, AC-11)
+  - [x] useChat client, part renderers, report panel wiring, credit cards and the client chip (AC-3, AC-4, AC-9, AC-10, AC-11)
   - [ ] Resumable streams and message limits (AC-6, AC-8)
   - [ ] Playwright full flow with axe, and a real model run (AC-4, AC-12)
 - [ ] Verify it: `/check verify validate an idea in chat`

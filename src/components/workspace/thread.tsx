@@ -9,12 +9,17 @@ import {
 } from "@/components/ai-elements/message";
 import { nextAnnouncement } from "./announce";
 import { StatusLine } from "./status-line";
-import type { MessageView } from "./types";
+import type { MessageView, ThreadEntry } from "./types";
 
 type ThreadProps = {
   readonly messages: readonly MessageView[];
   /** Plain text status while the assistant works; null when idle. */
   readonly status: string | null;
+  /**
+   * The thread in order, cards between messages. When absent, `messages` are drawn.
+   * Announcements always come from `messages`.
+   */
+  readonly entries?: readonly ThreadEntry[];
   /** Answer cards, the report card, and error cards, shown after the last message. */
   readonly children?: ReactNode;
   readonly label?: string;
@@ -26,7 +31,13 @@ type ThreadProps = {
  * is announced once, in full, when it stops streaming, and each new status text is
  * announced too (AC-6).
  */
-export function Thread({ messages, status, children, label }: ThreadProps) {
+export function Thread({
+  messages,
+  status,
+  entries,
+  children,
+  label,
+}: ThreadProps) {
   const [tracked, setTracked] = useState({
     messages,
     status,
@@ -43,22 +54,18 @@ export function Thread({ messages, status, children, label }: ThreadProps) {
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
       <Conversation label={label}>
-        {messages.map((message) => (
-          <Message key={message.id} from={message.role}>
-            <MessageContent aria-busy={message.streaming || undefined}>
-              {message.role === "assistant" ? (
-                <MessageResponse
-                  mode={message.streaming ? "streaming" : "static"}
-                  isAnimating={message.streaming}
-                >
-                  {message.markdown}
-                </MessageResponse>
-              ) : (
-                <p className="whitespace-pre-wrap">{message.markdown}</p>
-              )}
-            </MessageContent>
-          </Message>
-        ))}
+        {(
+          entries ??
+          messages.map((message): ThreadEntry => ({ kind: "message", message }))
+        ).map((entry) =>
+          entry.kind === "message" ? (
+            <MessageBubble key={entry.message.id} message={entry.message} />
+          ) : (
+            <div key={entry.id} className="flex min-w-0 flex-col">
+              {entry.node}
+            </div>
+          ),
+        )}
         <StatusLine text={status} />
         {children}
       </Conversation>
@@ -71,5 +78,24 @@ export function Thread({ messages, status, children, label }: ThreadProps) {
         {tracked.announcement}
       </div>
     </div>
+  );
+}
+
+function MessageBubble({ message }: { readonly message: MessageView }) {
+  return (
+    <Message from={message.role}>
+      <MessageContent aria-busy={message.streaming || undefined}>
+        {message.role === "assistant" ? (
+          <MessageResponse
+            mode={message.streaming ? "streaming" : "static"}
+            isAnimating={message.streaming}
+          >
+            {message.markdown}
+          </MessageResponse>
+        ) : (
+          <p className="whitespace-pre-wrap">{message.markdown}</p>
+        )}
+      </MessageContent>
+    </Message>
   );
 }

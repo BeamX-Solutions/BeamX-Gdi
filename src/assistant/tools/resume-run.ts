@@ -9,11 +9,14 @@ import { priceStillValid } from "@/billing/pricing";
 import { asOwner } from "../card-steps";
 import type { ToolEnv } from "./env";
 import {
+  cardBalance,
   currentTool,
   holdFailure,
   quoteRun,
   serverField,
+  withSummary,
   type HoldFailure,
+  type WithSummary,
 } from "./money";
 
 export const resumeRunInput = z.strictObject({
@@ -22,14 +25,15 @@ export const resumeRunInput = z.strictObject({
     .max(100)
     .describe("The paused run to continue, from the run state note."),
   shownPrice: serverField("The price on the approval card, if one is needed."),
+  availableBalance: serverField("The balance on the approval card."),
 });
 
 export type ResumeRunInput = z.infer<typeof resumeRunInput>;
 
 /**
- * Writes `shownPrice` only for a paused run of this chat, on its tool's current version,
- * with no active hold. Anything else (a held run, a failed read) leaves it out, so the
- * call runs with no card and `execute` decides.
+ * Writes `shownPrice` and `availableBalance` only for a paused run of this chat, on its
+ * tool's current version, with no active hold. Anything else (a held run, a failed
+ * read) leaves them out, so the call runs with no card and `execute` decides.
  */
 export const refineResumeRun =
   (env: ToolEnv) =>
@@ -38,20 +42,31 @@ export const refineResumeRun =
     if (!read.ok) return { runId: input.runId };
     const { quote } = read;
     const picked = currentTool(env, quote);
-    return quote.status === "paused" &&
-      quote.heldAmount === null &&
-      picked !== null
-      ? { runId: input.runId, shownPrice: picked.creditPrice }
-      : { runId: input.runId };
+    if (
+      quote.status !== "paused" ||
+      quote.heldAmount !== null ||
+      picked === null
+    )
+      return { runId: input.runId };
+    try {
+      return {
+        runId: input.runId,
+        shownPrice: picked.creditPrice,
+        availableBalance: await cardBalance(env),
+      };
+    } catch {
+      return { runId: input.runId };
+    }
   };
 
-export type ResumeRunOutput =
+export type ResumeRunOutput = WithSummary<
   | { readonly ok: true; readonly runId: string; readonly toolName: string }
   | {
       readonly ok: false;
       readonly error: "version_changed" | "approval_required" | "price_changed";
     }
-  | HoldFailure;
+  | HoldFailure
+>;
 
 export const resumeRunTool = (env: ToolEnv) =>
   tool({
@@ -103,8 +118,9 @@ export const resumeRunTool = (env: ToolEnv) =>
         (id) => deps.resumeRunWithHold(id, runId, price),
       );
       env.owner.current = owner.current;
-      if (!result.ok) return done(holdFailure(result.error, price));
+      if (!result.ok)
+        return done(await withSummary(env, holdFailure(result.error, price)));
       env.record({ kind: "resumed", runId });
-      return done(resumed);
+      return done(await withSummary(env, resumed));
     },
   });

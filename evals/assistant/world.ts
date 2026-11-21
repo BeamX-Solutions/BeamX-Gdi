@@ -152,6 +152,7 @@ export const evalDeps = (
     },
     ensureAccount: async () => ({ created: false, granted: 0 }),
     startRunWithHold: async () => ok({ runId: RUN_IDS.active }),
+    getSummary: async () => null,
     runQuote: async (_o, runId) => {
       const quote = quoteOf(world, runId);
       return quote === null ? err({ code: "not_found" }) : ok(quote);

@@ -4,6 +4,7 @@
  * before drawing anything. A 409 body carries an extra `code`, which is stripped.
  */
 import { z } from "zod";
+import { creditSummarySchema } from "@/billing/summary";
 import {
   reportErrorCopy,
   type ReportErrorViewKind,
@@ -85,6 +86,8 @@ export const reportPayloadSchema = z.object({
   canRetry: z.boolean(),
   stale: z.boolean(),
   view: z.array(reportBlockSchema).optional(),
+  /** The header chip's credits, on the GET (spec 0007, AC-9); null with no account. */
+  summary: creditSummarySchema.nullable().optional(),
 });
 
 export type ReportPayload = z.infer<typeof reportPayloadSchema>;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { reportPayloadSchema } from "./report-payload";
 import {
   asRetrying,
@@ -38,13 +38,26 @@ const request = async (
 /**
  * Polls a run's report status (spec 0005, AC-11): every 2s, then every 5s after 30s,
  * stopping once the report is ready, failed, or stale. `retry` POSTs the report again
- * and restarts the poll at the fast pace.
+ * and restarts the poll at the fast pace. A null `runId` polls nothing.
+ *
+ * A `pending` report has never been claimed, so the first poll that sees one POSTs it
+ * once (spec 0007: the view report card starts the report). The claim is idempotent
+ * (spec 0005), so a remount that POSTs again is harmless.
  */
-export function useReportStatus(runId: string) {
+export function useReportStatus(runId: string | null) {
   const [state, setState] = useState<FetchState>({ kind: "loading" });
   const [cycle, setCycle] = useState(0);
+  const [tracked, setTracked] = useState(runId);
+  // A new run starts from the loading state, never the last run's report.
+  if (tracked !== runId) {
+    setTracked(runId);
+    setState({ kind: "loading" });
+  }
+  // Runs this mount already POSTed, so a pending poll claims each one once.
+  const claimed = useRef(new Set<string>());
 
   useEffect(() => {
+    if (runId === null) return;
     const controller = new AbortController();
     const startedAt = Date.now();
     const timers: ReturnType<typeof setTimeout>[] = [];
@@ -53,7 +66,14 @@ export function useReportStatus(runId: string) {
       const next = await request(runId, "GET", controller.signal);
       if (controller.signal.aborted) return;
       setState(next);
-      if (next.kind === "loaded" && shouldPoll(next.payload)) {
+      if (next.kind !== "loaded") return;
+      if (next.payload.status === "pending" && !claimed.current.has(runId)) {
+        claimed.current.add(runId);
+        await request(runId, "POST", controller.signal);
+        if (!controller.signal.aborted) void poll();
+        return;
+      }
+      if (shouldPoll(next.payload)) {
         timers.push(
           setTimeout(() => void poll(), pollDelayMs(Date.now() - startedAt)),
         );
@@ -68,6 +88,7 @@ export function useReportStatus(runId: string) {
   }, [runId, cycle]);
 
   const retry = useCallback(async () => {
+    if (runId === null) return;
     setState(asRetrying);
     // The POST result is not needed: the restarted poll reads the new status, and an
     // offline POST shows up there as an offline poll.
