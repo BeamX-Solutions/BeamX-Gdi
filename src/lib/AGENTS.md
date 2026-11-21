@@ -2,17 +2,20 @@
 
 ## Overview
 
-Shared server helpers every feature leans on: the Zod checked env module, rate limits, the daily AI spend cap, and small shared utilities. `env.ts`, `result.ts`, `log.ts`, and `turn-lock.ts` exist; rate limits, the spend cap, and `ai-cost.ts` are not built yet, so those lines record the rules from spec 0001.
+Shared server helpers every feature leans on: the Zod checked env module, rate limits, the daily AI spend cap, and small shared utilities. `env.ts`, `result.ts`, `log.ts`, `turn-lock.ts`, `resumable.ts`, `bot-check.ts`, and `fake-model.ts` exist; rate limits, the spend cap, and `ai-cost.ts` are not built yet, so those lines record the rules from spec 0001.
 
 ## Key files
 
-| File           | Owns                                                                                                               |
-| -------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `env.ts`       | The only place env vars are read; Zod schema for every var                                                         |
-| `ai-cost.ts`   | Price table used to turn AI `usage` tokens into dollars                                                            |
-| `result.ts`    | `Result<T, E>` with `ok()` / `err()` for expected failures                                                         |
-| `log.ts`       | `logEvent(event, fields)`: one structured JSON log line                                                            |
-| `turn-lock.ts` | The per chat turn lock on Upstash (`turn:<conversationId>`, 60 second expiry); `acquire` and `release` never throw |
+| File            | Owns                                                                                                                                   |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `env.ts`        | The only place env vars are read; Zod schema for every var                                                                             |
+| `ai-cost.ts`    | Price table used to turn AI `usage` tokens into dollars                                                                                |
+| `result.ts`     | `Result<T, E>` with `ok()` / `err()` for expected failures                                                                             |
+| `log.ts`        | `logEvent(event, fields)`: one structured JSON log line                                                                                |
+| `turn-lock.ts`  | The per chat turn lock on Upstash (`turn:<conversationId>`, 60 second expiry); `acquire` and `release` never throw                     |
+| `resumable.ts`  | Resumable chat streams (spec 0007): `resumable-stream` over Upstash, with the `chat:active:<conversationId>` pointer (5 minute expiry) |
+| `bot-check.ts`  | `isBot()`: Vercel BotID for `POST /api/chat` and the anonymous sign in; off Vercel every request counts as human                       |
+| `fake-model.ts` | Scripted AI SDK mock models used when `E2E_FAKE_AI=true` (`pnpm e2e`); a production deploy refuses to boot with it on                  |
 
 ## Conventions
 
@@ -24,6 +27,12 @@ Shared server helpers every feature leans on: the Zod checked env module, rate l
 - Spend cap: after each AI call, `onFinish` adds usage tokens times the `ai-cost.ts` price into an Upstash Redis counter keyed by UTC day. Over `AI_DAILY_SPEND_CAP_USD`, new guest runs pause; signed in users continue.
 - `logEvent` takes an event name plus ids, counts, and flags only; never message content, answers, or secrets.
 - Upstash Redis lives in `eu-central-1` and is shared with `resumable-stream`; namespace keys with a clear prefix per use.
+
+## Gotchas
+
+- Upstash pub/sub messages must not carry raw newlines. The REST subscription is itself SSE and `@upstash/redis` splits it on newlines, so a multi line message (like an SSE chunk) arrives cut at its first newline. `resumable.ts` JSON encodes every message for this reason; keep that for any new pub/sub use.
+- BotID can't be tested through the Deployment Protection bypass token: Vercel trusts bypassed requests and `checkBotId` says human. To check it on a preview, turn off Require Log In briefly, send a plain request with no bypass (expect `403 {"code":"bot"}`), then turn it back on. BotID Basic needs no dashboard switch; only Deep Analysis (paid) does.
+- The Vercel team is on the Hobby plan for now: function `maxDuration` tops out at 300 seconds, and runtime logs last about an hour, so read them right after a test.
 
 ## Agent skills
 

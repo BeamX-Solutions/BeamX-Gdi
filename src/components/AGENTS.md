@@ -13,6 +13,7 @@ Shared UI for the whole workspace, built in spec [0003](../../docs/specs/0003-de
 | `workspace/`    | The shell (`WorkspaceShell`, header, history rail, report panel and sheet), `Thread`, `Composer`, `RunProgressBar`, theme toggle         |
 | `answer-cards/` | The four card kinds from one `QuestionView` shape, the answered bubble, and pure helpers (`format-answer`, `validate`, `progress-label`) |
 | `report/`       | Score header, verdict badge, category bars, advice list, report section, skeleton, with pure `bar-math` and `verdict`                    |
+| `credits/`      | The credit chip and the money cards (confirm, approval, short balance, stop), copy in `credit-copy.ts`                                   |
 | `feedback/`     | `ErrorCard` for the four expected failure kinds, copy in `error-copy.ts`                                                                 |
 | `fixtures/`     | Typed mock data for every state, used by `/design`, Vitest, and Playwright                                                               |
 
@@ -24,6 +25,7 @@ Shared UI for the whole workspace, built in spec [0003](../../docs/specs/0003-de
 - Logic lives in small pure `.ts` files beside the component, each with a Vitest test (`*.test.ts`); components stay thin.
 - One layout tree at a time: `useIsDesktop` picks desktop (rail, chat, resizable panel) or phone (drawer, sheet). Never render both and hide one with CSS.
 - Every tap target is at least 44 by 44px (inline text links are exempt). Animations must stop under reduced motion. The global rule in `globals.css` covers CSS animations and transitions only, so anything animated from JavaScript must check `prefers-reduced-motion` itself.
+- The live chat is `workspace/chat.tsx` (the `useChat` client, spec 0007); what the thread shows comes from the pure `chat-view.ts`, so thread rules (which card is live, busy and limit notices, Send again) get a Vitest case there.
 - The thread owns the only polite live region (`announce.ts`); do not add another.
 - A new shared component or state also gets a showcase on `/design` (`src/app/design/`) and, for a key flow, a Playwright check in `e2e/`.
 
