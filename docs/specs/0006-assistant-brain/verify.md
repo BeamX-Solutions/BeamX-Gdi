@@ -35,9 +35,9 @@ Milestones 1 and 2 are built (card path and AI turn). The chat route and screen 
 
 ## UI / manual (once #7 renders the parts)
 
-- [ ] Say "I have a business idea" → Stellar approval card with price and balance; tap Approve → first question card → AC-3, AC-4
-- [ ] Ask for homework help → polite one or two sentence decline with a pointer back → AC-10
-- [ ] Write in Pidgin → simple English reply with a light Pidgin touch, under about 80 words → AC-11
+- [x] Say "I have a business idea" → Stellar approval card with price and balance; tap Approve → first question card → AC-3, AC-4
+- [x] Ask for homework help → polite one or two sentence decline with a pointer back → AC-10
+- [x] Write in Pidgin → simple English reply with a light Pidgin touch, under about 80 words → AC-11
 
 ## Acceptance criteria coverage
 

@@ -18,7 +18,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 23 | Brand font: Montserrat everywhere, wider chat | Foundation | done |
 | 20 | Tool source access & parity fixtures | Foundation | in-progress |
 | 5 | Tool module contract & registry | Foundation | done |
-| 6 | Assistant brain | Foundation | in-progress |
+| 6 | Assistant brain | Foundation | done |
 | 7 | Validate an idea in chat (Stellar) | Slice 1 | done |
 | 22 | Credits & billing | Slice 1 | in-progress |
 | 21 | Abuse & AI cost guards | Slice 1 | planned |
@@ -104,7 +104,7 @@ spec [0005](../specs/0005-tool-module-contract/index.md) · code in `src/tools`,
   - [x] Report blocks, renderer, panel states on /design, and the contract test over the registry (AC-1, AC-11, AC-13)
 - [x] Verify it: `/check verify tool module contract & registry`
 
-### 6. Assistant brain · in-progress
+### 6. Assistant brain · done
 How the assistant understands what the client wants, picks the right tool, asks the questions as answer cards, skips anything it already knows, and stays on BeamX topics.
 **Done when:** given "I have a business idea" or "how healthy is my business", the assistant picks the right tool, walks the questions, and politely declines off topic requests.
 spec [0006](../specs/0006-assistant-brain/index.md) · code in `src/assistant`, `src/db/queries/credits.ts`, `evals/assistant`
@@ -114,7 +114,7 @@ spec [0006](../specs/0006-assistant-brain/index.md) · code in `src/assistant`, 
   - [x] AI turn: instructions, run state note, registry built startRun with approval, typed answers and reopening cards (AC-2, AC-3, AC-4, AC-8, AC-10, AC-11, AC-12, AC-14)
   - [x] Known facts extraction and prefill card, stop, resume and restart with credits.startFromWithHold (AC-3, AC-5, AC-5b, AC-9)
   - [x] Real model eval harness and the first committed results (AC-4, AC-10, AC-11, AC-12, AC-15)
-- [ ] Verify it: `/check verify assistant brain`
+- [x] Verify it: `/check verify assistant brain`
 
 ## Slice 1: First real thread
 
