@@ -5,6 +5,8 @@ import {
   latestToolSummary,
   threadItems,
   withoutMessageOf,
+  busyRetryPlan,
+  takenUserMessageId,
   type ViewMessage,
 } from "./chat-view";
 
@@ -340,5 +342,90 @@ describe("withoutMessageOf (spec 0007, AC-8)", () => {
     expect(threadItems(after, null).some((i) => i.kind === "question")).toBe(
       true,
     );
+  });
+});
+
+const notice = (id: string, kind: string): ViewMessage => ({
+  id,
+  role: "assistant",
+  parts: [{ type: "data-error", data: { kind, retry: false } }],
+});
+const typed = (id: string, t: string): ViewMessage => ({
+  id,
+  role: "user",
+  parts: [{ type: "text", text: t }],
+});
+const said = (id: string, t: string): ViewMessage => ({
+  id,
+  role: "assistant",
+  parts: [{ type: "text", text: t }],
+});
+
+describe("takenUserMessageId (spec 0007, AC-2)", () => {
+  it("is the user message a real reply answers", () => {
+    const ms = [typed("u1", "hi"), said("a1", "Hello")];
+    expect(takenUserMessageId(ms, said("a1", "Hello"))).toBe("u1");
+  });
+
+  it("is the last user message when the reply is not in the list yet", () => {
+    expect(takenUserMessageId([typed("u1", "hi")], said("a1", "x"))).toBe("u1");
+  });
+
+  it("is null for a busy or limit notice: the server never took the message", () => {
+    const ms = [typed("u1", "hi"), notice("n", "busy")];
+    expect(takenUserMessageId(ms, notice("n", "busy"))).toBeNull();
+    expect(takenUserMessageId(ms, notice("n", "limit_run"))).toBeNull();
+  });
+
+  it("counts an AI error reply (the message was saved before the AI ran)", () => {
+    const ms = [typed("u1", "hi"), notice("e", "ai_error")];
+    expect(takenUserMessageId(ms, notice("e", "ai_error"))).toBe("u1");
+  });
+
+  it("is null for a reply that never started", () => {
+    const empty: ViewMessage = { id: "x", role: "assistant", parts: [] };
+    expect(takenUserMessageId([typed("u1", "hi")], empty)).toBeNull();
+  });
+});
+
+describe("busyRetryPlan (spec 0007, AC-2)", () => {
+  it("a new message refused as busy: drop it and the notice, resend it after", () => {
+    const ms = [
+      typed("u1", "idea"),
+      said("a1", "Tell me more"),
+      typed("u2", "more"),
+      notice("n", "busy"),
+    ];
+    const plan = busyRetryPlan(ms, "n:0", new Set(["u1"]));
+    expect(plan.messages.map((m) => m.id)).toEqual(["u1", "a1"]);
+    expect(plan.resend?.id).toBe("u2");
+  });
+
+  it("a taken message resent (Retry after a dropped stream): keep it, resend nothing", () => {
+    const ms = [typed("u1", "idea"), notice("n", "busy")];
+    const plan = busyRetryPlan(ms, "n:0", new Set(["u1"]));
+    expect(plan.messages.map((m) => m.id)).toEqual(["u1"]);
+    expect(plan.resend).toBeNull();
+  });
+
+  it("never resends a message the running turn is answering, so no duplicate reply", () => {
+    // Send again twice in a row on the same taken message: still nothing resent.
+    const ms = [typed("u1", "idea"), notice("n1", "busy")];
+    const first = busyRetryPlan(ms, "n1:0", new Set(["u1"]));
+    const again = busyRetryPlan(
+      [...first.messages, notice("n2", "busy")],
+      "n2:0",
+      new Set(["u1"]),
+    );
+    expect(again.resend).toBeNull();
+    expect(again.messages.map((m) => m.id)).toEqual(["u1"]);
+  });
+
+  it("an unknown item leaves the thread as it is", () => {
+    const ms = [typed("u1", "idea")];
+    expect(busyRetryPlan(ms, "zz:0", new Set())).toEqual({
+      messages: ms,
+      resend: null,
+    });
   });
 });

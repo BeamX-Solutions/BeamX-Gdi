@@ -27,8 +27,10 @@ export type ChatActions = {
   readonly prefill: (data: PrefillResponseData) => void;
   readonly approve: (approvalId: string, approved: boolean) => void;
   readonly retryComplete: (runId: string) => void;
-  /** Sends the turn again (Retry after an AI error, Send again after `busy`). */
+  /** Sends the turn again (Retry after an AI error). */
   readonly retryTurn: () => void;
+  /** Send again after `busy`: reattaches to the running reply, then resends if needed. */
+  readonly retryBusy: (itemId: string) => void;
   readonly openReport: (runId: string) => void;
   /** Hides a notice that was never saved (a limit notice's Got it). */
   readonly dismiss: (itemId: string) => void;
@@ -150,7 +152,9 @@ export function ChatItem({
                 ? () => actions.dismiss(item.id)
                 : data.kind === "complete_retry" && runId !== undefined
                   ? () => actions.retryComplete(runId)
-                  : actions.retryTurn,
+                  : data.kind === "busy"
+                    ? () => actions.retryBusy(item.id)
+                    : actions.retryTurn,
           }}
         />
       );

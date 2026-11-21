@@ -29,8 +29,10 @@ import {
   type ChatFailure,
 } from "./chat-request";
 import {
+  busyRetryPlan,
   latestReport,
   latestToolSummary,
+  takenUserMessageId,
   threadItems,
   withoutMessageOf,
   type ThreadItem,
@@ -183,6 +185,13 @@ function LiveChat({
   const [selectedRun, setSelectedRun] = useState<string | null>(null);
   // Stops a second send from creating a second guest while the first sign in runs.
   const inFlight = useRef(false);
+  // User messages the server took (saved, then answered): every saved one, plus each
+  // one a reply in this tab shows was taken. "Send again" on busy reads it.
+  const taken = useRef<ReadonlySet<string>>(
+    new Set(initialMessages.filter((m) => m.role === "user").map((m) => m.id)),
+  );
+  // Counts finished replies; a resume that adds none found no running reply (`204`).
+  const finished = useRef(0);
 
   const transport = useMemo(
     () =>
@@ -213,6 +222,7 @@ function LiveChat({
     messages,
     sendMessage,
     regenerate,
+    resumeStream,
     setMessages,
     status,
     error,
@@ -226,6 +236,11 @@ function LiveChat({
     resume: initialMessages.length > 0,
     transport,
     onError: (e) => setFailure(failureOf(e)),
+    onFinish: ({ message, messages: all }) => {
+      finished.current += 1;
+      const userId = takenUserMessageId(all, message);
+      if (userId !== null) taken.current = new Set([...taken.current, userId]);
+    },
   });
 
   const busy =
@@ -285,6 +300,30 @@ function LiveChat({
       setFailure(null);
       clearError();
       void regenerate();
+    },
+    retryBusy: (itemId) => {
+      if (busy || inFlight.current) return;
+      inFlight.current = true;
+      setFailure(null);
+      clearError();
+      const plan = busyRetryPlan(messages, itemId, taken.current);
+      setMessages(plan.messages);
+      void (async () => {
+        try {
+          // Reattach to the reply the other turn is streaming (spec 0007, AC-2).
+          const before = finished.current;
+          await resumeStream();
+          if (plan.resend !== null) {
+            await sendMessage({ parts: plan.resend.parts });
+          } else if (finished.current === before) {
+            // The other turn finished before we got there: its reply is saved, so
+            // reload the saved thread (the URL is already `/c/[id]`) to show it.
+            window.location.reload();
+          }
+        } finally {
+          inFlight.current = false;
+        }
+      })();
     },
     openReport: setSelectedRun,
     dismiss: (itemId) => setMessages((ms) => withoutMessageOf(ms, itemId)),

@@ -451,3 +451,68 @@ export const withoutMessageOf = <
   const from = messages[at - 1]?.role === "user" ? at - 1 : at;
   return [...messages.slice(0, from), ...messages.slice(at + 1)];
 };
+
+/** Notices the server sends instead of taking the message: shown, never saved. */
+const refusalKinds: ReadonlySet<ErrorData["kind"]> = new Set([
+  "busy",
+  "limit_text",
+  "limit_run",
+]);
+
+/**
+ * The user message a finished reply shows the server took (saved, then answered), or
+ * null when the reply is only a busy or limit notice, or never started (no parts). An
+ * AI error mid reply still counts: the message was saved before the AI ran. Pure.
+ */
+export const takenUserMessageId = (
+  messages: readonly ViewMessage[],
+  reply: ViewMessage,
+): string | null => {
+  if (reply.parts.length === 0) return null;
+  const refusal = reply.parts.every((p) => {
+    const e = parse(errorPart, p);
+    return e !== null && refusalKinds.has(e.data.kind);
+  });
+  if (refusal) return null;
+  const at = messages.findIndex((m) => m.id === reply.id);
+  const before = at === -1 ? messages : messages.slice(0, at);
+  return before.findLast((m) => m.role === "user")?.id ?? null;
+};
+
+/** What "Send again" on a busy notice does: the thread to show, then what to send. */
+export type BusyRetry<M> = {
+  /** The thread without the notice, ready for the running reply to stream into. */
+  readonly messages: M[];
+  /** The refused user message, to send once the running reply is done; null if it was taken. */
+  readonly resend: M | null;
+};
+
+/**
+ * "Send again" on a busy notice (spec 0007, AC-2). Another turn holds the chat, so
+ * the client reattaches to that turn's reply instead of asking again (no second AI
+ * call, no duplicate reply). The notice always goes. The user message before it:
+ * - already taken by the server (`taken`, e.g. Retry after a dropped stream resent
+ *   it): the running reply is its answer, so it stays and nothing is resent;
+ * - never taken: it comes off the thread and is sent again after the running reply.
+ * Pure.
+ */
+export const busyRetryPlan = <
+  M extends { readonly id: string; readonly role?: string },
+>(
+  messages: readonly M[],
+  itemId: string,
+  taken: ReadonlySet<string>,
+): BusyRetry<M> => {
+  const at = messages.findIndex((m) => itemId.startsWith(`${m.id}:`));
+  if (at === -1) return { messages: [...messages], resend: null };
+  const refused = messages[at - 1];
+  const resend =
+    refused !== undefined && refused.role === "user" && !taken.has(refused.id)
+      ? refused
+      : null;
+  const from = resend === null ? at : at - 1;
+  return {
+    messages: [...messages.slice(0, from), ...messages.slice(at + 1)],
+    resend,
+  };
+};
