@@ -435,10 +435,19 @@ export const lastTypedMessageId = (
 
 /**
  * The messages without the one a thread item came from (item ids are
- * `<messageId>:<partIndex>`). "Got it" on a limit notice uses it: the notice was never
+ * `<messageId>:<partIndex>`), and without the user message right before it. "Got it" on a limit notice uses it: the notice was never
  * saved, so dropping it on the client is the whole dismissal (spec 0007, AC-8).
  */
-export const withoutMessageOf = <M extends { readonly id: string }>(
+export const withoutMessageOf = <
+  M extends { readonly id: string; readonly role?: string },
+>(
   messages: readonly M[],
   itemId: string,
-): M[] => messages.filter((m) => !itemId.startsWith(`${m.id}:`));
+): M[] => {
+  const at = messages.findIndex((m) => itemId.startsWith(`${m.id}:`));
+  if (at === -1) return [...messages];
+  // The user message the notice refused was never saved either. Dropping it too makes
+  // the reply before it the last message again, so its open card is live (AC-8).
+  const from = messages[at - 1]?.role === "user" ? at - 1 : at;
+  return [...messages.slice(0, from), ...messages.slice(at + 1)];
+};

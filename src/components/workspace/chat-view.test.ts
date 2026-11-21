@@ -313,4 +313,32 @@ describe("withoutMessageOf (spec 0007, AC-8)", () => {
     expect(withoutMessageOf(ms, "b:0")).toEqual([{ id: "a" }, { id: "ab" }]);
     expect(withoutMessageOf(ms, "a:2")).toEqual([{ id: "b" }, { id: "ab" }]);
   });
+
+  it("drops the refused user message with the notice, so the open card is live again", () => {
+    const reply: ViewMessage = {
+      id: "r",
+      role: "assistant",
+      parts: [{ type: "text", text: "Sure." }, question()],
+    };
+    const ms: ViewMessage[] = [
+      reply,
+      { id: "u", role: "user", parts: [{ type: "text", text: "41st" }] },
+      {
+        id: "n",
+        role: "assistant",
+        parts: [
+          { type: "data-error", data: { kind: "limit_run", retry: false } },
+        ],
+      },
+    ];
+    // While the notice shows, it is the last message and the card is not live.
+    expect(threadItems(ms, null).some((i) => i.kind === "question")).toBe(
+      false,
+    );
+    const after = withoutMessageOf(ms, "n:0");
+    expect(after.map((m) => m.id)).toEqual(["r"]);
+    expect(threadItems(after, null).some((i) => i.kind === "question")).toBe(
+      true,
+    );
+  });
 });
