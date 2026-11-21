@@ -13,18 +13,18 @@ Run against a production build: `SKIP_ENV_VALIDATION=1 pnpm build`, then `E2E_FA
 - [ ] On `/`, double tap a starter prompt quickly → still only one guest user is created → AC-1
 - [x] Block `/api/auth/sign-in/anonymous` (devtools request blocking) and send → the "We could not start your chat" card shows and the composer still works → AC-1, AC-11
 - [ ] Reload `/c/<uuid>` → the same thread shows, with nothing lost or duplicated → AC-5
-- [ ] In a second browser (another guest), open the first guest's `/c/<uuid>` → the 404 page, and none of the first guest's text appears → AC-7
-- [ ] Open `/c/<a new valid uuid>` → the empty chat with starter prompts → AC-7
-- [ ] Open `/c/not-a-uuid` → the 404 page → AC-7
+- [x] In a second browser (another guest), open the first guest's `/c/<uuid>` → the 404 page, and none of the first guest's text appears → AC-7
+- [x] Open `/c/<a new valid uuid>` → the empty chat with starter prompts → AC-7
+- [x] Open `/c/not-a-uuid` → the 404 page → AC-7
 
 ## Commands
 
 - [ ] `curl -X POST /api/chat` with no session cookie → `401 {"code":"unauthenticated"}` → AC-2
 - [ ] POST with a session and `{"conversationId":"nope"}` → `400 {"code":"invalid_request"}`, and no conversation row is created → AC-2
-- [ ] POST as guest B with guest A's `conversationId` → `404 {"code":"not_found"}`, and A's chat gains no message → AC-7
+- [x] POST as guest B with guest A's `conversationId` → `404 {"code":"not_found"}`, and A's chat gains no message → AC-7
 - [ ] POST "I have a business idea" as a new guest → the stream starts with `{"type":"start","messageId":<server uuid>}`, holds a `startRun` approval request with `shownPrice: 30`, and ends with `finish`; afterwards the DB has exactly one user and one assistant message for that turn → AC-2
 - [ ] POST a request whose `message` carries extra history or an `assistant` role → refused with `400`; only a single new user message is ever saved → AC-2
-- [ ] On a Vercel preview with BotID: a scripted POST to `/api/chat` or `/api/auth/sign-in/anonymous` without the BotID client → `403 {"code":"bot"}` → AC-7
+- [x] On a Vercel preview with BotID: a scripted POST to `/api/chat` or `/api/auth/sign-in/anonymous` without the BotID client → `403 {"code":"bot"}` → AC-7
 - [x] `pnpm test` → `chat-api.test.ts` passes, including "answers busy to a message sent again before the reply is saved" and "saves the partial reply and frees the lock when the response is cancelled" → AC-2
 - [ ] `pnpm test:integration` on a throwaway Neon branch → `turn-context.int.test.ts` passes → AC-2, AC-8
 
