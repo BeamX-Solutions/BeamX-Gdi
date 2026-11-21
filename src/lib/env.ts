@@ -40,6 +40,12 @@ const schema = z.object({
     (v) => (v === "" ? undefined : v),
     z.string().optional(),
   ),
+  // Set by Vercel: the branch alias host (no scheme) on a git deploy. Better Auth trusts it
+  // as an origin, since `NEXT_PUBLIC_APP_URL` falls back to the per deploy `VERCEL_URL`.
+  VERCEL_BRANCH_URL: z.preprocess(
+    (v) => (v === "" ? undefined : v),
+    z.string().optional(),
+  ),
 });
 
 export type Env = z.infer<typeof schema>;
@@ -106,6 +112,7 @@ export const env: Env = skip
           ? process.env.VERCEL_ENV
           : undefined,
       VERCEL: process.env.VERCEL || undefined,
+      VERCEL_BRANCH_URL: process.env.VERCEL_BRANCH_URL || undefined,
     } satisfies Env)
   : envSchema(process.env.VERCEL_ENV === "production").parse({
       ...process.env,
