@@ -80,9 +80,11 @@ test.describe("validate an idea in chat: the whole flow (AC-12)", () => {
 
     // AC-3: approving holds the credits and opens the first card.
     await page.getByRole("button", { name: "Approve" }).click();
-    await expect(page.getByText(FAKE_REPLIES.approved)).toBeVisible({
-      timeout: TURN_MS,
-    });
+    // Scoped to the reply bubbles: the screen reader live region repeats the finished
+    // reply, so a page wide text match finds it twice once the announcement lands.
+    await expect(
+      page.locator('[data-from="assistant"]').getByText(FAKE_REPLIES.approved),
+    ).toBeVisible({ timeout: TURN_MS });
 
     // AC-4: every card answered completes the run.
     const answered = await answerEveryCard(page);
