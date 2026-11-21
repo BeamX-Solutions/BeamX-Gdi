@@ -11,7 +11,7 @@ Run against a production build: `SKIP_ENV_VALIDATION=1 pnpm build`, then `E2E_FA
 - [ ] Open `/` in a fresh browser (no cookies) → the empty chat shows the starter prompts "I have a business idea" and "What can BeamX do?"; the composer is off until the session check finishes, then on; no conversation row exists yet → AC-1
 - [ ] Tap "What can BeamX do?" → one guest is signed in (one `user` row with `is_anonymous`), the URL changes to `/c/<uuid>` with no reload, and the reply shows → AC-1
 - [ ] On `/`, double tap a starter prompt quickly → still only one guest user is created → AC-1
-- [ ] Block `/api/auth/sign-in/anonymous` (devtools request blocking) and send → the "We could not start your chat" card shows and the composer still works → AC-1, AC-11
+- [x] Block `/api/auth/sign-in/anonymous` (devtools request blocking) and send → the "We could not start your chat" card shows and the composer still works → AC-1, AC-11
 - [ ] Reload `/c/<uuid>` → the same thread shows, with nothing lost or duplicated → AC-5
 - [ ] In a second browser (another guest), open the first guest's `/c/<uuid>` → the 404 page, and none of the first guest's text appears → AC-7
 - [ ] Open `/c/<a new valid uuid>` → the empty chat with starter prompts → AC-7
@@ -25,7 +25,7 @@ Run against a production build: `SKIP_ENV_VALIDATION=1 pnpm build`, then `E2E_FA
 - [ ] POST "I have a business idea" as a new guest → the stream starts with `{"type":"start","messageId":<server uuid>}`, holds a `startRun` approval request with `shownPrice: 30`, and ends with `finish`; afterwards the DB has exactly one user and one assistant message for that turn → AC-2
 - [ ] POST a request whose `message` carries extra history or an `assistant` role → refused with `400`; only a single new user message is ever saved → AC-2
 - [ ] On a Vercel preview with BotID: a scripted POST to `/api/chat` or `/api/auth/sign-in/anonymous` without the BotID client → `403 {"code":"bot"}` → AC-7
-- [ ] `pnpm test` → `chat-api.test.ts` passes, including "answers busy to a message sent again before the reply is saved" and "saves the partial reply and frees the lock when the response is cancelled" → AC-2
+- [x] `pnpm test` → `chat-api.test.ts` passes, including "answers busy to a message sent again before the reply is saved" and "saves the partial reply and frees the lock when the response is cancelled" → AC-2
 - [ ] `pnpm test:integration` on a throwaway Neon branch → `turn-context.int.test.ts` passes → AC-2, AC-8
 
 ## Value sourcing
@@ -65,13 +65,13 @@ Same setup: a production build with `E2E_FAKE_AI=true pnpm start`, a fresh brows
 - [ ] With a run in progress, type "stop" → the stop card reads "Stop this run? Your 30 credits held will be returned."; Stop the run releases the hold and the chip goes back up → AC-9
 - [ ] Force a `complete_retry` (change an answer row between the last tap and completion) → the "Something changed while saving" card's Try again completes the run → AC-11
 - [ ] Tap a card twice fast while the first tap is in flight → the second tap is ignored (cards are off while a turn runs); if the server still answers `busy`, the "One moment" card's Send again resends the tap → AC-11
-- [ ] Make the report fail (stop the network during generation) → the panel shows the friendly Retry card, never a blank panel → AC-11
+- [x] Make the report fail (stop the network during generation) → the panel shows the friendly Retry card, never a blank panel → AC-11
 
 ### Commands
 
-- [ ] `pnpm test` → `chat-view.test.ts`, `credit-copy.test.ts`, `chat-copy.test.ts` and the new `ai-turn.test.ts` cases (account balance on the card, failed balance read shows no card, summary on the approved start) pass → AC-3, AC-9, AC-10
+- [x] `pnpm test` → `chat-view.test.ts`, `credit-copy.test.ts`, `chat-copy.test.ts` and the new `ai-turn.test.ts` cases (account balance on the card, failed balance read shows no card, summary on the approved start) pass → AC-3, AC-9, AC-10
 - [ ] `pnpm test:integration` on a throwaway Neon branch → `report-api.int.test.ts` passes, including the GET's `summary` and the failed summary read that leaves it out → AC-9
-- [ ] `SKIP_ENV_VALIDATION=1 ENABLE_DESIGN_PAGE=true pnpm build && pnpm e2e` → axe passes on `/design` with the confirm, stop, short balance, prefill cards and the chip, in both themes at 360 and 1280px → AC-11
+- [x] `SKIP_ENV_VALIDATION=1 ENABLE_DESIGN_PAGE=true pnpm build && pnpm e2e` → axe passes on `/design` with the confirm, stop, short balance, prefill cards and the chip, in both themes at 360 and 1280px → AC-11
 
 ### Value sourcing
 
@@ -99,18 +99,18 @@ _Reconnecting needs Redis close to the app. From a laptop far from Frankfurt, ea
 
 ### UI / manual
 
-- [ ] On a preview, ask a question that gets a long reply; reload `/c/<id>` while it is still typing → the same reply carries on and finishes, with no text missing and none twice → AC-6
-- [ ] Same, but turn the network off in DevTools for a few seconds mid reply, then back on and reload → the reply completes once → AC-6
-- [ ] Reload after the reply has finished → the saved message shows, and the network tab shows `GET /api/chat/<id>/stream` answering `204` → AC-6
-- [ ] Open `/` in a fresh private window → no `GET …/stream` request is made, and no guest is created before the first send → AC-1, AC-6
+- [x] On a preview, ask a question that gets a long reply; reload `/c/<id>` while it is still typing → the same reply carries on and finishes, with no text missing and none twice → AC-6
+- [x] Same, but turn the network off in DevTools for a few seconds mid reply, then back on and reload → the reply completes once → AC-6
+- [x] Reload after the reply has finished → the saved message shows, and the network tab shows `GET /api/chat/<id>/stream` answering `204` → AC-6
+- [x] Open `/` in a fresh private window → no `GET …/stream` request is made, and no guest is created before the first send → AC-1, AC-6
 - [ ] Paste 4,001 characters and send (bypass the composer cap, for example with a request from DevTools) → "That message is too long" card with Got it, no AI call, and nothing saved after a reload → AC-8
-- [ ] Got it on a limit card → the card goes away → AC-8
+- [x] Got it on a limit card → the card goes away → AC-8
 - [ ] In a run, send 40 typed messages, then a 41st → "This run has reached its message limit"; card and approval taps still work → AC-8
 
 ### Commands
 
-- [ ] `pnpm vitest run src/lib/resumable.test.ts` → the real `resumable-stream` library resumes through the Upstash adapters (a reader joining partway gets the whole reply once, a finished stream resumes to null, the `chat:active` pointer keeps its 5 minute expiry and is only cleared by its own turn) → AC-6
-- [ ] `pnpm vitest run src/assistant/chat-api.test.ts` → limit notices (4,000 passes, 4,001 refused, the 40th typed message passes, the 41st refused, taps never counted), and busy turns never made resumable → AC-6, AC-8
+- [x] `pnpm vitest run src/lib/resumable.test.ts` → the real `resumable-stream` library resumes through the Upstash adapters (a reader joining partway gets the whole reply once, a finished stream resumes to null, the `chat:active` pointer keeps its 5 minute expiry and is only cleared by its own turn) → AC-6
+- [x] `pnpm vitest run src/assistant/chat-api.test.ts` → limit notices (4,000 passes, 4,001 refused, the 40th typed message passes, the 41st refused, taps never counted), and busy turns never made resumable → AC-6, AC-8
 - [ ] In Upstash's Data Browser during a reply on the preview → a `chat:active:<conversationId>` key with a TTL under 300, gone once the reply is saved → AC-6
 
 ### Value sourcing (milestone 3)
@@ -133,7 +133,7 @@ _Reconnecting needs Redis close to the app. From a laptop far from Frankfurt, ea
 
 ### Commands
 
-- [ ] `ENABLE_DESIGN_PAGE=true pnpm build && pnpm exec playwright test e2e/flow.spec.ts` → 4 passed (phone and desktop, light and dark): first message, URL `/c/<id>`, confirm card for 30 credits, approve, every card, report from the fake model, chip at 0, reload keeps it, axe clean on `/`, the ready report, and `/c/<id>` → AC-1, AC-3, AC-4, AC-5, AC-9, AC-12
+- [x] `ENABLE_DESIGN_PAGE=true pnpm build && pnpm exec playwright test e2e/flow.spec.ts` → 4 passed (phone and desktop, light and dark): first message, URL `/c/<id>`, confirm card for 30 credits, approve, every card, report from the fake model, chip at 0, reload keeps it, axe clean on `/`, the ready report, and `/c/<id>` → AC-1, AC-3, AC-4, AC-5, AC-9, AC-12
 - [ ] On a PR, the CI `e2e` job creates a `ci-e2e-*` Neon branch, migrates it, runs the suite, and deletes the branch afterwards (check the Neon console) → AC-12
 - [ ] The test server runs with `E2E_FAKE_AI=true` (playwright.config.ts), so the suite makes no Anthropic calls: the Anthropic console shows no usage for a CI run → AC-12
 
