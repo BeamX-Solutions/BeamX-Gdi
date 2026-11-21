@@ -242,7 +242,11 @@ function LiveChat({
     try {
       if (!session.data) {
         setSigningIn(true);
-        const signed = await authClient.signIn.anonymous();
+        // The auth client returns `{ error }` for a server reply but throws when the
+        // request never lands (offline, DNS, aborted), so both end in the same card.
+        const signed = await authClient.signIn
+          .anonymous()
+          .catch(() => ({ error: true }) as const);
         setSigningIn(false);
         if (signed.error) {
           setFailure("sign_in");
