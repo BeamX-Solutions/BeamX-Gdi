@@ -127,6 +127,8 @@ export const errorKinds = [
   // Chat limit notices (spec 0007, AC-8): shown, never saved.
   "limit_text",
   "limit_run",
+  // A resent message that already has a saved reply: the client reloads the thread.
+  "answered",
 ] as const;
 export type ErrorKind = (typeof errorKinds)[number];
 

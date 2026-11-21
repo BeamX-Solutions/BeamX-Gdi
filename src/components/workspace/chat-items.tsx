@@ -31,6 +31,8 @@ export type ChatActions = {
   readonly retryTurn: () => void;
   /** Send again after `busy`: reattaches to the running reply, then resends if needed. */
   readonly retryBusy: (itemId: string) => void;
+  /** Loads the saved thread again (an `answered` notice). */
+  readonly reload: () => void;
   readonly openReport: (runId: string) => void;
   /** Hides a notice that was never saved (a limit notice's Got it). */
   readonly dismiss: (itemId: string) => void;
@@ -154,7 +156,9 @@ export function ChatItem({
                   ? () => actions.retryComplete(runId)
                   : data.kind === "busy"
                     ? () => actions.retryBusy(item.id)
-                    : actions.retryTurn,
+                    : data.kind === "answered"
+                      ? actions.reload
+                      : actions.retryTurn,
           }}
         />
       );

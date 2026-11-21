@@ -8,6 +8,7 @@ import {
   pageQuery,
   toPage,
   typedUserCountSince,
+  userMessageState,
 } from "./messages";
 import { releaseRunHolds } from "./credit-holds";
 import { runsWithReports } from "./reports";
@@ -65,20 +66,24 @@ export type TurnContext = {
   readonly active: ReturnType<typeof toActive>;
   /** Typed user messages since the active run started; 0 with no active run. */
   readonly typedInRun: number;
+  /** The incoming user message: already saved, and answered by a saved reply. */
+  readonly message: { readonly saved: boolean; readonly answered: boolean };
 };
 
 /**
  * The chat route's one round trip before a turn (spec 0007, step 4), one `db.batch`:
  * create the chat under the client's id if absent, read its owner, the active and
- * paused runs, and the typed message count since the active run started. The insert
+ * paused runs, the typed message count since the active run started, and whether the
+ * incoming message is already saved and answered (a resend). The insert
  * runs first, so the owner read always finds a row: the result is the context, or
  * `other_owner` when the id belongs to someone else (nothing is written then).
  */
 export const turnContext = async (
   userId: string,
   conversationId: string,
+  messageId: string,
 ): Promise<Result<TurnContext, { readonly code: "other_owner" }>> => {
-  const [, owner, live, answers, typed] = await db.batch([
+  const [, owner, live, answers, typed, state] = await db.batch([
     db
       .insert(conversation)
       .values({ id: conversationId, userId })
@@ -93,11 +98,16 @@ export const turnContext = async (
       conversationId,
       sql`SELECT created_at FROM tool_run WHERE conversation_id = ${conversationId}::uuid AND user_id = ${userId}::uuid AND status = 'in_progress' LIMIT 1`,
     ),
+    userMessageState(userId, conversationId, messageId),
   ]);
   if (owner[0]?.userId !== userId) return err({ code: "other_owner" });
   return ok({
     active: toActive(live, answers),
     typedInRun: Number(typed.rows[0]?.n ?? 0),
+    message: {
+      saved: state.rows[0]?.saved === true,
+      answered: state.rows[0]?.answered === true,
+    },
   });
 };
 

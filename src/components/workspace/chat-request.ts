@@ -12,7 +12,13 @@ export const chatRequestBody = (
 ) => ({ conversationId, message: messages.at(-1) });
 
 export type ChatFailure =
-  "sign_in" | "bot" | "not_found" | "invalid" | "network" | "unknown";
+  | "sign_in"
+  | "session_ended"
+  | "bot"
+  | "not_found"
+  | "invalid"
+  | "network"
+  | "unknown";
 
 /**
  * Which failure an error from the transport is. A non ok response's error message is
@@ -34,8 +40,10 @@ export const failureOf = (error: Error): ChatFailure => {
       case "invalid_request":
       case "invalid_message":
         return "invalid";
+      // The first send signs a guest in before it posts, so a `401` here means the
+      // guest session ended on a chat that already has messages.
       case "unauthenticated":
-        return "sign_in";
+        return "session_ended";
       default:
         return "unknown";
     }
@@ -57,6 +65,12 @@ export const failureCopy: Readonly<Record<ChatFailure, FailureCopy>> = {
     title: "We could not start your chat",
     message: "Check your connection, then send your message again.",
     actionLabel: "Got it",
+  },
+  session_ended: {
+    kind: "ai_error",
+    title: "Your guest session has ended",
+    message: "Start a new chat to keep going.",
+    actionLabel: "New chat",
   },
   bot: {
     kind: "ai_error",

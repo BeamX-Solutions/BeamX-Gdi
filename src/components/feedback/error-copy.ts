@@ -85,7 +85,8 @@ export type ChatErrorKind =
   | "complete_retry"
   | "busy"
   | "limit_text"
-  | "limit_run";
+  | "limit_run"
+  | "answered";
 
 /**
  * Chat error card copy (spec 0006, AC-7, AC-14; spec 0007, AC-11). The action label is
@@ -118,5 +119,10 @@ export const chatErrorCopy: Readonly<Record<ChatErrorKind, ErrorCopy>> = {
     title: "This run has reached its message limit",
     message: "You can still tap the cards to answer, or start a new chat.",
     actionLabel: "Got it",
+  },
+  answered: {
+    title: "Already answered",
+    message: "Loading the reply to that message.",
+    actionLabel: "Reload",
   },
 };

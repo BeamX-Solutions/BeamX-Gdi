@@ -24,6 +24,7 @@ export type ChatApiDeps = {
   readonly turnContext: (
     userId: string,
     conversationId: string,
+    messageId: string,
   ) => Promise<Result<TurnContext, { readonly code: "other_owner" }>>;
   readonly handleTurn: (
     input: TurnInput,
@@ -110,7 +111,7 @@ export const onAbort = (
  */
 export const noticeStream = (
   id: string,
-  kind: "limit_text" | "limit_run",
+  kind: "limit_text" | "limit_run" | "answered",
 ): ReadableStream<UIMessageChunk> =>
   createUIMessageStream({
     generateId: () => id,
@@ -230,18 +231,32 @@ export const postChat = async (
   if (!classified.ok) return json(400, "invalid_message");
   const { conversationId, message } = body.data;
 
-  const context = await deps.turnContext(input.userId, conversationId);
+  const context = await deps.turnContext(
+    input.userId,
+    conversationId,
+    classified.value.message.id,
+  );
   if (!context.ok) return json(404, "not_found");
 
   // Made once, up front: a retried `onEnd` keeps the same id and `callKey`.
   const assistantId = deps.newId();
 
-  // Step 5: limits before the turn. Shown, never saved, no lock, no AI call.
-  const limit = limitHit(
-    classified.value.turn,
-    context.value.typedInRun,
-    deps.limits,
-  );
+  // A resend of a message that already has a saved reply: no second AI turn and no
+  // duplicate reply. The notice is never saved; the client reloads the saved thread.
+  if (context.value.message.answered) {
+    deps.log("chat_already_answered", { conversationId });
+    return {
+      kind: "stream",
+      stream: noticeStream(assistantId, "answered"),
+      resumable: null,
+    };
+  }
+
+  // Step 5: limits before the turn. Shown, never saved, no lock, no AI call. A resend
+  // of a saved message passed the limit when it came in, so it is not counted again.
+  const limit = context.value.message.saved
+    ? null
+    : limitHit(classified.value.turn, context.value.typedInRun, deps.limits);
   if (limit !== null) {
     deps.log("chat_limit", { conversationId, limit });
     return {

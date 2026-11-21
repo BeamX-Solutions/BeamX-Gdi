@@ -30,15 +30,17 @@ import {
 } from "./chat-request";
 import {
   busyRetryPlan,
+  isAnsweredNotice,
   latestReport,
   latestToolSummary,
+  refusedText,
   takenUserMessageId,
   threadItems,
   withoutMessageOf,
   type ThreadItem,
   type ViewMessage,
 } from "./chat-view";
-import { Composer } from "./composer";
+import { Composer, type ComposerHandle } from "./composer";
 import { Header } from "./header";
 import { HistoryRail } from "./history-rail";
 import { Thread } from "./thread";
@@ -101,6 +103,9 @@ function ChatPlaceholder({ chip }: { readonly chip?: ReactNode }) {
 }
 
 const noSubscribe = () => () => {};
+
+/** Request header marking a send to a chat that already has messages. */
+const SAVED_CHAT = "x-beamx-saved-chat";
 
 /**
  * A new chat id, made only in the browser: null during prerender and hydration, then a
@@ -185,6 +190,7 @@ function LiveChat({
   const [selectedRun, setSelectedRun] = useState<string | null>(null);
   // Stops a second send from creating a second guest while the first sign in runs.
   const inFlight = useRef(false);
+  const composer = useRef<ComposerHandle>(null);
   // User messages the server took (saved, then answered): every saved one, plus each
   // one a reply in this tab shows was taken. "Send again" on busy reads it.
   const taken = useRef<ReadonlySet<string>>(
@@ -199,15 +205,22 @@ function LiveChat({
         api: "/api/chat",
         prepareSendMessagesRequest: ({ messages }) => ({
           body: chatRequestBody(id, messages),
+          // A chat that already has messages must not move to a new guest on `401`.
+          headers: messages.length > 1 ? { [SAVED_CHAT]: "1" } : undefined,
         }),
         prepareReconnectToStreamRequest: () => ({
           api: `/api/chat/${id}/stream`,
         }),
         fetch: async (input, init) => {
           const first = await fetch(input, init);
-          // The session expired between sends: sign in again and retry once.
+          // The session expired before the first send of a new chat: sign a guest in
+          // and retry once. A chat with messages belongs to the old guest, so its `401`
+          // shows the "session ended" card instead of a 404 under a new guest.
+          const savedChat = new Headers(init?.headers).has(SAVED_CHAT);
           const response =
-            first.status === 401 && !(await authClient.signIn.anonymous()).error
+            first.status === 401 &&
+            !savedChat &&
+            !(await authClient.signIn.anonymous()).error
               ? await fetch(input, init)
               : first;
           if (response.ok && window.location.pathname !== `/c/${id}`)
@@ -238,6 +251,11 @@ function LiveChat({
     onError: (e) => setFailure(failureOf(e)),
     onFinish: ({ message, messages: all }) => {
       finished.current += 1;
+      // The server already has a reply to this message: show the saved thread.
+      if (isAnsweredNotice(message)) {
+        window.location.reload();
+        return;
+      }
       const userId = takenUserMessageId(all, message);
       if (userId !== null) taken.current = new Set([...taken.current, userId]);
     },
@@ -325,8 +343,14 @@ function LiveChat({
         }
       })();
     },
+    reload: () => window.location.reload(),
     openReport: setSelectedRun,
-    dismiss: (itemId) => setMessages((ms) => withoutMessageOf(ms, itemId)),
+    dismiss: (itemId) => {
+      // The refused text goes back in the composer, so a long message is not lost.
+      const text = refusedText(messages as readonly ViewMessage[], itemId);
+      setMessages((ms) => withoutMessageOf(ms, itemId));
+      if (text !== null) composer.current?.restore(text);
+    },
     edit: setEditing,
   };
 
@@ -439,7 +463,8 @@ function LiveChat({
                 title={copy.title}
                 message={copy.message}
                 action={
-                  shownFailure === "not_found"
+                  shownFailure === "not_found" ||
+                  shownFailure === "session_ended"
                     ? { label: copy.actionLabel, href: "/" }
                     : {
                         label: copy.actionLabel,
@@ -455,6 +480,7 @@ function LiveChat({
         }
         composer={
           <Composer
+            ref={composer}
             hint={cardOpen ? "Or type your answer" : undefined}
             onSend={(text) => void send(text)}
             disabled={busy}
