@@ -45,7 +45,10 @@ export function ApprovalCard({
       data-approval-state={state}
       className="flex w-full min-w-0 flex-col gap-3 rounded-xl border bg-card p-4 text-card-foreground md:p-5"
     >
-      <p id={titleId} className="text-lg font-semibold wrap-anywhere">
+      <p
+        id={titleId}
+        className="font-heading text-lg font-semibold wrap-anywhere"
+      >
         {title}
       </p>
       {children}

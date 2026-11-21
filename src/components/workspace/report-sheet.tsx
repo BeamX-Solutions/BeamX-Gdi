@@ -40,7 +40,9 @@ export function ReportSheet({
         }}
       >
         <div className="flex h-14 shrink-0 items-center border-b pr-14 pl-4">
-          <SheetTitle className="min-w-0 truncate">{title}</SheetTitle>
+          <SheetTitle className="min-w-0 truncate font-heading">
+            {title}
+          </SheetTitle>
           <SheetDescription className="sr-only">
             The full report for this chat.
           </SheetDescription>

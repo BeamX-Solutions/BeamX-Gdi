@@ -37,7 +37,10 @@ export function CardFrame({
           {progressLabel(progress)}
         </p>
       ) : null}
-      <p id={promptId} className="text-lg font-semibold wrap-anywhere">
+      <p
+        id={promptId}
+        className="font-heading text-lg font-semibold wrap-anywhere"
+      >
         {prompt}
       </p>
       {help ? (

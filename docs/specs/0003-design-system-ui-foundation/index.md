@@ -1,11 +1,11 @@
 # 0003. Design system and UI foundation for the BeamX Workspace
 
-**Date**: 2026-11-18
+**Date**: 2026-11-18 (type updated 2026-11-21: Montserrat headings)
 **Status**: Accepted
 
 ## Summary
 
-This spec sets the BeamX Workspace look and the building blocks every later screen uses. The feel is a calm, trusted advisor: mostly neutral surfaces in the BeamX royal blue from the logo (with its sky blue and a small touch of its orange), the Inter font, medium rounded corners, and green, amber, and red kept only for score verdicts. It defines the chat parts (thread, composer, tap to answer cards, status lines, error cards), the report parts (score header, category bars, advice list, long written sections), and the workspace shell (chat with a report panel beside it on desktop, a full screen report sheet on phones). Everything is built on shadcn/ui and Vercel's AI Elements, shown on mock data on a dev only `/design` page, written up in `DESIGN.md`, and checked automatically for keyboard use, contrast, and small phone screens. Feature #7 then only has to plug in the real chat and database.
+This spec sets the BeamX Workspace look and the building blocks every later screen uses. The feel is a calm, trusted advisor: mostly neutral surfaces in the BeamX royal blue from the logo (with its sky blue and a small touch of its orange), Montserrat (the BeamX brand font) for headings and Inter for everything people read at length, medium rounded corners, and green, amber, and red kept only for score verdicts. It defines the chat parts (thread, composer, tap to answer cards, status lines, error cards), the report parts (score header, category bars, advice list, long written sections), and the workspace shell (chat with a report panel beside it on desktop, a full screen report sheet on phones). Everything is built on shadcn/ui and Vercel's AI Elements, shown on mock data on a dev only `/design` page, written up in `DESIGN.md`, and checked automatically for keyboard use, contrast, and small phone screens. Feature #7 then only has to plug in the real chat and database.
 
 ## Requirements
 
@@ -33,13 +33,14 @@ This spec sets the BeamX Workspace look and the building blocks every later scre
 - **AC-12**: One `ErrorCard` renders every expected failure inline, in the thread or the panel, with a short plain message and exactly one primary action, styled with neutral and destructive tokens (never verdict colors). The four kinds and their actions: `ai_error` → Retry; `network` → Retry; `limit_reached` → "Sign up to keep going" (links to `/sign-up`, a placeholder until feature #8); `spend_cap` → "Got it" (dismisses). No failure state in the fixtures renders a blank area or relies on a toast.
 - **AC-13**: The `/design` page renders every token and every shared component in every state listed in `DESIGN.md`, on fixture data. It returns 404 unless `ENABLE_DESIGN_PAGE` was `true` when the app was built (Cache Components renders the page at build time, so changing the flag needs a new build).
 - **AC-14**: With reduced motion set on the device, every animation and transition is off (shimmer, skeleton pulse, panel, sheet, drawer, and the Radix and `tw-animate-css` animations shadcn ships), through one global rule in `globals.css`; content still appears.
+- **AC-16** (added 2026-11-21): Headings use Montserrat, the BeamX brand font, through one `--font-heading` token: every `h1` to `h4`, and every title at 16px or larger set in weight 600 (the list in **Type** below). All other text (chat replies, buttons, chips, answer options, labels, hints, body, and anything under 16px) stays Inter. `/design` shows both fonts in the type scale, axe still passes, and nothing scrolls sideways at 360px with the wider headings.
 - **AC-15**: The Playwright suite (axe scans with the `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`, `wcag22aa` tags for AC-3; keyboard walks for AC-4, AC-5, AC-7, AC-8, AC-9; live region text checks for AC-6; the 360px checks for AC-5; a reduced motion run for AC-14) runs in Chromium in CI on every PR against a production build and uploads its HTML report. It is not enforced as a required check: the repo is private on the GitHub free plan, which has no branch protection, so you keep the rule yourself and never merge while it is red.
 
 ## Decision
 
 **Chosen option**: Option 1: shadcn/ui and AI Elements, restyled with BeamX tokens, shown on a dev only `/design` page
 
-Build the look as shadcn CSS variable tokens (BeamX royal blue from the logo, sky blue and orange accents, neutral surfaces, reserved verdict colors, Inter, medium radius) with light and dark themes through `next-themes`; take the chat parts from AI Elements and restyle them; hand build the answer cards, report parts, error card, and workspace shell on shadcn primitives; document it all in `DESIGN.md`; and prove it on a `/design` page tested by Playwright with axe.
+Build the look as shadcn CSS variable tokens (BeamX royal blue from the logo, sky blue and orange accents, neutral surfaces, reserved verdict colors, Montserrat headings over Inter text, medium radius) with light and dark themes through `next-themes`; take the chat parts from AI Elements and restyle them; hand build the answer cards, report parts, error card, and workspace shell on shadcn primitives; document it all in `DESIGN.md`; and prove it on a `/design` page tested by Playwright with axe.
 
 **Implementation skills**: `shadcn` (`shadcn-ui/ui`, `.claude/skills/shadcn/`) · `ai-elements` (`vercel/ai-elements`, `.claude/skills/ai-elements/`) · `playwright-cli` (`microsoft/playwright-cli`, `.claude/skills/playwright-cli/`) · `next-cache-components-adoption` (`vercel/next.js`, `.claude/skills/next-cache-components-adoption/`) · `next-dev-loop` (`vercel/next.js`, `.claude/skills/next-dev-loop/`) · `next-bundle-optimizer` (`vercel/next.js`, `.claude/skills/next-bundle-optimizer/`)
 
@@ -99,6 +100,11 @@ All tokens are shadcn CSS variables in `src/app/globals.css`, in `oklch` (a colo
 No `--sidebar-*` or `--chart-*` tokens: this design uses neither the shadcn sidebar nor shadcn charts; delete them if `shadcn init` adds them. Every pair above (each foreground on its background, in both themes) appears on `/design`, so the axe scan sees it.
 
 - **Type**: Inter (variable, via `next/font/google`, `latin` and `latin-ext`, `display: "swap"`) as `--font-sans`; Geist Mono as `--font-mono`. Scale: Tailwind's default `text-xs` to `text-4xl` (12, 14, 16, 18, 20, 24, 30, 36px), no custom scale; 16px for body and composer. Body line height 1.5, headings 1.25. Weights 400, 500, 600 only. Remove the scaffold's Arial body rule.
+- **Heading font** (updated 2026-11-21, **AC-16**): Montserrat, the BeamX brand font (variable, via `next/font/google`, `latin` and `latin-ext`, `display: "swap"`), as `--font-heading`, exposed to Tailwind as the `font-heading` utility through `@theme inline` in `globals.css`. Weight 600 only (the weight rule above still holds). Where it applies, and nowhere else:
+  - a base rule in `globals.css` sets `h1, h2, h3, h4` to `--font-heading`, which covers page headings, the `ReportPanel` title, report section titles, and headings inside the chat's markdown;
+  - the `font-heading` class on the titles that are not heading elements: `SheetTitle` in `ReportSheet`, the `CardFrame` prompt, the `ScoreHeader` title and score, the `ApprovalCard` title (confirm and stop cards), the `PrefillCard` title, the `ShortBalanceCard` title, and the `ErrorCard` title;
+  - the rule for any new component: a title at 16px or larger in weight 600 gets `font-heading`; anything else stays Inter. Buttons, chips, answer options, the composer, labels, hints, progress text, the credit chip, and chat replies are always Inter.
+  Montserrat is wider than Inter, so heading containers keep `min-w-0` and `wrap-anywhere`, and the 360px checks stay the gate.
 - **Spacing**: Tailwind's 4px scale. Thread gap 16px; card padding 16px on mobile, 20px from 768px.
 - **Radius**: `--radius: 0.625rem`, shadcn derived `sm`, `md`, `lg`, `xl`. Chips and the composer use `xl`.
 - **Touch**: minimum 44 by 44px for every button, chip, input, menu item, checkbox row, and resize handle hit area. Override shadcn's default sizes in `src/components/ui/` (`button` default `h-11`, `sm` `h-11` on touch via `pointer-coarse:`, icon buttons `size-11`). Exempt: inline text links (like Edit), which meet the 24px WCAG 2.2 minimum.
@@ -289,6 +295,9 @@ Ordered as a Tracer Bullet (the project default): the first milestone pushes one
 16. Finish `DESIGN.md` with a section per component (props, states, usage rules, do and don't), and check every token name against `globals.css`, satisfies **AC-1**
 17. Run the full Playwright suite and fix any axe findings by adjusting token lightness, satisfies **AC-3**, **AC-15**
 
+**Milestone 5 (2026-11-21): Montserrat headings**
+18. Load Montserrat with `next/font/google` in `src/app/layout.tsx` as `--font-heading` (weight 600, `latin` and `latin-ext`, `display: "swap"`); add `--font-heading` to `@theme inline` and the `h1` to `h4` base rule in `globals.css`; add `font-heading` to the titles listed under **Heading font**; update the type section of `DESIGN.md` (both fonts, where each applies, the 16px and 600 rule) and the `/design` type scale; keep `design-tokens.test.ts` passing with the new token; run the full Playwright suite (axe, 360px, both themes), satisfies **AC-1**, **AC-3**, **AC-16**
+
 ## Consequences
 
 **Positive**:
@@ -321,4 +330,5 @@ Ordered as a Tracer Bullet (the project default): the first milestone pushes one
 - [ ] Set `ENABLE_DESIGN_PAGE=true` for the Preview environment in Vercel; leave it unset in Production.
 - [ ] For `AGENTS.md` (`/sync` owns the edit): the rule "style only with tokens from `DESIGN.md`, never raw colors", the component folders above, and `Declined:` Agent Skills for `next-themes` and `@axe-core/playwright`.
 - [ ] The full WCAG audit stays deferred in the scope; this spec covers the base components only.
+- [ ] Feature #15 (report PDF) uses Montserrat for its headings too, so the PDF matches the app (AC-16).
 - [ ] If the repo moves to GitHub Pro or Team, or goes public, make the `e2e` job a required check on `main` (branch protection) and restore that wording in AC-15.

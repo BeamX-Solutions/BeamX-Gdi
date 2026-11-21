@@ -41,7 +41,7 @@ export function PrefillCard({
     >
       <p
         id={titleId}
-        className="flex items-center gap-2 text-lg font-semibold wrap-anywhere"
+        className="flex items-center gap-2 font-heading text-lg font-semibold wrap-anywhere"
       >
         <MessageSquareQuoteIcon
           className="size-5 shrink-0 text-primary"

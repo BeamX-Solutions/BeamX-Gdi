@@ -108,6 +108,14 @@ const typeScale: readonly { name: string; classes: string }[] = [
   { name: "text-4xl · 36px", classes: "text-4xl" },
 ];
 
+// Headings and titles 16px or larger in weight 600 use Montserrat (AC-16).
+const headingScale: readonly { name: string; classes: string }[] = [
+  { name: "text-base · 16px", classes: "text-base" },
+  { name: "text-lg · 18px", classes: "text-lg" },
+  { name: "text-2xl · 24px", classes: "text-2xl" },
+  { name: "text-4xl · 36px", classes: "text-4xl" },
+];
+
 const verdicts: readonly {
   label: string;
   Icon: LucideIcon;
@@ -206,6 +214,22 @@ export default function DesignPage() {
       </Section>
 
       <Section id="type" title="Type scale">
+        <p className="text-sm text-muted-foreground">
+          Montserrat, weight 600: headings and titles 16px or larger.
+        </p>
+        <ul className="flex flex-col gap-2">
+          {headingScale.map((step) => (
+            <li
+              key={step.name}
+              className={`font-heading font-semibold wrap-anywhere ${step.classes}`}
+            >
+              {step.name} · The quick brown fox
+            </li>
+          ))}
+        </ul>
+        <p className="text-sm text-muted-foreground">
+          Inter: everything else, including chat replies, buttons, and labels.
+        </p>
         <ul className="flex flex-col gap-2">
           {typeScale.map((step) => (
             <li key={step.name} className={step.classes}>

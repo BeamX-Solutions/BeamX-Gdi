@@ -38,7 +38,7 @@ export function ShortBalanceCard({
           aria-hidden
         />
         <div className="flex min-w-0 flex-col gap-1">
-          <p id={titleId} className="font-semibold wrap-anywhere">
+          <p id={titleId} className="font-heading font-semibold wrap-anywhere">
             {shortTitle}
           </p>
           <p className="text-sm wrap-anywhere">{shortfallLine(shortfall)}</p>

@@ -15,6 +15,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 2 | Coding standards & tooling | Foundation | done |
 | 3 | Data model | Foundation | done |
 | 4 | Design system & UI foundation | Foundation | done |
+| 23 | Brand font: Montserrat headings | Foundation | in-progress |
 | 20 | Tool source access & parity fixtures | Foundation | in-progress |
 | 5 | Tool module contract & registry | Foundation | done |
 | 6 | Assistant brain | Foundation | in-progress |
@@ -73,6 +74,15 @@ spec [0003](../specs/0003-design-system-ui-foundation/index.md) · code in `src/
   - [x] Chat thread, composer, and answer cards: AI Elements restyled, live region, composer rules, four card kinds, answered bubble, run progress bar (AC-6, AC-7, AC-8, AC-9, AC-10, AC-15)
   - [x] Report parts, errors, and the finished `DESIGN.md`: score, bars, advice, sections, skeleton, error card, full axe pass (AC-1, AC-3, AC-11, AC-12, AC-15)
 - [x] Verify it: `/check verify design system & UI foundation`
+
+### 23. Brand font: Montserrat headings · in-progress
+Headings and big titles use Montserrat, the BeamX brand font, so the workspace looks like BeamX. Chat replies, buttons, and labels stay in Inter, which reads better at small sizes on phones.
+**Done when:** every heading and every title 16px or larger shows in Montserrat, everything else stays Inter, and axe and the 360px checks still pass in both themes.
+spec [0003](../specs/0003-design-system-ui-foundation/index.md) (Milestone 5, AC-16) · code in `src/app/layout.tsx`, `src/app/globals.css`, `src/components`, `DESIGN.md`
+- [x] Design it (spec): `/architect design system: switch the font to Montserrat`
+- [x] Build it: `/develop brand font: Montserrat headings`
+  - [x] Load Montserrat as `--font-heading`, the heading rule and the title classes, `DESIGN.md` and `/design` type scale, full Playwright pass (AC-1, AC-3, AC-16)
+- [ ] Verify it: `/check verify brand font: Montserrat headings`
 
 ### 20. Tool source access & parity fixtures · in-progress
 Get read access to the source code of Beacon, Beacon Pro, Luna, and Stellar, and capture real answer sets with the scores and verdicts the live tools give them. The rebuilt tools are tested against these so they score the same way (from spec 0001).

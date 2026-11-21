@@ -20,7 +20,7 @@ export function ScoreHeader({
   return (
     <div className="flex min-w-0 flex-col gap-3">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <p className="text-4xl font-semibold">
+        <p className="font-heading text-4xl font-semibold">
           {Math.round(score)}
           <span className="text-xl font-medium text-muted-foreground">
             /{max}
