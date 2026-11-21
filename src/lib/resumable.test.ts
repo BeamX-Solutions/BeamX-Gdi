@@ -47,7 +47,10 @@ const memoryRedis = () => {
     publish: async (channel: string, message: string) => {
       const subs = [...(channels.get(channel) ?? [])];
       await tick();
-      for (const deliver of subs) deliver(message);
+      // The real subscription is itself SSE, and `@upstash/redis` splits it on "\n":
+      // a message only arrives up to its first newline, the rest is dropped.
+      const framed = message.split("\n")[0] ?? "";
+      for (const deliver of subs) deliver(framed);
       return subs.length;
     },
     subscribe: ([channel]: string[]) => {

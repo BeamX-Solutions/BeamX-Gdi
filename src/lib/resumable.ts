@@ -49,13 +49,27 @@ const activeKey = (conversationId: string) => `chat:active:${conversationId}`;
 
 const FINISH = `if redis.call("get", KEYS[1]) == ARGV[1] then return redis.call("del", KEYS[1]) else return 0 end`;
 
-const asText = (message: unknown): string =>
-  typeof message === "string" ? message : JSON.stringify(message);
+/**
+ * Pub/sub messages go JSON encoded. The Upstash subscription is itself SSE and the client
+ * splits it on "\n", so a raw SSE chunk (or the library's replay buffer, many events in
+ * one message) would arrive cut at its first newline. JSON escapes the newlines.
+ */
+const encode = (message: string): string => JSON.stringify(message);
+
+const decode = (message: unknown): string => {
+  if (typeof message !== "string") return JSON.stringify(message);
+  try {
+    const parsed: unknown = JSON.parse(message);
+    return typeof parsed === "string" ? parsed : message;
+  } catch {
+    return message;
+  }
+};
 
 /** `resumable-stream`'s publisher over the Upstash REST client. */
 export const upstashPublisher = (redis: Redis): Publisher => ({
   connect: async () => {},
-  publish: (channel, message) => redis.publish(channel, message),
+  publish: (channel, message) => redis.publish(channel, encode(message)),
   set: (key, value, options) =>
     options?.EX === undefined
       ? redis.set(key, value)
@@ -92,7 +106,7 @@ export const upstashSubscriber = (redis: Redis): Subscriber => {
           clearTimeout(timer);
           reject(e);
         });
-        sub.on("message", ({ message }) => callback(asText(message)));
+        sub.on("message", ({ message }) => callback(decode(message)));
       }),
     unsubscribe: async (channel) => {
       const sub = live.get(channel);
