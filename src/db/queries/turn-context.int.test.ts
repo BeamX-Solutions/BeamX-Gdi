@@ -32,14 +32,15 @@ describe("conversations.turnContext", () => {
     const userId = await tracker.guest();
     const id = newId();
 
-    const first = unwrap(await conversations.turnContext(userId, id));
+    const first = unwrap(await conversations.turnContext(userId, id, newId()));
     expect(first).toEqual({
       active: { active: null, paused: [] },
       typedInRun: 0,
+      message: { saved: false, answered: false },
     });
     expect(unwrap(await conversations.ownerOf(id))).toBe(userId);
 
-    const again = await conversations.turnContext(userId, id);
+    const again = await conversations.turnContext(userId, id, newId());
     expect(again.ok).toBe(true);
   });
 
@@ -47,9 +48,9 @@ describe("conversations.turnContext", () => {
     const owner = await tracker.guest();
     const stranger = await tracker.guest();
     const id = newId();
-    unwrap(await conversations.turnContext(owner, id));
+    unwrap(await conversations.turnContext(owner, id, newId()));
 
-    expect(await conversations.turnContext(stranger, id)).toEqual({
+    expect(await conversations.turnContext(stranger, id, newId())).toEqual({
       ok: false,
       error: { code: "other_owner" },
     });
@@ -59,7 +60,7 @@ describe("conversations.turnContext", () => {
   it("counts only typed user messages written since the active run started", async () => {
     const userId = await tracker.guest();
     const id = newId();
-    unwrap(await conversations.turnContext(userId, id));
+    unwrap(await conversations.turnContext(userId, id, newId()));
 
     // Before the run: never counted.
     unwrap(await messages.append(userId, id, [text("I have a business idea")]));
@@ -79,18 +80,55 @@ describe("conversations.turnContext", () => {
       ]),
     );
 
-    const context = unwrap(await conversations.turnContext(userId, id));
+    const context = unwrap(
+      await conversations.turnContext(userId, id, newId()),
+    );
     expect(context.active.active?.run.id).toBe(started.value.run.id);
     expect(context.typedInRun).toBe(2);
+  });
+
+  it("tells a resend apart: saved, then answered once a reply follows", async () => {
+    const userId = await tracker.guest();
+    const id = newId();
+    unwrap(await conversations.turnContext(userId, id, newId()));
+    const asked = text("what can you do?");
+    unwrap(await messages.append(userId, id, [asked]));
+
+    // Saved, no reply yet (an AI error, or the turn still running).
+    expect(
+      unwrap(await conversations.turnContext(userId, id, asked.id)).message,
+    ).toEqual({ saved: true, answered: false });
+
+    unwrap(
+      await messages.append(userId, id, [
+        {
+          id: newId(),
+          role: "assistant",
+          parts: [{ type: "text", text: "I can check an idea." }],
+        },
+      ]),
+    );
+    expect(
+      unwrap(await conversations.turnContext(userId, id, asked.id)).message,
+    ).toEqual({ saved: true, answered: true });
+
+    // Another user's message id never reads as saved here.
+    const stranger = await tracker.guest();
+    const other = newId();
+    unwrap(await conversations.turnContext(stranger, other, newId()));
+    expect(
+      unwrap(await conversations.turnContext(stranger, other, asked.id))
+        .message,
+    ).toEqual({ saved: false, answered: false });
   });
 
   it("counts nothing when no run is active", async () => {
     const userId = await tracker.guest();
     const id = newId();
-    unwrap(await conversations.turnContext(userId, id));
+    unwrap(await conversations.turnContext(userId, id, newId()));
     unwrap(await messages.append(userId, id, [text("hi"), text("hello?")]));
-    expect(unwrap(await conversations.turnContext(userId, id)).typedInRun).toBe(
-      0,
-    );
+    expect(
+      unwrap(await conversations.turnContext(userId, id, newId())).typedInRun,
+    ).toBe(0);
   });
 });

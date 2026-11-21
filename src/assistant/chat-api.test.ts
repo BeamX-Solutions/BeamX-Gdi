@@ -69,7 +69,11 @@ const fakeDeps = (over: Partial<ChatApiDeps> = {}) => {
   const finished: string[] = [];
   const deps: ChatApiDeps = {
     turnContext: async () =>
-      ok({ active: { active: null, paused: [] }, typedInRun: 0 }),
+      ok({
+        active: { active: null, paused: [] },
+        typedInRun: 0,
+        message: { saved: false, answered: false },
+      }),
     handleTurn: async () => ok(turnOutput()),
     ownerOf: async () => ok(USER),
     appendMessage: async (ownerId, _c, message) => {
@@ -151,7 +155,12 @@ describe("postChat: input and ownership (AC-2, AC-7)", () => {
     const active = { active: null, paused: [] };
     const handle = vi.fn(async () => ok(turnOutput()));
     const { deps } = fakeDeps({
-      turnContext: async () => ok({ active, typedInRun: 0 }),
+      turnContext: async () =>
+        ok({
+          active,
+          typedInRun: 0,
+          message: { saved: false, answered: false },
+        }),
       handleTurn: handle,
     });
     await readAll(
@@ -472,8 +481,16 @@ const approvalTap = (id = MSG) => ({
   parts: [{ type: "tool-approval-response", approvalId: "a1", approved: true }],
 });
 
-const inRun = (typedInRun: number) => async () =>
-  ok({ active: { active: null, paused: [] }, typedInRun });
+const inRun =
+  (
+    typedInRun: number,
+    message: { saved: boolean; answered: boolean } = {
+      saved: false,
+      answered: false,
+    },
+  ) =>
+  async () =>
+    ok({ active: { active: null, paused: [] }, typedInRun, message });
 
 describe("postChat: limits (spec 0007, AC-8)", () => {
   it("refuses typed text over the limit with a notice, no turn and nothing saved", async () => {
@@ -517,6 +534,22 @@ describe("postChat: limits (spec 0007, AC-8)", () => {
       data: { kind: "limit_run", retry: false },
     });
     expect(handle).not.toHaveBeenCalled();
+  });
+
+  it("lets a retried 40th typed message through: it was counted when it came in", async () => {
+    const handle = vi.fn(async () => ok(turnOutput()));
+    const { deps } = fakeDeps({
+      handleTurn: handle,
+      // The 40th is already saved, so the count includes it.
+      turnContext: inRun(40, { saved: true, answered: false }),
+    });
+    await readAll(
+      await postChat(deps, {
+        userId: USER,
+        body: { conversationId: CONV, message: typed("fortieth") },
+      }),
+    );
+    expect(handle).toHaveBeenCalledOnce();
   });
 
   it("lets the 40th typed message through", async () => {
@@ -597,5 +630,27 @@ describe("postChat: resumable streams (spec 0007, AC-6)", () => {
     expect(result).toMatchObject({ resumable: null });
     await readAll(result);
     expect(finished).toEqual([]);
+  });
+});
+
+describe("postChat: a resent message that already has a reply", () => {
+  it("answers with the answered notice: no turn, nothing saved, not resumable", async () => {
+    const handle = vi.fn();
+    const turnContext = vi.fn(inRun(0, { saved: true, answered: true }));
+    const { deps, saved } = fakeDeps({ handleTurn: handle, turnContext });
+    const message = typed("what can you do?");
+    const result = await postChat(deps, {
+      userId: USER,
+      body: { conversationId: CONV, message },
+    });
+    expect(result.kind === "stream" && result.resumable).toBe(null);
+    expect(await readAll(result)).toContainEqual({
+      type: "data-error",
+      data: { kind: "answered", retry: false },
+    });
+    expect(handle).not.toHaveBeenCalled();
+    expect(saved).toEqual([]);
+    // The route asks about this exact message id.
+    expect(turnContext).toHaveBeenCalledWith(USER, CONV, message.id);
   });
 });

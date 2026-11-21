@@ -21,7 +21,7 @@ describe("failureOf", () => {
     [{ code: "not_found" }, "not_found"],
     [{ code: "invalid_request" }, "invalid"],
     [{ code: "invalid_message" }, "invalid"],
-    [{ code: "unauthenticated" }, "sign_in"],
+    [{ code: "unauthenticated" }, "session_ended"],
     [{ code: "something_new" }, "unknown"],
   ] as const)("maps %j to %s", (body, failure) => {
     expect(failureOf(httpError(body))).toBe(failure);

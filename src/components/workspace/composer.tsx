@@ -19,7 +19,11 @@ import {
   showCounter,
 } from "./composer-rules";
 
-export type ComposerHandle = { readonly focus: () => void };
+export type ComposerHandle = {
+  readonly focus: () => void;
+  /** Puts text back in the box and focuses it (a refused message's "Got it"). */
+  readonly restore: (text: string) => void;
+};
 
 type ComposerProps = {
   /** Called with the trimmed text. What it means (an answer, a side question) is the caller's call. */
@@ -48,7 +52,13 @@ export function Composer({
   const localRef = useRef<HTMLTextAreaElement | null>(null);
   useImperativeHandle(
     ref,
-    () => ({ focus: () => localRef.current?.focus() }),
+    () => ({
+      focus: () => localRef.current?.focus(),
+      restore: (value: string) => {
+        setText(value);
+        localRef.current?.focus();
+      },
+    }),
     [],
   );
   const hintId = useId();

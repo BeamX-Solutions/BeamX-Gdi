@@ -6,10 +6,21 @@
  */
 import { checkBotId } from "botid/server";
 import { env } from "./env";
+import { logEvent } from "./log";
 
+/**
+ * Fails open: when BotID itself fails (no OIDC token, the Vercel API down) the request
+ * counts as human and `bot_check_failed` is logged, so an outage never locks real users
+ * out or turns into a 500. The turn lock, limits and spend cap still apply.
+ */
 export const isBot = async (): Promise<boolean> => {
-  const verdict = await checkBotId({
-    developmentOptions: { isDevelopment: env.VERCEL !== "1" },
-  });
-  return verdict.isBot;
+  try {
+    const verdict = await checkBotId({
+      developmentOptions: { isDevelopment: env.VERCEL !== "1" },
+    });
+    return verdict.isBot;
+  } catch {
+    logEvent("bot_check_failed", {});
+    return false;
+  }
 };

@@ -167,3 +167,34 @@ export const typedUserCountSince = (
       AND m.parts @> '[{"type":"text"}]'::jsonb
       AND m.created_at > (${since})
   `);
+
+/**
+ * Statement builder: whether the owner's user message `messageId` is already saved in
+ * the chat, and whether an assistant message was saved after it (spec 0007, the
+ * "Send again" review fix). A resent message that is saved skips the per run limit (it
+ * was counted when it came in); one that is also answered runs no second AI turn.
+ */
+export const userMessageState = (
+  userId: string,
+  conversationId: string,
+  messageId: string,
+) =>
+  db.execute<{ saved: boolean; answered: boolean }>(sql`
+    SELECT
+      u.id IS NOT NULL AS saved,
+      EXISTS (
+        SELECT 1 FROM message a
+        WHERE a.conversation_id = ${conversationId}::uuid
+          AND a.role = 'assistant'
+          AND a.seq > u.seq
+      ) AS answered
+    FROM (SELECT 1) AS one
+    LEFT JOIN message u
+      ON u.id = ${messageId}::uuid
+      AND u.conversation_id = ${conversationId}::uuid
+      AND u.role = 'user'
+      AND EXISTS (
+        SELECT 1 FROM conversation c
+        WHERE c.id = u.conversation_id AND c.user_id = ${userId}::uuid
+      )
+  `);

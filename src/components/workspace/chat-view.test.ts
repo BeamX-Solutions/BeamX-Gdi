@@ -6,6 +6,8 @@ import {
   threadItems,
   withoutMessageOf,
   busyRetryPlan,
+  isAnsweredNotice,
+  refusedText,
   takenUserMessageId,
   type ViewMessage,
 } from "./chat-view";
@@ -427,5 +429,39 @@ describe("busyRetryPlan (spec 0007, AC-2)", () => {
       messages: ms,
       resend: null,
     });
+  });
+});
+
+describe("refusedText (Got it keeps the typed text)", () => {
+  it("is the text of the user message the notice refused", () => {
+    const ms = [
+      said("a1", "Hi"),
+      typed("u1", "a very long message"),
+      notice("n", "limit_text"),
+    ];
+    expect(refusedText(ms, "n:0")).toBe("a very long message");
+  });
+
+  it("is null for a card tap or a notice with no user message before it", () => {
+    const tap: ViewMessage = {
+      id: "u1",
+      role: "user",
+      parts: [
+        {
+          type: "data-answer",
+          data: { runId: "r", questionId: "q", value: "a" },
+        },
+      ],
+    };
+    expect(refusedText([tap, notice("n", "limit_run")], "n:0")).toBeNull();
+    expect(refusedText([notice("n", "limit_run")], "n:0")).toBeNull();
+  });
+});
+
+describe("isAnsweredNotice", () => {
+  it("spots only the answered notice", () => {
+    expect(isAnsweredNotice(notice("n", "answered"))).toBe(true);
+    expect(isAnsweredNotice(notice("n", "busy"))).toBe(false);
+    expect(isAnsweredNotice(said("a", "hello"))).toBe(false);
   });
 });

@@ -516,3 +516,25 @@ export const busyRetryPlan = <
     resend,
   };
 };
+
+/**
+ * The typed text of the user message a notice refused (the message right before the
+ * notice's message), so "Got it" can put it back in the composer; null for a card tap.
+ * Pure.
+ */
+export const refusedText = (
+  messages: readonly ViewMessage[],
+  itemId: string,
+): string | null => {
+  const at = messages.findIndex((m) => itemId.startsWith(`${m.id}:`));
+  const refused = at > 0 ? messages[at - 1] : undefined;
+  if (refused === undefined || refused.role !== "user") return null;
+  const text = refused.parts
+    .map((p) => parse(textPart, p)?.text ?? "")
+    .join("");
+  return text === "" ? null : text;
+};
+
+/** True when a reply is the `answered` notice: the thread should be loaded again. Pure. */
+export const isAnsweredNotice = (reply: ViewMessage): boolean =>
+  reply.parts.some((p) => parse(errorPart, p)?.data.kind === "answered");
