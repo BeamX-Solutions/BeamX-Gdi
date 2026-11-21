@@ -36,7 +36,7 @@ Build the workspace as a single Next.js 16 app in one repo, with each BeamX tool
 | PDF | `@react-pdf/renderer` (slice 5) | Renders inside a normal serverless function; no Chromium binary. |
 | File storage | Vercel Blob, private access | Same platform as hosting; private blobs for uploads (slice 6) and PDFs. |
 | Abuse protection | Upstash Redis (`eu-central-1`) rate limiting + Vercel BotID on guest start and the chat route + a daily AI spend cap (see Runtime rules) | Guests can trigger paid AI calls for free; this caps both scripted abuse and the bill. |
-| Hosting | Vercel **Pro** plan, Fluid compute on, functions in `fra1` (Frankfurt) | Native Next.js host, preview deploys, long streaming responses; Hobby forbids commercial use, and a lead funnel is commercial. |
+| Hosting | Vercel **Hobby** plan for now (updated 2026-11-22, was Pro), Fluid compute on, functions in `fra1` (Frankfurt). Move to Pro before the commercial launch. | Native Next.js host, preview deploys, long streaming responses. Hobby caps a function at 300 seconds and keeps runtime logs about an hour; reports fit by running one phase per function call (see Runtime rules). Hobby's terms forbid commercial use, so Pro is owed at launch. |
 | Scheduled jobs | Vercel Cron | Free, no new vendor; runs the guest data purge. |
 | Testing | Vitest (unit and tool parity tests), Playwright (end to end) | Parity with the original tools is required; `/test` may refine. |
 | CI | GitHub Actions: typecheck, lint, test, build on every PR; Vercel does deploys | Catches breakage before a preview deploy. |
@@ -70,7 +70,7 @@ Rules:
 
 ### Runtime rules (stack level, every feature honors these)
 
-- **Time limits**: the chat route sets `maxDuration = 300` (seconds). A report that cannot finish inside that moves to Inngest.
+- **Time limits** (updated 2026-11-22): every function stays inside Hobby's 300 second cap (`maxDuration = 300`). A report runs one phase per function call: each phase is saved before the next starts (spec 0005), so a tool with several phases (Luna, five) chains one call per phase, each with its own 300 seconds, the way the standalone Luna already runs on Hobby. Prefer chaining on the server (the end of one phase starts the next) over the browser starting each call, so generation goes on with the tab closed. Feature #12 designs the chaining; Inngest stays the fallback if a single phase cannot fit.
 - **Stream persistence**: chat messages and reports are saved on the server in the AI SDK `onFinish` callback, never by the client. A refresh mid stream resumes through `resumable-stream` on the same Upstash Redis. Feature #7 builds it; this spec fixes the pattern.
 - **AI failures**: AI SDK `maxRetries: 2`; on timeout or provider overload the chat shows a "try again" card, never a blank or a 500. Model ids live in one file, `src/assistant/models.ts`.
 - **Abuse limits** (defaults, all from env): per guest 3 tool runs a day; per IP 20 tool runs a day (loose, because Nigerian mobile carriers share IPs); 40 messages per run; 4,000 characters per message; a `maxOutputTokens` ceiling on every AI call. Hitting a limit shows a friendly message with a sign up or come back later prompt. BotID has a local dev bypass.
@@ -106,13 +106,13 @@ All env vars are read through one Zod checked module in `src/lib/env.ts`: requir
 **Negative / tradeoffs**:
 - Rebuilding the tools creates a second copy of each tool's logic while the standalone tools keep running. Scores can drift if one side changes. Parity tests against the originals are required (see Follow-up).
 - Heavy Vercel lock in (hosting, Blob, BotID, preview branching). Leaving later means replacing those pieces, not the app.
-- Serverless limits apply: no long lived connections, and function time limits. Any report that cannot finish inside one streamed request must move to Inngest earlier than slice 5.
+- Serverless limits apply: no long lived connections, and a 300 second cap per function on Hobby. A report with several phases must chain one call per phase (#12), and any single phase that cannot fit moves to Inngest.
 - Client answers go to Anthropic (US) for AI processing, even though data is stored in Frankfurt. This must be disclosed in the privacy notice (feature #18).
 - Vercel only logging means weaker error alerts until a dedicated tracker is added.
 - Drizzle is pre 1.0; a v1 upgrade will need a planned migration pass.
 - Frankfurt is about 150 to 250 ms from Nigeria: keep DB calls per request few and parallel, never a chain of sequential queries.
 - Neon free tier scales to zero, so the first request after idle is slower; plan a paid Neon plan before public launch.
-- Fixed running cost from day one: Vercel Pro (per seat) plus AI usage.
+- Running cost is AI usage only while on Hobby; Vercel Pro (per seat) is owed before the commercial launch, since Hobby's terms forbid commercial use.
 - `@react-pdf/renderer` has limited layout and font support; matching the standalone tools' branded PDFs exactly may be hard (feature #15 decides).
 
 **Neutral**:
@@ -127,6 +127,8 @@ All env vars are read through one Zod checked module in `src/lib/env.ts`: requir
 - [ ] Record the Agent Skills and MCP choices in root `AGENTS.md` `## Agent skills` (`/audit` writes it in feature #2): framework, AI SDK, shadcn, Neon, and Drizzle skills at root; Better Auth skills in `src/auth/AGENTS.md`; Upstash skills in `src/lib/AGENTS.md`. `MCP servers:` Neon, Vercel (already connected). `Declined:` Better Auth docs MCP, Upstash MCP, Resend MCP, Inngest MCP.
 - [ ] Skills not installed yet, to offer when their slice starts: Resend + React Email (`resend/resend-skills`) in slice 5, Inngest (`inngest/inngest-skills`) in slice 5. No official skill exists for Drizzle, Tailwind v4, Vercel Blob, or `@react-pdf/renderer`.
 - [ ] Revisit error monitoring (for example Sentry) before the public launch.
+- [ ] Move the Vercel team to Pro before the commercial launch (Hobby forbids commercial use); then decide whether reports still need one call per phase.
+- [ ] Design one call per report phase, chained on the server, in feature #12's spec (Luna is the first tool with more than one phase); spec 0005's AC-7 (a POST on a generating report makes no AI call) changes with it.
 - [ ] At scaffold time, confirm the Better Auth Drizzle adapter supports Drizzle 0.45, and that Neon and Vercel Blob offer Frankfurt on your account.
 - [ ] Hand feature #18 the processor list for the privacy notice: Vercel, Neon, Upstash, Resend, Anthropic (US transfer).
 

@@ -18,7 +18,7 @@ From [spec 0001](docs/specs/0001-stack-architecture/index.md) (source of truth).
 - **Framework**: Next.js 16 App Router (exact patch pinned), Cache Components on; modular monolith, single package
 - **Key dependencies**: Vercel AI SDK 7 + Anthropic Claude · Neon Postgres (Frankfurt) via Drizzle ORM 0.45 · Better Auth (`anonymous` plugin) · Zod · Tailwind v4 + shadcn/ui · Upstash Redis (rate limits, spend cap)
 - **Package manager**: pnpm
-- **Hosting**: Vercel Pro, functions in `fra1`. Tests: Vitest + Playwright. CI: GitHub Actions.
+- **Hosting**: Vercel Hobby for now (Pro before the commercial launch), functions in `fra1`; each function fits in 300 seconds, so reports run one phase per call. Tests: Vitest + Playwright. CI: GitHub Actions.
 
 ## Build approach
 

@@ -174,6 +174,7 @@ Run the deeper Beacon Pro assessment, with its report streaming in live. It is a
 
 ### 12. Luna marketing plan in chat · needs a decision
 Run Luna's long questionnaire (50 questions: 12 about the business, 38 across 9 marketing areas) in chat without wearing the client out. Progress is shown, the client can stop and resume, and the plan is generated at the end. Luna has no scoring: the plan is written by Claude in five phases in a row, which won't fit in one request, so each finished phase is saved and a failure resumes from the phase that broke.
+Design note (spec 0001, 2026-11-22): the app runs on Vercel Hobby (300 seconds per function call), so the plan runs one phase per call, chained on the server, the way the standalone Luna already runs on Hobby; spec 0005's AC-7 changes with it.
 **Done when:** a client can pause midway, come back, finish, and get the full marketing plan in the panel, and a plan that fails partway resumes from the failed phase.
 - [ ] Design it (spec): `/architect luna marketing plan in chat`
 

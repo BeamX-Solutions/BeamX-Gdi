@@ -13,8 +13,8 @@ import {
 import { reportApiDeps } from "@/assistant/report-deps";
 import { sessionUserId } from "@/auth/session";
 
-// Vercel Hobby's limit for now (the project runs on Hobby; spec 0001 planned Pro at 800).
-// Enough for Stellar's one phase. Luna's five phase report needs Pro again, or a rework.
+// Vercel Hobby's cap (spec 0001): every phase must fit in 300 seconds. Stellar has one
+// phase. Luna's five run one phase per call, chained on the server (designed in #12).
 export const maxDuration = 300;
 
 const runIdSchema = z.uuid();
