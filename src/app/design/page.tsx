@@ -108,12 +108,11 @@ const typeScale: readonly { name: string; classes: string }[] = [
   { name: "text-4xl · 36px", classes: "text-4xl" },
 ];
 
-// Headings and titles 16px or larger in weight 600 use Montserrat (AC-16).
-const headingScale: readonly { name: string; classes: string }[] = [
-  { name: "text-base · 16px", classes: "text-base" },
-  { name: "text-lg · 18px", classes: "text-lg" },
-  { name: "text-2xl · 24px", classes: "text-2xl" },
-  { name: "text-4xl · 36px", classes: "text-4xl" },
+// The three weights the design uses, all Montserrat (AC-16).
+const weights: readonly { name: string; classes: string }[] = [
+  { name: "Regular 400 · body and chat replies", classes: "font-normal" },
+  { name: "Medium 500 · labels and buttons", classes: "font-medium" },
+  { name: "Semibold 600 · headings and titles", classes: "font-semibold" },
 ];
 
 const verdicts: readonly {
@@ -215,21 +214,15 @@ export default function DesignPage() {
 
       <Section id="type" title="Type scale">
         <p className="text-sm text-muted-foreground">
-          Montserrat, weight 600: headings and titles 16px or larger.
+          Montserrat, the BeamX brand font, for all text.
         </p>
         <ul className="flex flex-col gap-2">
-          {headingScale.map((step) => (
-            <li
-              key={step.name}
-              className={`font-heading font-semibold wrap-anywhere ${step.classes}`}
-            >
-              {step.name} · The quick brown fox
+          {weights.map((w) => (
+            <li key={w.name} className={`text-base ${w.classes}`}>
+              {w.name}
             </li>
           ))}
         </ul>
-        <p className="text-sm text-muted-foreground">
-          Inter: everything else, including chat replies, buttons, and labels.
-        </p>
         <ul className="flex flex-col gap-2">
           {typeScale.map((step) => (
             <li key={step.name} className={step.classes}>

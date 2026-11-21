@@ -80,9 +80,9 @@ All text uses Montserrat, the BeamX brand font, so the workspace looks like Beam
 **Done when:** all text shows in Montserrat (Inter gone), the chat column is up to 64rem wide on desktop, and axe and the 360px and 1280px checks still pass in both themes.
 spec [0003](../specs/0003-design-system-ui-foundation/index.md) (Milestones 5 and 6, AC-4, AC-16) · code in `src/app/layout.tsx`, `src/app/globals.css`, `src/components`, `DESIGN.md`
 - [x] Design it (spec): `/architect design system: switch the font to Montserrat` (updated: all text, 64rem chat)
-- [ ] Build it: `/develop brand font: Montserrat everywhere, wider chat`
+- [x] Build it: `/develop brand font: Montserrat everywhere, wider chat`
   - [x] Load Montserrat as `--font-heading`, the heading rule and the title classes, `DESIGN.md` and `/design` type scale, full Playwright pass (AC-1, AC-3, AC-16)
-  - [ ] Montserrat as the only sans font (Inter and `--font-heading` removed), chat column 64rem, `DESIGN.md` and `/design`, full Playwright pass (AC-1, AC-3, AC-4, AC-16)
+  - [x] Montserrat as the only sans font (Inter and `--font-heading` removed), chat column 64rem, `DESIGN.md` and `/design`, full Playwright pass (AC-1, AC-3, AC-4, AC-16)
 - [ ] Verify it: `/check verify brand font: Montserrat everywhere, wider chat`
 
 ### 20. Tool source access & parity fixtures · in-progress

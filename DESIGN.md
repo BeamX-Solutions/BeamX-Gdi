@@ -4,7 +4,7 @@ The look and the building blocks of the BeamX Workspace. Spec: [0003](docs/specs
 
 ## Feel
 
-A calm, trusted advisor. Mostly neutral surfaces, the BeamX royal blue from the logo as the one strong color, sky blue for focus and progress, and a small touch of orange. Green, yellow, and red are kept for score verdicts only. Medium rounded corners, Montserrat (the BeamX brand font) for headings over Inter for everything people read, plenty of space.
+A calm, trusted advisor. Mostly neutral surfaces, the BeamX royal blue from the logo as the one strong color, sky blue for focus and progress, and a small touch of orange. Green, yellow, and red are kept for score verdicts only. Medium rounded corners, Montserrat (the BeamX brand font) for all text, plenty of space.
 
 **Rule: style only with tokens.** No raw hex, `rgb`, `oklch`, or Tailwind palette colors (`bg-blue-600`) in `src/components/` or `src/app/`. A CI step fails the build if it finds one.
 
@@ -63,15 +63,9 @@ A verdict is never shown by color alone: it always carries an icon (check circle
 
 ## Type
 
-Inter (variable, `latin` and `latin-ext`) as `--font-sans`; Geist Mono as `--font-mono`. Tailwind's default scale `text-xs` to `text-4xl` (12, 14, 16, 18, 20, 24, 30, 36px). 16px for body and the composer, so phones never zoom in. Body line height 1.5, headings 1.25. Weights 400, 500, 600 only.
+Montserrat, the BeamX brand font (variable, `latin` and `latin-ext`, weights 400 to 600), as `--font-sans` for all text; Geist Mono as `--font-mono`. Tailwind's default scale `text-xs` to `text-4xl` (12, 14, 16, 18, 20, 24, 30, 36px). 16px for body and the composer, so phones never zoom in. Body line height 1.5, headings 1.25. Weights 400, 500, 600 only.
 
-Montserrat, the BeamX brand font (`latin` and `latin-ext`, weight 600 only), is `--font-heading`, used through the `font-heading` utility. Where it applies, and nowhere else:
-
-- `h1` to `h4`, through the base rule in `globals.css`. That covers page headings, the `ReportPanel` title, report section titles, and headings in chat markdown.
-- The titles that are not heading elements, which carry `font-heading`: `SheetTitle` in `ReportSheet`, the `CardFrame` prompt, the `ScoreHeader` score, the `ApprovalCard` title (confirm and stop cards), the `PrefillCard` title, the `ShortBalanceCard` title, and the `ErrorCard` title.
-- For any new component: a title at 16px or larger in weight 600 gets `font-heading`. Anything else stays Inter. Buttons, chips, answer options, the composer, labels, hints, progress text, the credit chip, and chat replies are always Inter.
-
-Montserrat is wider than Inter, so heading containers keep `min-w-0` and `wrap-anywhere`, and the 360px checks stay the gate.
+There is no separate heading font: every element inherits Montserrat from `body`. Headings use weight 600 and line height 1.25. Montserrat is wider than most UI fonts, so text containers keep `min-w-0` and `wrap-anywhere`, and the 360px checks stay the gate.
 
 ## Spacing
 
@@ -128,7 +122,7 @@ Every shared component has a section here (props, states, usage rules) and an en
 - It renders exactly one layout tree, picked by `useIsDesktop`, never both hidden by CSS. The server and the first paint use the phone layout.
 - At 1024px and up: the `HistoryRail` (16rem open, 3.5rem collapsed), the chat column, and a resizable `ReportPanel` when `report` is set. Below 1280px the rail collapses on its own when the panel opens. Panel width and rail state are not saved.
 - Below 1024px: one column, the rail as a drawer from a menu button, the report in a full screen `ReportSheet` opened from a `ViewReportCard` in the thread.
-- With no report, the chat column is centered at 48rem max.
+- With no report, the chat column is centered at 64rem max.
 - It is `h-dvh`; the viewport is set with `viewportFit: "cover"` and `interactiveWidget: "resizes-content"`, so the composer stays above the Android keyboard. iOS Safari ignores `interactiveWidget` and relies on its own scroll into view (not tested in CI).
 
 Usage rules: text containers use `min-w-0` and `wrap-anywhere`, so long words and URLs wrap instead of widening the page.

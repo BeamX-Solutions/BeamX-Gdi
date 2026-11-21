@@ -104,7 +104,8 @@ test.describe("workspace shell", () => {
       page.getByRole("region", { name: "Idea check report" }),
     ).toHaveCount(0);
     const box = await page.getByRole("main").boundingBox();
-    expect(box?.width ?? 0).toBeLessThanOrEqual(768 + 1);
+    // 64rem (spec 0003, AC-4, updated 2026-11-21).
+    expect(box?.width ?? 0).toBeLessThanOrEqual(1024 + 1);
   });
 
   test("desktop: the history rail collapses and expands (AC-4)", async ({

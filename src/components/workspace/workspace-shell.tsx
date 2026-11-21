@@ -136,12 +136,12 @@ export function WorkspaceShell({
   );
 }
 
-/** The chat column: centered, 48rem at most, never wider than its space. */
+/** The chat column: centered, 64rem at most, never wider than its space. */
 function ChatColumn({ children }: { readonly children: ReactNode }) {
   return (
     <main
       className={cn(
-        "mx-auto flex h-full min-h-0 w-full max-w-3xl min-w-0 flex-1 flex-col",
+        "mx-auto flex h-full min-h-0 w-full max-w-5xl min-w-0 flex-1 flex-col",
       )}
     >
       {children}

@@ -6,8 +6,7 @@
 
 /* Design tokens: see DESIGN.md. Every token named there exists here (Vitest checks it). */
 @theme inline {
-  --font-sans: var(--font-inter);
-  --font-heading: var(--font-montserrat);
+  --font-sans: var(--font-montserrat);
   --font-mono: var(--font-geist-mono);
 
   --color-background: var(--background);
@@ -138,7 +137,6 @@
   h2,
   h3,
   h4 {
-    font-family: var(--font-heading);
     font-weight: 600;
     line-height: 1.25;
   }

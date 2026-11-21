@@ -43,7 +43,6 @@ describe("DESIGN.md and globals.css agree (AC-1)", () => {
     const colorTokens = named.filter(
       (token) =>
         token !== "--font-sans" &&
-        token !== "--font-heading" &&
         token !== "--font-mono" &&
         token !== "--radius",
     );

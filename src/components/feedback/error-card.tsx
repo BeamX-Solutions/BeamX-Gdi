@@ -46,7 +46,7 @@ export function ErrorCard({ kind, title, message, action }: ErrorCardProps) {
       <div className="flex min-w-0 items-start gap-3">
         <Icon className="mt-0.5 size-5 shrink-0 text-destructive" aria-hidden />
         <div className="flex min-w-0 flex-col gap-1">
-          <p className="font-heading font-semibold wrap-anywhere">{title}</p>
+          <p className="font-semibold wrap-anywhere">{title}</p>
           <p className="text-sm wrap-anywhere text-muted-foreground">
             {message}
           </p>
