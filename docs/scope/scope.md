@@ -15,11 +15,11 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 2 | Coding standards & tooling | Foundation | done |
 | 3 | Data model | Foundation | done |
 | 4 | Design system & UI foundation | Foundation | done |
-| 23 | Brand font: Montserrat everywhere, wider chat | Foundation | in-progress |
+| 23 | Brand font: Montserrat everywhere, wider chat | Foundation | done |
 | 20 | Tool source access & parity fixtures | Foundation | in-progress |
 | 5 | Tool module contract & registry | Foundation | done |
-| 6 | Assistant brain | Foundation | in-progress |
-| 7 | Validate an idea in chat (Stellar) | Slice 1 | in-progress |
+| 6 | Assistant brain | Foundation | done |
+| 7 | Validate an idea in chat (Stellar) | Slice 1 | done |
 | 22 | Credits & billing | Slice 1 | in-progress |
 | 21 | Abuse & AI cost guards | Slice 1 | planned |
 | 8 | Accounts & sign up to save | Slice 2 | planned |
@@ -75,7 +75,7 @@ spec [0003](../specs/0003-design-system-ui-foundation/index.md) · code in `src/
   - [x] Report parts, errors, and the finished `DESIGN.md`: score, bars, advice, sections, skeleton, error card, full axe pass (AC-1, AC-3, AC-11, AC-12, AC-15)
 - [x] Verify it: `/check verify design system & UI foundation`
 
-### 23. Brand font: Montserrat everywhere, wider chat · in-progress
+### 23. Brand font: Montserrat everywhere, wider chat · done
 All text uses Montserrat, the BeamX brand font, so the workspace looks like BeamX, and on desktop the chat column widens to 64rem so the conversation uses more of the screen (updated 2026-11-21; the first version used Montserrat for headings only).
 **Done when:** all text shows in Montserrat (Inter gone), the chat column is up to 64rem wide on desktop, and axe and the 360px and 1280px checks still pass in both themes.
 spec [0003](../specs/0003-design-system-ui-foundation/index.md) (Milestones 5 and 6, AC-4, AC-16) · code in `src/app/layout.tsx`, `src/app/globals.css`, `src/components`, `DESIGN.md`
@@ -83,7 +83,7 @@ spec [0003](../specs/0003-design-system-ui-foundation/index.md) (Milestones 5 an
 - [x] Build it: `/develop brand font: Montserrat everywhere, wider chat`
   - [x] Load Montserrat as `--font-heading`, the heading rule and the title classes, `DESIGN.md` and `/design` type scale, full Playwright pass (AC-1, AC-3, AC-16)
   - [x] Montserrat as the only sans font (Inter and `--font-heading` removed), chat column 64rem, `DESIGN.md` and `/design`, full Playwright pass (AC-1, AC-3, AC-4, AC-16)
-- [ ] Verify it: `/check verify brand font: Montserrat everywhere, wider chat`
+- [x] Verify it: `/check verify brand font: Montserrat everywhere, wider chat`
 
 ### 20. Tool source access & parity fixtures · in-progress
 Get read access to the source code of Beacon, Beacon Pro, Luna, and Stellar, and capture real answer sets with the scores and verdicts the live tools give them. The rebuilt tools are tested against these so they score the same way (from spec 0001).
@@ -104,7 +104,7 @@ spec [0005](../specs/0005-tool-module-contract/index.md) · code in `src/tools`,
   - [x] Report blocks, renderer, panel states on /design, and the contract test over the registry (AC-1, AC-11, AC-13)
 - [x] Verify it: `/check verify tool module contract & registry`
 
-### 6. Assistant brain · in-progress
+### 6. Assistant brain · done
 How the assistant understands what the client wants, picks the right tool, asks the questions as answer cards, skips anything it already knows, and stays on BeamX topics.
 **Done when:** given "I have a business idea" or "how healthy is my business", the assistant picks the right tool, walks the questions, and politely declines off topic requests.
 spec [0006](../specs/0006-assistant-brain/index.md) · code in `src/assistant`, `src/db/queries/credits.ts`, `evals/assistant`
@@ -114,11 +114,11 @@ spec [0006](../specs/0006-assistant-brain/index.md) · code in `src/assistant`, 
   - [x] AI turn: instructions, run state note, registry built startRun with approval, typed answers and reopening cards (AC-2, AC-3, AC-4, AC-8, AC-10, AC-11, AC-12, AC-14)
   - [x] Known facts extraction and prefill card, stop, resume and restart with credits.startFromWithHold (AC-3, AC-5, AC-5b, AC-9)
   - [x] Real model eval harness and the first committed results (AC-4, AC-10, AC-11, AC-12, AC-15)
-- [ ] Verify it: `/check verify assistant brain`
+- [x] Verify it: `/check verify assistant brain`
 
 ## Slice 1: First real thread
 
-### 7. Validate an idea in chat (Stellar) · in-progress
+### 7. Validate an idea in chat (Stellar) · done
 The walking skeleton. A guest types an idea, the assistant routes to Stellar, collects the 10 answers as cards, runs the real scoring and AI analysis, and shows the green, yellow, or red report in the panel. It is saved to the guest session. No accounts, PDF, or history yet.
 **Done when:** a guest goes from first message to a saved Stellar report on screen, using real data and real AI, and a refresh keeps the report.
 spec [0007](../specs/0007-validate-idea-chat/index.md) · code in `src/app`, `src/auth`, `src/components/workspace`, `src/components/credits`, `src/db/queries`
@@ -128,7 +128,7 @@ spec [0007](../specs/0007-validate-idea-chat/index.md) · code in `src/app`, `sr
   - [x] useChat client, part renderers, report panel wiring, credit cards and the client chip (AC-3, AC-4, AC-9, AC-10, AC-11)
   - [x] Resumable streams and message limits (AC-6, AC-8)
   - [x] Playwright full flow with axe, and a real model run (AC-4, AC-12)
-- [ ] Verify it: `/check verify validate an idea in chat`
+- [x] Verify it: `/check verify validate an idea in chat`
 
 ### 22. Credits & billing · Beta · in-progress
 Clients pay for tool runs with credits from one balance. Each tool has a fixed price per run, and chat beyond a small daily free allowance costs a little. The assistant always confirms before spending ("this uses 30 credits, go ahead?"). Credits are held when a run starts, charged when the report arrives, and released if it fails; Luna's phased plan resumes without charging twice. New accounts get starter credits, top ups are paid through Paystack in naira, credits expire after 12 months of inactivity (with a reminder first), and existing Luna credit balances move in. Comes right after the first Stellar thread and before any public link.
@@ -136,7 +136,7 @@ Clients pay for tool runs with credits from one balance. Each tool has a fixed p
 spec [0004](../specs/0004-credits-billing/index.md) · code in `src/billing`, `src/db`
 - [x] Design it (spec): `/architect credits & billing`
 - [ ] Build it: `/develop credits & billing`
-  - [ ] Thin thread: a guest pays for a Stellar run with starter credits (config, ledger and holds migration, hold on approve, charge on report ready, release on failure, confirm card, header chip) (AC-1, AC-2, AC-3, AC-4, AC-5, AC-8, AC-11, AC-14, AC-18, AC-20, AC-21)
+  - [x] Thin thread: a guest pays for a Stellar run with starter credits (config, ledger and holds migration, hold on approve, charge on report ready, release on failure, confirm card, header chip) (AC-1, AC-2, AC-3, AC-4, AC-5, AC-8, AC-11, AC-14, AC-18, AC-20, AC-21)
   - [ ] Hold lifecycle and paid chat: resume and reconfirm, daily cron with idle and chat hold sweeps, free allowance and metered chat, guest grant IP cap, charge once across phases (AC-2, AC-6, AC-7, AC-9, AC-10, AC-11, AC-21)
   - [ ] Buying credits, after #8 sign up: payment table, Paystack client, checkout, callback, webhook, pending sweep, buy from the card, `/credits` page (AC-8, AC-13, AC-14, AC-21)
   - [ ] Accounts and money operations, after #8: sign up grant, Luna import and claim, guest link merge, deletion, adjust script, expiry (behind a flag) and drift check (AC-11, AC-12, AC-15, AC-16, AC-17, AC-19, AC-20)

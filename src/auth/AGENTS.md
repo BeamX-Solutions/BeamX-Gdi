@@ -2,14 +2,16 @@
 
 ## Overview
 
-Better Auth server and client config, with tables in Neon via the Drizzle adapter. Guests start without signing up: the `anonymous` plugin gives each guest a real user row, and signing up keeps their work (feature #8). `auth.ts` (server config) and `link.ts` (the guest link hook) exist; there is no `/api/auth` route, sign up method, or UI yet (features #7 and #8).
+Better Auth server and client config, with tables in Neon via the Drizzle adapter. Guests start without signing up: the `anonymous` plugin gives each guest a real user row, and signing up keeps their work (feature #8). `auth.ts` (server config), `link.ts` (the guest link hook), and `client.ts` (the React auth client with the anonymous plugin) exist, served by `src/app/api/auth/[...all]/route.ts`. There is no sign up method or UI yet (feature #8).
 
 ## Conventions
 
 - Use the Better Auth `anonymous` plugin for guests. On sign up, `onLinkAccount` moves the guest's runs to the new account.
 - `onLinkAccount` calls `users.linkGuest` (one batch over every user owned table) and must let any error propagate, no try and log: Better Auth then aborts before deleting the guest, so a failed link keeps the guest and their data.
-- Secrets and URLs come from `src/lib/env.ts`: `BETTER_AUTH_SECRET`, `NEXT_PUBLIC_APP_URL` as `baseURL`. `trustedOrigins` also allows the `VERCEL_URL` of preview deploys.
+- Secrets and URLs come from `src/lib/env.ts`: `BETTER_AUTH_SECRET`, `NEXT_PUBLIC_APP_URL` as `baseURL`. `baseURL` falls back to `VERCEL_URL` on previews, and `trustedOrigins` adds `VERCEL_BRANCH_URL`, so the branch preview link can sign a guest in.
 - User data stays in our DB, so NDPA/GDPR export and delete stay possible.
+- `POST /api/auth/sign-in/anonymous` is BotID checked first (`isBot()` from `src/lib/bot-check.ts`), so a bot can't mint guests; a bot gets `403 {"code":"bot"}`.
+- A guest is signed in on the first send, never on page load: the resume route answers `204`, not `401`, with no session, because the chat client's `401` handling signs a guest in.
 - The guest session cookie is strictly necessary (no consent needed); tracking cookies wait for feature #18.
 
 ## Gotchas
