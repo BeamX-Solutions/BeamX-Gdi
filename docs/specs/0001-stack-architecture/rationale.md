@@ -56,6 +56,10 @@ Smaller calls made during the walk (engineer picked each; runner up in brackets)
 
 Calls made at write time: Zod for all validation and env checks [Valibot, smaller but less ecosystem support]; Vercel BotID as the bot check [Cloudflare Turnstile, which adds a visible widget and another vendor]; Neon serverless driver with the pooled connection [node-postgres, which suits long lived servers]; route handlers for chat and Server Actions for mutations, no public API [tRPC, unneeded with one client].
 
+### Update 2026-11-22: Vercel Hobby for now
+
+The team runs on Vercel Hobby, not Pro. The cost of Pro buys little before launch: the only hard limit that bites is the 300 second function cap, and the standalone Luna already lives with it by generating its five phase plan as five calls (each POST runs the next unsaved phase and returns 202 until the plan is done). The workspace's report runner already saves each phase and skips saved phases on retry (spec 0005, AC-8), so the same split costs little here: one phase per call instead of all phases in one `after()`. Chaining on the server is preferred over Luna's browser driven loop, so a closed tab does not stop a paid report. What Hobby does not settle is its terms: commercial use is not allowed, so Pro stays owed before the commercial launch.
+
 ## References
 
 **Project sources**:
