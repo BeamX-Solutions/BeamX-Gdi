@@ -47,7 +47,7 @@ export function ReportSheet({
             The full report for this chat.
           </SheetDescription>
         </div>
-        <ScrollArea className="min-h-0 flex-1">
+        <ScrollArea className="min-h-0 flex-1" viewportLabel="Report contents">
           <div className="min-w-0 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
             {children}
           </div>

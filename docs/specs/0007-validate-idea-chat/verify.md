@@ -123,3 +123,26 @@ _Reconnecting needs Redis close to the app. From a laptop far from Frankfurt, ea
 
 - AC-6: resume mid reply, after a network drop, after the reply finished, no request on a new chat, the adapter tests
 - AC-8: too long text, the 41st typed message, taps never counted, Got it dismisses
+
+## Milestone 4: full flow e2e and a real model run · updated 2026-11-21
+
+### UI / manual
+
+- [ ] Real model, a weak idea: pick the weakest answer on each card → a yellow or red verdict whose badge, icon and bars match the score (the 2026-11-21 run only covered green: 100/100, "Good") → AC-4
+- [ ] Real model, phone width: the report opens as a full screen sheet, and the sheet's report text scrolls with the keyboard (Tab to "Report contents", then the arrow keys) → AC-4, AC-3
+
+### Commands
+
+- [ ] `ENABLE_DESIGN_PAGE=true pnpm build && pnpm exec playwright test e2e/flow.spec.ts` → 4 passed (phone and desktop, light and dark): first message, URL `/c/<id>`, confirm card for 30 credits, approve, every card, report from the fake model, chip at 0, reload keeps it, axe clean on `/`, the ready report, and `/c/<id>` → AC-1, AC-3, AC-4, AC-5, AC-9, AC-12
+- [ ] On a PR, the CI `e2e` job creates a `ci-e2e-*` Neon branch, migrates it, runs the suite, and deletes the branch afterwards (check the Neon console) → AC-12
+- [ ] The test server runs with `E2E_FAKE_AI=true` (playwright.config.ts), so the suite makes no Anthropic calls: the Anthropic console shows no usage for a CI run → AC-12
+
+### Notes
+
+- From a laptop far from Frankfurt, running all e2e tests at once can drop database requests ("Error connecting to database: fetch failed"), and the flow test then fails on its first send. Run `e2e/flow.spec.ts` on its own, or rely on CI.
+- The full flow found a real accessibility gap: the report's scroll area could not be reached with a keyboard (`scrollable-region-focusable`). Fixed with `viewportLabel` on `ScrollArea`.
+
+### Acceptance-criteria coverage (milestone 4)
+
+- AC-12: the full flow test on four projects, axe on `/`, the ready report and `/c/<id>`, the fake model in CI on a throwaway branch
+- AC-4: the real model run (green covered; yellow and red still owed above)

@@ -167,7 +167,7 @@ Tracer Bullet: one guest gets from the first message to a ready report on the fa
 4. [x] Credit UI: confirm card with `availableBalance`, short balance card (guest text), stop card, the client chip and `summary` on the approval, stop and report status results, satisfies **AC-3**, **AC-9**, **AC-10**
 5. [x] Resumable streams: `resumable-stream` on Upstash with `after()`, the 5 minute key, and the GET resume route, satisfies **AC-6**
 6. [x] Limits: env values, the typed only count, notices as `data-error` streams, satisfies **AC-8**
-7. Playwright full flow plus axe, and a real model run with `/check verify`, satisfies **AC-12**, **AC-4**
+7. [x] Playwright full flow plus axe, and a real model run with `/check verify`, satisfies **AC-12**, **AC-4**
 
 ## Consequences
 

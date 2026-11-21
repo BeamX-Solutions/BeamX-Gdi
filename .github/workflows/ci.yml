@@ -43,10 +43,13 @@ jobs:
       - run: pnpm test
       - run: pnpm build
 
-  # Accessibility and layout checks on /design (spec 0003, AC-15). Chromium only, against a
-  # production build. ENABLE_DESIGN_PAGE must be set for BOTH build and start: Cache
-  # Components renders the page at build time.
+  # Accessibility and layout checks on /design (spec 0003, AC-15) and the whole chat flow
+  # on the scripted fake model (spec 0007, AC-12). Chromium only, against a production
+  # build. ENABLE_DESIGN_PAGE must be set for BOTH build and start: Cache Components
+  # renders the page at build time. The chat flow writes to a throwaway Neon branch, so
+  # this job needs the same Neon settings as the database job (fork PRs are skipped).
   e2e:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     env:
       SKIP_ENV_VALIDATION: "1"
@@ -68,6 +71,33 @@ jobs:
           key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
       - name: Install Chromium
         run: pnpm exec playwright install --with-deps chromium
+      - name: Check Neon settings
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+        run: |
+          if [ -z "$NEON_API_KEY" ] || [ -z "$NEON_PROJECT_ID" ]; then
+            echo "::error::Set the NEON_API_KEY secret and the NEON_PROJECT_ID variable in GitHub (Settings, Secrets and variables, Actions)."
+            exit 1
+          fi
+      - name: Expiry for the branch (safety net if cleanup is skipped)
+        id: expiry
+        run: echo "at=$(date -u -d '+2 hours' +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+      - name: Create Neon branch
+        id: branch
+        uses: neondatabase/create-branch-action@v6
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          api_key: ${{ secrets.NEON_API_KEY }}
+          branch_name: ci-e2e-${{ github.run_id }}-${{ github.run_attempt }}
+          expires_at: ${{ steps.expiry.outputs.at }}
+      - name: Connection settings for the next steps
+        run: |
+          echo "DATABASE_URL=${{ steps.branch.outputs.db_url_pooled }}" >> "$GITHUB_ENV"
+          echo "DATABASE_URL_UNPOOLED=${{ steps.branch.outputs.db_url }}" >> "$GITHUB_ENV"
+          echo "BETTER_AUTH_SECRET=$(openssl rand -base64 32)" >> "$GITHUB_ENV"
+          echo "NEXT_PUBLIC_APP_URL=http://localhost:3000" >> "$GITHUB_ENV"
+      - run: pnpm db:migrate
       - run: pnpm build
       - run: pnpm e2e
       - name: Upload Playwright report
@@ -77,6 +107,13 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 14
+      - name: Delete Neon branch
+        if: always() && steps.branch.outputs.branch_id != ''
+        uses: neondatabase/delete-branch-action@v3
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch_id: ${{ steps.branch.outputs.branch_id }}
+          api_key: ${{ secrets.NEON_API_KEY }}
 
   # Database integration tests on a throwaway Neon branch (spec 0002, AC-11).
   # Needs the NEON_API_KEY secret and the NEON_PROJECT_ID variable. Fork PRs get no
