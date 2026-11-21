@@ -4,11 +4,18 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 import { ScrollArea as ScrollAreaPrimitive } from "radix-ui";
 
+/**
+ * `viewportLabel` makes the scrolling area a named, focusable region, so keyboard users
+ * can scroll content that holds nothing focusable (axe `scrollable-region-focusable`).
+ */
 function ScrollArea({
   className,
   children,
+  viewportLabel,
   ...props
-}: React.ComponentProps<typeof ScrollAreaPrimitive.Root>) {
+}: React.ComponentProps<typeof ScrollAreaPrimitive.Root> & {
+  readonly viewportLabel?: string;
+}) {
   return (
     <ScrollAreaPrimitive.Root
       data-slot="scroll-area"
@@ -17,6 +24,9 @@ function ScrollArea({
     >
       <ScrollAreaPrimitive.Viewport
         data-slot="scroll-area-viewport"
+        {...(viewportLabel === undefined
+          ? {}
+          : { tabIndex: 0, role: "region", "aria-label": viewportLabel })}
         className="size-full rounded-[inherit] transition-[color,box-shadow] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1"
       >
         {children}

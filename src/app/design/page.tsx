@@ -108,6 +108,13 @@ const typeScale: readonly { name: string; classes: string }[] = [
   { name: "text-4xl · 36px", classes: "text-4xl" },
 ];
 
+// The three weights the design uses, all Montserrat (AC-16).
+const weights: readonly { name: string; classes: string }[] = [
+  { name: "Regular 400 · body and chat replies", classes: "font-normal" },
+  { name: "Medium 500 · labels and buttons", classes: "font-medium" },
+  { name: "Semibold 600 · headings and titles", classes: "font-semibold" },
+];
+
 const verdicts: readonly {
   label: string;
   Icon: LucideIcon;
@@ -206,6 +213,16 @@ export default function DesignPage() {
       </Section>
 
       <Section id="type" title="Type scale">
+        <p className="text-sm text-muted-foreground">
+          Montserrat, the BeamX brand font, for all text.
+        </p>
+        <ul className="flex flex-col gap-2">
+          {weights.map((w) => (
+            <li key={w.name} className={`text-base ${w.classes}`}>
+              {w.name}
+            </li>
+          ))}
+        </ul>
         <ul className="flex flex-col gap-2">
           {typeScale.map((step) => (
             <li key={step.name} className={step.classes}>

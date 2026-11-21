@@ -58,7 +58,13 @@ import {
   type OwnerBox,
   type ToolEvent,
 } from "./tools";
-import { partsStream, type ActiveRead, type AiTurnContext } from "./turn";
+import {
+  partsStream,
+  type ActiveRead,
+  type AiTurnContext,
+  type AiTurnResult,
+  type ChatUsage,
+} from "./turn";
 
 /** Steps per turn: room for a tool call, its result and a reply, plus one retry. */
 export const MAX_STEPS = 5;
@@ -396,23 +402,78 @@ const writeParts = (
   }
 };
 
-/** Builds `TurnDeps.aiTurn`. The stream holds no start or finish chunk (#7 wraps it). */
+/** One step's usage, as `onStepEnd` reports it. */
+type StepUsage = {
+  readonly usage: {
+    readonly inputTokens?: number | undefined;
+    readonly outputTokens?: number | undefined;
+    readonly inputTokenDetails?:
+      | {
+          readonly cacheReadTokens?: number | undefined;
+          readonly cacheWriteTokens?: number | undefined;
+        }
+      | undefined;
+  };
+  readonly response: { readonly modelId: string };
+};
+
+/**
+ * The turn's totals from its steps (spec 0007, step 6). A missing count is 0; `model`
+ * is the last step's response model. Null when no step ran. Pure.
+ */
+export const sumUsage = (steps: readonly StepUsage[]): ChatUsage | null => {
+  const last = steps.at(-1);
+  if (last === undefined) return null;
+  const n = (v: number | undefined) =>
+    v !== undefined && Number.isFinite(v) && v > 0 ? v : 0;
+  return steps.reduce<ChatUsage>(
+    (total, step) => ({
+      model: total.model,
+      inputTokens: total.inputTokens + n(step.usage.inputTokens),
+      outputTokens: total.outputTokens + n(step.usage.outputTokens),
+      cacheReadTokens:
+        total.cacheReadTokens +
+        n(step.usage.inputTokenDetails?.cacheReadTokens),
+      cacheWriteTokens:
+        total.cacheWriteTokens +
+        n(step.usage.inputTokenDetails?.cacheWriteTokens),
+    }),
+    {
+      model: last.response.modelId,
+      inputTokens: 0,
+      outputTokens: 0,
+      cacheReadTokens: 0,
+      cacheWriteTokens: 0,
+    },
+  );
+};
+
+const NO_USAGE: Promise<ChatUsage | null> = Promise.resolve(null);
+
+/**
+ * Builds `TurnDeps.aiTurn`. The stream holds no start or finish chunk (#7 wraps it).
+ * `usage` settles when the stream's work ends, however it ends.
+ */
 export const createAiTurn =
   (deps: AiTurnDeps) =>
-  async (ctx: AiTurnContext): Promise<ReadableStream<UIMessageChunk>> => {
+  async (ctx: AiTurnContext): Promise<AiTurnResult> => {
     const started = deps.now();
     const chat = await deps.openChat(ctx.ownerId, ctx.conversationId);
-    if (!chat.ok) return partsStream([AI_ERROR], deps.newId);
+    if (!chat.ok)
+      return { stream: partsStream([AI_ERROR], deps.newId), usage: NO_USAGE };
     const history = chat.value.messages;
 
     if (
       ctx.turn.kind === "approval" &&
       pendingApprovals(history, ctx.turn.responses).length === 0
     )
-      return partsStream(
-        [{ type: "text", text: AI_REPLIES.approvalExpired }],
-        deps.newId,
-      );
+      return {
+        stream: partsStream(
+          [{ type: "text", text: AI_REPLIES.approvalExpired }],
+          deps.newId,
+        ),
+        usage: NO_USAGE,
+      };
 
     const noteFor = (read: ActiveRead) => {
       const active = read.active;
@@ -476,6 +537,14 @@ export const createAiTurn =
         ? respondedCalls(history, ctx.turn.responses)
         : new Map<string, { toolName: string; input: unknown }>();
     const introduced = new Set<string>();
+    // Each finished step's usage, read once the stream's work ends.
+    const steps: StepUsage[] = [];
+    const settled: { resolve: (usage: ChatUsage | null) => void } = {
+      resolve: () => {},
+    };
+    const usage = new Promise<ChatUsage | null>((resolve) => {
+      settled.resolve = resolve;
+    });
 
     const result = streamText({
       model: model.model,
@@ -491,76 +560,90 @@ export const createAiTurn =
       }),
       stopWhen: stepCountIs(MAX_STEPS),
       maxOutputTokens: MAX_OUTPUT_TOKENS,
+      onStepEnd: (step) => {
+        steps.push(step);
+      },
       providerOptions: {
         anthropic: { ...model.providerOptions.anthropic, fallbacks: "default" },
       },
     });
 
-    return createUIMessageStream({
-      execute: async ({ writer }) => {
-        const seen = { approvalPending: false, failed: false };
-        for await (const chunk of result.toUIMessageStream({
-          sendStart: false,
-          sendFinish: false,
-          onError: toolErrorText,
-        })) {
-          if (chunk.type === "error") {
-            seen.failed = true;
-            continue;
-          }
-          if (chunk.type === "tool-approval-request")
-            seen.approvalPending = true;
-          if ("toolCallId" in chunk) {
-            const call = responded.get(chunk.toolCallId);
-            if (call && !introduced.has(chunk.toolCallId))
-              writer.write({
-                type: "tool-input-available",
-                toolCallId: chunk.toolCallId,
-                toolName: call.toolName,
-                input: call.input,
-              });
-            introduced.add(chunk.toolCallId);
-          }
-          if (
-            chunk.type === "tool-input-available" &&
-            chunk.toolName === "startRun"
-          ) {
-            const toolId = (chunk.input as { toolId?: unknown }).toolId;
-            deps.log("assistant_route", {
-              toolId: typeof toolId === "string" ? toolId : null,
-            });
-          }
-          writer.write(chunk);
+    const writeTurn = async (writer: {
+      write: (chunk: UIMessageChunk) => void;
+    }) => {
+      const seen = { approvalPending: false, failed: false };
+      for await (const chunk of result.toUIMessageStream({
+        sendStart: false,
+        sendFinish: false,
+        onError: toolErrorText,
+      })) {
+        if (chunk.type === "error") {
+          seen.failed = true;
+          continue;
         }
+        if (chunk.type === "tool-approval-request") seen.approvalPending = true;
+        if ("toolCallId" in chunk) {
+          const call = responded.get(chunk.toolCallId);
+          if (call && !introduced.has(chunk.toolCallId))
+            writer.write({
+              type: "tool-input-available",
+              toolCallId: chunk.toolCallId,
+              toolName: call.toolName,
+              input: call.input,
+            });
+          introduced.add(chunk.toolCallId);
+        }
+        if (
+          chunk.type === "tool-input-available" &&
+          chunk.toolName === "startRun"
+        ) {
+          const toolId = (chunk.input as { toolId?: unknown }).toolId;
+          deps.log("assistant_route", {
+            toolId: typeof toolId === "string" ? toolId : null,
+          });
+        }
+        writer.write(chunk);
+      }
 
-        const finish = seen.failed
-          ? null
-          : await Promise.resolve(result.finishReason).catch(() => null);
-        const steps = await Promise.resolve(result.steps)
-          .then((s) => s.length)
-          .catch(() => 0);
-        if (finish === "content-filter")
-          deps.log("assistant_refusal", { conversationId: ctx.conversationId });
-        const parts =
-          finish === null
-            ? [AI_ERROR]
-            : finish === "content-filter"
-              ? [REFUSAL]
-              : await partsAfterStream(deps, {
-                  conversationId: ctx.conversationId,
-                  owner,
-                  history,
-                  events,
-                  approvalPending: seen.approvalPending,
-                }).catch(() => [AI_ERROR]);
-        writeParts(writer, parts, deps.newId);
-        deps.log("assistant_turn", {
-          path: "ai_done",
-          conversationId: ctx.conversationId,
-          steps,
-          approvalPending: seen.approvalPending,
-          ms: deps.now() - started,
-        });
+      const finish = seen.failed
+        ? null
+        : await Promise.resolve(result.finishReason).catch(() => null);
+      const steps = await Promise.resolve(result.steps)
+        .then((s) => s.length)
+        .catch(() => 0);
+      if (finish === "content-filter")
+        deps.log("assistant_refusal", { conversationId: ctx.conversationId });
+      const parts =
+        finish === null
+          ? [AI_ERROR]
+          : finish === "content-filter"
+            ? [REFUSAL]
+            : await partsAfterStream(deps, {
+                conversationId: ctx.conversationId,
+                owner,
+                history,
+                events,
+                approvalPending: seen.approvalPending,
+              }).catch(() => [AI_ERROR]);
+      writeParts(writer, parts, deps.newId);
+      deps.log("assistant_turn", {
+        path: "ai_done",
+        conversationId: ctx.conversationId,
+        steps,
+        approvalPending: seen.approvalPending,
+        ms: deps.now() - started,
+      });
+    };
+
+    const stream = createUIMessageStream({
+      execute: async ({ writer }) => {
+        try {
+          await writeTurn(writer);
+        } finally {
+          settled.resolve(sumUsage(steps));
+        }
       },
     });
+
+    return { stream, usage };
   };

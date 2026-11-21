@@ -8,7 +8,9 @@
  */
 import { z } from "zod";
 import type { HoldError, RunQuote } from "@/db/queries/credits";
+import { billingConfig } from "@/billing/config";
 import { shortfall } from "@/billing/pricing";
+import type { CreditSummary } from "@/billing/summary";
 import type { ToolModule } from "@/tools/registry";
 import { asOwner } from "../card-steps";
 import type { ToolEnv } from "./env";
@@ -107,5 +109,34 @@ export const holdFailure = (error: HoldError, price: number): HoldFailure => {
       const unreachable: never = error;
       return unreachable;
     }
+  }
+};
+
+/**
+ * The available balance on a money card (spec 0007, Credit UI): the account's available
+ * credits, or the starter grant a first approval would create. Throws on a failed read,
+ * so the refinement leaves the card out (fail closed). It reads the same on the card
+ * and on the approval, because the account is only created in `execute`.
+ */
+export const cardBalance = async (env: ToolEnv): Promise<number> =>
+  (await env.deps.getSummary(env.owner.current))?.available ??
+  billingConfig.grants.starter;
+
+/** What a money tool returns with the chip's numbers (spec 0007, AC-9). */
+export type WithSummary<T> = T & { readonly summary?: CreditSummary };
+
+/**
+ * The output with the owner's credit summary, read after the money write. A failed read
+ * or no account leaves `summary` out; the chip keeps what it showed. Never throws.
+ */
+export const withSummary = async <T extends object>(
+  env: ToolEnv,
+  output: T,
+): Promise<WithSummary<T>> => {
+  try {
+    const summary = await env.deps.getSummary(env.owner.current);
+    return summary === null ? output : { ...output, summary };
+  } catch {
+    return output;
   }
 };

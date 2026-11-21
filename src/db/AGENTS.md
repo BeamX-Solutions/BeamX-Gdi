@@ -33,6 +33,7 @@ pnpm test:integration   # *.int.test.ts against a real Neon branch
 - Every new user owned table must be added to `users.linkGuest` and given a delete rule (cascade, or SET NULL for business records). `link.int.test.ts` reads every foreign key to `user.id` and fails on a table that is neither linked nor excluded.
 - Schema changes are additive only (spec 0002, AC-12): new tables, nullable columns, foreign keys, enum values. Anything else goes back through `/architect`.
 - Timestamps use `mode: "string"`. Pass them back as the raw strings (for example `lastAnswerAt` to `runs.complete`); a JS `Date` drops the microseconds and breaks the answer fingerprint.
+- `messages.append` upserts by message id only within the same chat and the same role; a reused id of another role or chat writes nothing and returns 0 (callers treat 0 as "not saved").
 - Hand written SQL goes through Drizzle's `sql` template with bound parameters, never string concatenation.
 - Money writes (spec 0004) go only through `queries/credits.ts` and the builders in `queries/credit-holds.ts`; each writes its ledger entry in the same batch. A failed money check inside a batch calls `billing_assert(ok, code)`, which raises `P0001` and rolls back the whole batch; map it back with `billingAssertCode`.
 - `reports.claim` and `reports.markReady` need an active credit hold on the run. Integration tests that claim a report call `fundRun` after starting the run.

@@ -15,6 +15,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 2 | Coding standards & tooling | Foundation | done |
 | 3 | Data model | Foundation | done |
 | 4 | Design system & UI foundation | Foundation | done |
+| 23 | Brand font: Montserrat everywhere, wider chat | Foundation | in-progress |
 | 20 | Tool source access & parity fixtures | Foundation | in-progress |
 | 5 | Tool module contract & registry | Foundation | done |
 | 6 | Assistant brain | Foundation | in-progress |
@@ -74,6 +75,16 @@ spec [0003](../specs/0003-design-system-ui-foundation/index.md) · code in `src/
   - [x] Report parts, errors, and the finished `DESIGN.md`: score, bars, advice, sections, skeleton, error card, full axe pass (AC-1, AC-3, AC-11, AC-12, AC-15)
 - [x] Verify it: `/check verify design system & UI foundation`
 
+### 23. Brand font: Montserrat everywhere, wider chat · in-progress
+All text uses Montserrat, the BeamX brand font, so the workspace looks like BeamX, and on desktop the chat column widens to 64rem so the conversation uses more of the screen (updated 2026-11-21; the first version used Montserrat for headings only).
+**Done when:** all text shows in Montserrat (Inter gone), the chat column is up to 64rem wide on desktop, and axe and the 360px and 1280px checks still pass in both themes.
+spec [0003](../specs/0003-design-system-ui-foundation/index.md) (Milestones 5 and 6, AC-4, AC-16) · code in `src/app/layout.tsx`, `src/app/globals.css`, `src/components`, `DESIGN.md`
+- [x] Design it (spec): `/architect design system: switch the font to Montserrat` (updated: all text, 64rem chat)
+- [x] Build it: `/develop brand font: Montserrat everywhere, wider chat`
+  - [x] Load Montserrat as `--font-heading`, the heading rule and the title classes, `DESIGN.md` and `/design` type scale, full Playwright pass (AC-1, AC-3, AC-16)
+  - [x] Montserrat as the only sans font (Inter and `--font-heading` removed), chat column 64rem, `DESIGN.md` and `/design`, full Playwright pass (AC-1, AC-3, AC-4, AC-16)
+- [ ] Verify it: `/check verify brand font: Montserrat everywhere, wider chat`
+
 ### 20. Tool source access & parity fixtures · in-progress
 Get read access to the source code of Beacon, Beacon Pro, Luna, and Stellar, and capture real answer sets with the scores and verdicts the live tools give them. The rebuilt tools are tested against these so they score the same way (from spec 0001).
 **Done when:** all four source repos are readable by the team, and each tool has at least 5 fixture answer sets with its original scores, verdict, and report captured in the repo.
@@ -112,11 +123,11 @@ The walking skeleton. A guest types an idea, the assistant routes to Stellar, co
 **Done when:** a guest goes from first message to a saved Stellar report on screen, using real data and real AI, and a refresh keeps the report.
 spec [0007](../specs/0007-validate-idea-chat/index.md) · code in `src/app`, `src/auth`, `src/components/workspace`, `src/components/credits`, `src/db/queries`
 - [x] Design it (spec): `/architect validate an idea in chat`
-- [ ] Build it: `/develop validate an idea in chat`
-  - [ ] Chat screens, auth route and client with BotID, POST /api/chat with one writer per turn and the fake model (AC-1, AC-2, AC-5, AC-7)
-  - [ ] useChat client, part renderers, report panel wiring, credit cards and the client chip (AC-3, AC-4, AC-9, AC-10, AC-11)
-  - [ ] Resumable streams and message limits (AC-6, AC-8)
-  - [ ] Playwright full flow with axe, and a real model run (AC-4, AC-12)
+- [x] Build it: `/develop validate an idea in chat`
+  - [x] Chat screens, auth route and client with BotID, POST /api/chat with one writer per turn and the fake model (AC-1, AC-2, AC-5, AC-7)
+  - [x] useChat client, part renderers, report panel wiring, credit cards and the client chip (AC-3, AC-4, AC-9, AC-10, AC-11)
+  - [x] Resumable streams and message limits (AC-6, AC-8)
+  - [x] Playwright full flow with axe, and a real model run (AC-4, AC-12)
 - [ ] Verify it: `/check verify validate an idea in chat`
 
 ### 22. Credits & billing · Beta · in-progress

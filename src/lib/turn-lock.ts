@@ -1,6 +1,6 @@
 /**
  * Server only. The per conversation chat turn lock (spec 0006, "Turn lock"):
- * `SET turn:<conversationId> <token> NX EX 60`, released by a compare and delete so a
+ * `SET turn:<conversationId> <token> NX EX 120`, released by a compare and delete so a
  * turn never frees a lock a later turn took after this one expired.
  *
  * Without the Upstash variables the lock is off: every acquire succeeds and a
@@ -19,7 +19,8 @@ export type TurnLock = {
 };
 
 /** Seconds a lock lives if the function dies before releasing it. */
-export const TURN_LOCK_TTL_S = 60;
+// Above the chat route's 90 second `maxDuration` (spec 0007), so no turn outlives its lock.
+export const TURN_LOCK_TTL_S = 120;
 
 const key = (conversationId: string) => `turn:${conversationId}`;
 

@@ -19,8 +19,11 @@ export type HistoryItem = {
  */
 export function HistoryRail({
   items,
+  newChatHref = "/",
 }: {
   readonly items: readonly HistoryItem[];
+  /** Where "New chat" goes: the empty chat, or the shell demo on `/design`. */
+  readonly newChatHref?: string;
 }) {
   const workspace = useWorkspace();
   const collapsed =
@@ -68,7 +71,7 @@ export function HistoryRail({
         aria-label="New chat"
         asChild
       >
-        <Link href="/design/shell">
+        <Link href={newChatHref}>
           <PlusIcon aria-hidden />
           {collapsed ? null : "New chat"}
         </Link>

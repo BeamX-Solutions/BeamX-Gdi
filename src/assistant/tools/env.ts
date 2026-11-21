@@ -10,6 +10,7 @@ import type {
   StartFromHoldError,
 } from "@/db/queries/credits";
 import type { AbandonError, ResumeError } from "@/db/queries/runs";
+import type { CreditSummary } from "@/billing/summary";
 import type { Result } from "@/lib/result";
 import type { ToolModule, UnknownTool } from "@/tools/registry";
 import type { LogFn, NotFound, StepDeps } from "../card-steps";
@@ -43,6 +44,8 @@ export type AssistantToolDeps = Pick<StepDeps, "ownerOf"> & {
     toolVersion: string,
     price: number,
   ) => Promise<Result<{ readonly runId: string }, HoldError>>;
+  /** `credits.getSummary` as the chip's numbers, or null with no account (spec 0007). */
+  readonly getSummary: (ownerId: string) => Promise<CreditSummary | null>;
   /** `credits.runQuote`: a run and its active hold, read before a money card. */
   readonly runQuote: (
     ownerId: string,

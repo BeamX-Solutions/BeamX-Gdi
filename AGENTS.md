@@ -39,6 +39,7 @@ pnpm check:colors  # fail on raw colors in src/components and src/app
 pnpm e2e          # Playwright + axe against a production build (build first with ENABLE_DESIGN_PAGE=true)
 pnpm db:generate  # write a migration after a schema change (CI fails on drift)
 pnpm db:migrate   # apply migrations
+pnpm eval:assistant  # real model eval of the assistant (spends tokens, needs ANTHROPIC_API_KEY); commit the results file it writes
 ```
 
 ## Specs
@@ -98,5 +99,6 @@ MCP servers: Neon (connected), Vercel (connected)
 - [src/db/AGENTS.md](src/db/AGENTS.md): Drizzle schema, migrations, the typed query layer, DB integration tests
 - [src/components/AGENTS.md](src/components/AGENTS.md): shared UI, shadcn and AI Elements, workspace shell, answer cards, report parts, fixtures
 - [src/billing/AGENTS.md](src/billing/AGENTS.md): credits and billing config, pure pricing math, money write rules
+- [evals/assistant/AGENTS.md](evals/assistant/AGENTS.md): the real model eval of the assistant, its graders, and the results file a prompt change owes
 
 _Drafted by /audit from the repo, worth a quick human pass. Edit freely: once a line stops matching this draft, later runs treat it as curated and will flag rather than overwrite it._

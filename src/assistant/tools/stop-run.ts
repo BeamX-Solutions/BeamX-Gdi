@@ -7,7 +7,7 @@ import { tool } from "ai";
 import { z } from "zod";
 import { asOwner } from "../card-steps";
 import type { ToolEnv } from "./env";
-import { quoteRun, serverField } from "./money";
+import { quoteRun, serverField, withSummary, type WithSummary } from "./money";
 
 export const stopRunInput = z.strictObject({
   runId: z
@@ -31,12 +31,13 @@ export const refineStopRun =
       : { runId: input.runId };
   };
 
-export type StopRunOutput =
+export type StopRunOutput = WithSummary<
   | { readonly ok: true }
   | {
       readonly ok: false;
       readonly error: "already_completed" | "not_found" | "try_again";
-    };
+    }
+>;
 
 export const stopRunTool = (env: ToolEnv) =>
   tool({
@@ -81,6 +82,6 @@ export const stopRunTool = (env: ToolEnv) =>
       env.owner.current = owner.current;
       if (!result.ok) return done({ ok: false, error: result.error.code });
       env.record({ kind: "stopped", runId });
-      return done({ ok: true });
+      return done(await withSummary(env, { ok: true }));
     },
   });

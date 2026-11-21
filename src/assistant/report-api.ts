@@ -12,6 +12,7 @@ import type {
   ReportStatus,
   StatusError,
 } from "@/db/queries/reports";
+import type { CreditSummary } from "@/billing/summary";
 import type { Result } from "@/lib/result";
 import type {
   ToolModule,
@@ -49,6 +50,8 @@ export type ReportApiDeps = {
     id: string,
     version: string,
   ) => Result<ToolReader, UnknownTool | UnsupportedVersion>;
+  /** The chip's credits for the status poll (spec 0007, AC-9), null with no account. */
+  readonly summary: (userId: string) => Promise<CreditSummary | null>;
   readonly runner: RunnerDeps;
   readonly log: RunnerDeps["log"];
 };
@@ -167,12 +170,27 @@ export const postReport = async (
 
 /**
  * GET: the status poll (AC-10, AC-13). The light status row on every poll; the full
- * run only once the report is ready, read with the reader for its stored version.
+ * run only once the report is ready, read with the reader for its stored version. The
+ * chip's credit summary is read beside the status row (spec 0007, AC-9); a failed
+ * summary read only leaves it out.
  */
 export const getReport = async (
   deps: ReportApiDeps,
-  { userId, runId }: ReportRequest,
+  request: ReportRequest,
 ): Promise<ApiResponse> => {
+  const [response, summary] = await Promise.all([
+    reportStatus(deps, request),
+    deps.summary(request.userId).catch(() => undefined),
+  ]);
+  return response.status === 404 || summary === undefined
+    ? response
+    : { status: response.status, body: { ...response.body, summary } };
+};
+
+const reportStatus = async (
+  deps: ReportApiDeps,
+  { userId, runId }: ReportRequest,
+): Promise<Extract<ApiResponse, { readonly status: 200 | 202 | 404 }>> => {
   const read = await deps.status(userId, runId);
   if (!read.ok) return NOT_FOUND;
   const row = read.value;

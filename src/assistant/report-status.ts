@@ -3,6 +3,7 @@
  * their body here, from the light `reports.status` row, the current tool module, and
  * (only when the report is ready and GET loaded the run) the parsed report view.
  */
+import type { CreditSummary } from "@/billing/summary";
 import {
   reportErrorCopy,
   type ReportErrorViewKind,
@@ -34,6 +35,8 @@ export type ReportStatusPayload = {
   readonly stale: boolean;
   /** The tool's report blocks, only when ready and readable. */
   readonly view?: readonly ReportBlock[];
+  /** The chip's credits on the status poll (spec 0007, AC-9); null with no account. */
+  readonly summary?: CreditSummary | null;
 };
 
 export type StoredDataInvalid = { readonly code: "stored_data_invalid" };

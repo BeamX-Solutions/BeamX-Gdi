@@ -2,6 +2,8 @@
  * Server only. The real dependencies of the report runner and the report routes: the
  * query layer, the registry, the spend cap hook, the model provider, and the logger.
  */
+import { toCreditSummary } from "@/billing/summary";
+import * as credits from "@/db/queries/credits";
 import * as reports from "@/db/queries/reports";
 import * as runs from "@/db/queries/runs";
 import * as usage from "@/db/queries/usage";
@@ -35,6 +37,7 @@ export const reportApiDeps: ReportApiDeps = {
   getRun: runs.get,
   getTool,
   getReader,
+  summary: async (userId) => toCreditSummary(await credits.getSummary(userId)),
   runner: reportDeps,
   log: logEvent,
 };

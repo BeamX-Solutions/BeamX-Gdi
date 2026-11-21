@@ -13,8 +13,9 @@ import {
 import { reportApiDeps } from "@/assistant/report-deps";
 import { sessionUserId } from "@/auth/session";
 
-// Vercel Pro's limit, so the longest phased report (Luna, five phases) fits in `after()`.
-export const maxDuration = 800;
+// Vercel Hobby's limit for now (the project runs on Hobby; spec 0001 planned Pro at 800).
+// Enough for Stellar's one phase. Luna's five phase report needs Pro again, or a rework.
+export const maxDuration = 300;
 
 const runIdSchema = z.uuid();
 

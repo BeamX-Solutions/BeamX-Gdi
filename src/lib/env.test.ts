@@ -4,7 +4,7 @@ vi.hoisted(() => {
   process.env.SKIP_ENV_VALIDATION = "1";
 });
 
-const { envSchema } = await import("./env");
+const { envSchema, fakeAiEnabled } = await import("./env");
 
 const base = {
   DATABASE_URL: "postgres://u:p@host/db",
@@ -47,5 +47,33 @@ describe("envSchema: the Upstash variables behind the turn lock", () => {
     expect(envSchema(true).safeParse({ ...base, ...upstash }).success).toBe(
       true,
     );
+  });
+});
+
+describe("E2E_FAKE_AI: the scripted fake models (spec 0007)", () => {
+  const parsed = (extra: Record<string, string>) =>
+    envSchema(false).parse({ ...base, ...extra });
+
+  it("is off unless set", () => {
+    expect(fakeAiEnabled(parsed({}))).toBe(false);
+  });
+
+  it("turns on for `next start` in e2e (NODE_ENV=production, not on Vercel)", () => {
+    expect(fakeAiEnabled(parsed({ E2E_FAKE_AI: "true" }))).toBe(true);
+  });
+
+  it("stays off on a production deploy even when set", () => {
+    expect(
+      fakeAiEnabled(parsed({ E2E_FAKE_AI: "true", VERCEL_ENV: "production" })),
+    ).toBe(false);
+  });
+
+  it("fails a production deploy that sets it", () => {
+    const result = envSchema(true).safeParse({
+      ...base,
+      ...upstash,
+      E2E_FAKE_AI: "true",
+    });
+    expect(result.error?.issues.map((i) => i.path[0])).toEqual(["E2E_FAKE_AI"]);
   });
 });

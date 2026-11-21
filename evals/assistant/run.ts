@@ -18,6 +18,7 @@ import {
   type UIMessageChunk,
 } from "ai";
 import { createAiTurn } from "@/assistant/ai-turn";
+import type { AiTurnResult } from "@/assistant/turn";
 import { extractKnownFacts } from "@/assistant/extract";
 import { resolveModel, type ResolvedModel } from "@/assistant/model-provider";
 import { modelConfigs } from "@/assistant/models";
@@ -111,11 +112,9 @@ const recording = (
 // Reading a turn
 // ---------------------------------------------------------------------------
 
-const readAll = async (
-  stream: ReadableStream<UIMessageChunk>,
-): Promise<UIMessageChunk[]> => {
+const readAll = async (turn: AiTurnResult): Promise<UIMessageChunk[]> => {
   const chunks: UIMessageChunk[] = [];
-  const reader = stream.getReader();
+  const reader = turn.stream.getReader();
   for (;;) {
     const next = await reader.read();
     if (next.done) return chunks;

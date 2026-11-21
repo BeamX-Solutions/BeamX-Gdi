@@ -1,6 +1,13 @@
 "use client";
 
 import { useRef, useState, type ReactNode } from "react";
+import { billingConfig } from "@/billing/config";
+import { coveringPacks } from "@/billing/pricing";
+import { PrefillCard } from "@/components/answer-cards/prefill-card";
+import { ConfirmCard } from "@/components/credits/confirm-card";
+import { CreditChip } from "@/components/credits/credit-chip";
+import { ShortBalanceCard } from "@/components/credits/short-balance-card";
+import { StopCard } from "@/components/credits/stop-card";
 import { Button } from "@/components/ui/button";
 import { Suggestion, Suggestions } from "@/components/ai-elements/suggestion";
 import {
@@ -170,6 +177,67 @@ export function ChatGallery() {
             total={12}
             onPause={() => undefined}
           />
+        </div>
+      </Block>
+
+      <Block title="Credit and prefill cards">
+        <div className="grid min-w-0 gap-6 lg:grid-cols-2">
+          <ConfirmCard
+            tool="startRun"
+            toolName="Stellar"
+            price={30}
+            available={30}
+            state="pending"
+            onApprove={() => undefined}
+            onDecline={() => undefined}
+          />
+          <ConfirmCard
+            tool="startRun"
+            toolName="Stellar"
+            price={30}
+            available={30}
+            state="approved"
+            onApprove={() => undefined}
+            onDecline={() => undefined}
+          />
+          <StopCard
+            heldAmount={30}
+            state="pending"
+            onApprove={() => undefined}
+            onDecline={() => undefined}
+          />
+          <StopCard
+            heldAmount={0}
+            state="declined"
+            onApprove={() => undefined}
+            onDecline={() => undefined}
+          />
+          <ShortBalanceCard shortfall={30} guest packs={[]} />
+          <ShortBalanceCard
+            shortfall={30}
+            guest={false}
+            packs={coveringPacks(billingConfig.packs, 30)}
+          />
+          <PrefillCard
+            title="From our chat"
+            items={[
+              {
+                questionId: "stage",
+                prompt: "What stage is your idea at?",
+                label: "Just an idea",
+              },
+              {
+                questionId: "customer",
+                prompt: "Who is your customer?",
+                label: "Small shop owners in Lagos",
+              },
+            ]}
+            onAcceptAll={() => undefined}
+            onEdit={() => undefined}
+          />
+          <div className="flex items-start">
+            <CreditChip initial={{ available: 30, held: 0 }} />
+          </div>
         </div>
       </Block>
 

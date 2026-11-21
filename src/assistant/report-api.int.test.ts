@@ -184,7 +184,23 @@ describe("POST and GET report: happy path (AC-7, AC-8, AC-10)", () => {
         { label: "Step three", done: true },
       ],
       view: [{ kind: "bullets", title: "Steps", items: ["a", "b", "c"] }],
+      // The chip's numbers ride on the poll; the charge cleared the hold (spec 0007).
+      summary: { available: expect.any(Number), held: 0 },
     });
+
+    // A failed summary read only leaves the summary out.
+    const noSummary = await getReport(
+      {
+        ...deps,
+        summary: async () => {
+          throw new Error("db down");
+        },
+      },
+      { userId: u, runId },
+    );
+    expect(noSummary.status).toBe(200);
+    expect(body(noSummary)).not.toHaveProperty("summary");
+    expect(body(noSummary)).toMatchObject({ status: "ready" });
 
     // A POST on a ready report changes nothing.
     const again = await postReport(deps, { userId: u, runId }, after.schedule);
