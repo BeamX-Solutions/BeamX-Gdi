@@ -165,8 +165,8 @@ Tracer Bullet: one guest gets from the first message to a ready report on the fa
 2. [x] Auth pieces: `/api/auth/[...all]` with BotID on anonymous sign in, `src/auth/client.ts`; then `POST /api/chat` with BotID, session, Zod, `conversations.turnContext`, `handleTurn` (saving the user message inside the lock, and returning `usage` and `release`), the `createUIMessageStream` wrapper with a single `onFinish` writer that saves, releases the lock, then records usage, plus `fake-model.ts`; tests that a repeated tap before the save gets `busy`, and that a response cancelled partway still frees the lock and saves the reply; integration tests, satisfies **AC-1**, **AC-2**, **AC-7**
 3. [x] `chat.tsx`: `useChat`, the session loading state, the first send guard and anonymous sign in, URL replace after headers, the transport's error mapping and `401` retry, and every part renderer, wired to the report panel (spec 0005), satisfies **AC-1**, **AC-3**, **AC-4**, **AC-11**
 4. [x] Credit UI: confirm card with `availableBalance`, short balance card (guest text), stop card, the client chip and `summary` on the approval, stop and report status results, satisfies **AC-3**, **AC-9**, **AC-10**
-5. Resumable streams: `resumable-stream` on Upstash with `after()`, the 5 minute key, and the GET resume route, satisfies **AC-6**
-6. Limits: env values, the typed only count, notices as `data-error` streams, satisfies **AC-8**
+5. [x] Resumable streams: `resumable-stream` on Upstash with `after()`, the 5 minute key, and the GET resume route, satisfies **AC-6**
+6. [x] Limits: env values, the typed only count, notices as `data-error` streams, satisfies **AC-8**
 7. Playwright full flow plus axe, and a real model run with `/check verify`, satisfies **AC-12**, **AC-4**
 
 ## Consequences

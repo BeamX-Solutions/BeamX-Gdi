@@ -14,7 +14,7 @@ const schema = z.object({
     (v) => (v === "" ? undefined : v),
     z.string().min(1).optional(),
   ),
-  // Upstash Redis (spec 0001): the chat turn lock now, rate limits and resumable streams
+  // Upstash Redis (spec 0001): the chat turn lock and resumable streams now, rate limits
   // later. Optional at boot: without them the turn lock is off (logged), so dev and CI
   // run without Redis. A production deploy fails without both (`envSchema`).
   UPSTASH_REDIS_REST_URL: z.preprocess(
@@ -25,6 +25,10 @@ const schema = z.object({
     (v) => (v === "" ? undefined : v),
     z.string().min(1).optional(),
   ),
+  // Chat limits (spec 0007, AC-8): typed text longer than this is refused with a notice
+  // before any AI call, and so is the typed message after this many in one run.
+  MAX_MESSAGE_CHARS: z.coerce.number().int().positive().default(4000),
+  RATE_LIMIT_MESSAGES_PER_RUN: z.coerce.number().int().positive().default(40),
   // "true" swaps every AI call for the scripted fake models in `src/lib/fake-model.ts`
   // (spec 0007), for `pnpm e2e`. Ignored on a production deploy, which refuses to boot
   // with it set (`envSchema`).
@@ -91,6 +95,9 @@ export const env: Env = skip
       UPSTASH_REDIS_REST_URL: process.env.UPSTASH_REDIS_REST_URL || undefined,
       UPSTASH_REDIS_REST_TOKEN:
         process.env.UPSTASH_REDIS_REST_TOKEN || undefined,
+      MAX_MESSAGE_CHARS: Number(process.env.MAX_MESSAGE_CHARS) || 4000,
+      RATE_LIMIT_MESSAGES_PER_RUN:
+        Number(process.env.RATE_LIMIT_MESSAGES_PER_RUN) || 40,
       E2E_FAKE_AI: process.env.E2E_FAKE_AI === "true",
       VERCEL_ENV:
         process.env.VERCEL_ENV === "production" ||

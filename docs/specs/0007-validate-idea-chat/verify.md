@@ -92,3 +92,34 @@ Same setup: a production build with `E2E_FAKE_AI=true pnpm start`, a fresh brows
 - AC-10: guest short balance card
 - AC-11: complete_retry, busy, report failure cards
 - AC-6, AC-8, AC-12: later milestones
+
+## Milestone 3: resumable streams and limits · updated 2026-11-21
+
+_Reconnecting needs Redis close to the app. From a laptop far from Frankfurt, each Upstash call takes over a second and `resumable-stream`'s fixed 1 second handshake gives up, so a reload simply shows the saved message. Check the resume steps on a Vercel preview (functions in `fra1`, Redis in `eu-central-1`)._
+
+### UI / manual
+
+- [ ] On a preview, ask a question that gets a long reply; reload `/c/<id>` while it is still typing → the same reply carries on and finishes, with no text missing and none twice → AC-6
+- [ ] Same, but turn the network off in DevTools for a few seconds mid reply, then back on and reload → the reply completes once → AC-6
+- [ ] Reload after the reply has finished → the saved message shows, and the network tab shows `GET /api/chat/<id>/stream` answering `204` → AC-6
+- [ ] Open `/` in a fresh private window → no `GET …/stream` request is made, and no guest is created before the first send → AC-1, AC-6
+- [ ] Paste 4,001 characters and send (bypass the composer cap, for example with a request from DevTools) → "That message is too long" card with Got it, no AI call, and nothing saved after a reload → AC-8
+- [ ] Got it on a limit card → the card goes away → AC-8
+- [ ] In a run, send 40 typed messages, then a 41st → "This run has reached its message limit"; card and approval taps still work → AC-8
+
+### Commands
+
+- [ ] `pnpm vitest run src/lib/resumable.test.ts` → the real `resumable-stream` library resumes through the Upstash adapters (a reader joining partway gets the whole reply once, a finished stream resumes to null, the `chat:active` pointer keeps its 5 minute expiry and is only cleared by its own turn) → AC-6
+- [ ] `pnpm vitest run src/assistant/chat-api.test.ts` → limit notices (4,000 passes, 4,001 refused, the 40th typed message passes, the 41st refused, taps never counted), and busy turns never made resumable → AC-6, AC-8
+- [ ] In Upstash's Data Browser during a reply on the preview → a `chat:active:<conversationId>` key with a TTL under 300, gone once the reply is saved → AC-6
+
+### Value sourcing (milestone 3)
+
+- [ ] Limits: change `MAX_MESSAGE_CHARS` to 10 on a preview, and a 11 character message gets the notice → AC-8
+- [ ] Typed message count: only messages with a `text` part since the active run's `created_at` count (taps in the same run don't move it) → AC-8
+- [ ] Resume stream: the stream comes from `chat:active:<conversationId>`; a second chat's reload never picks up the first chat's reply → AC-6
+
+### Acceptance-criteria coverage (milestone 3)
+
+- AC-6: resume mid reply, after a network drop, after the reply finished, no request on a new chat, the adapter tests
+- AC-8: too long text, the 41st typed message, taps never counted, Got it dismisses

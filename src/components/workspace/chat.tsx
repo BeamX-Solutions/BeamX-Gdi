@@ -32,6 +32,7 @@ import {
   latestReport,
   latestToolSummary,
   threadItems,
+  withoutMessageOf,
   type ThreadItem,
   type ViewMessage,
 } from "./chat-view";
@@ -208,14 +209,24 @@ function LiveChat({
     [id],
   );
 
-  const { messages, sendMessage, regenerate, status, error, clearError } =
-    useChat<ChatUIMessage>({
-      id,
-      messages: [...initialMessages],
-      generateId: newId,
-      transport,
-      onError: (e) => setFailure(failureOf(e)),
-    });
+  const {
+    messages,
+    sendMessage,
+    regenerate,
+    setMessages,
+    status,
+    error,
+    clearError,
+  } = useChat<ChatUIMessage>({
+    id,
+    messages: [...initialMessages],
+    generateId: newId,
+    // A saved chat may have a reply still streaming: reconnect to it on load (AC-6).
+    // A new chat has nothing to resume, so it makes no request.
+    resume: initialMessages.length > 0,
+    transport,
+    onError: (e) => setFailure(failureOf(e)),
+  });
 
   const busy =
     session.isPending ||
@@ -272,6 +283,7 @@ function LiveChat({
       void regenerate();
     },
     openReport: setSelectedRun,
+    dismiss: (itemId) => setMessages((ms) => withoutMessageOf(ms, itemId)),
     edit: setEditing,
   };
 

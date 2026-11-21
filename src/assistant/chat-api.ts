@@ -5,6 +5,10 @@
  *
  * One writer per turn: the reply is saved once, in the outer stream's `onEnd`, and only
  * then is the turn lock released, so a tap sent again before the save gets `busy`.
+ *
+ * Limits (AC-8) are checked before the turn: a notice stream, never saved, with no lock
+ * and no AI call. A turn's stream is resumable (AC-6): the route buffers a copy under the
+ * assistant message id, and `onEnd` forgets it once the reply is saved.
  */
 import { createUIMessageStream, type UIMessageChunk } from "ai";
 import { z } from "zod";
@@ -13,7 +17,7 @@ import type { NewMessage } from "@/db/queries/messages";
 import type { UsageInput } from "@/db/queries/usage";
 import { costUsd } from "@/lib/ai-cost";
 import type { Result } from "@/lib/result";
-import { classifyMessage } from "./parts";
+import { classifyMessage, type TurnKind } from "./parts";
 import type { ChatUsage, TurnError, TurnInput, TurnOutput } from "./turn";
 
 export type ChatApiDeps = {
@@ -34,6 +38,13 @@ export type ChatApiDeps = {
     message: NewMessage,
   ) => Promise<Result<number, { readonly code: "not_found" }>>;
   readonly recordUsage: (input: UsageInput) => Promise<unknown>;
+  /** Forgets the chat's resumable stream once its reply is saved. Never throws. */
+  readonly finishStream: (
+    conversationId: string,
+    streamId: string,
+  ) => Promise<void>;
+  /** `MAX_MESSAGE_CHARS` and `RATE_LIMIT_MESSAGES_PER_RUN` (spec 0007, AC-8). */
+  readonly limits: { readonly maxChars: number; readonly perRun: number };
   /** Keeps work alive after the response ends (Next's `after`). */
   readonly waitUntil: (task: Promise<unknown>) => void;
   readonly newId: () => string;
@@ -48,6 +59,11 @@ export type ChatResponse =
   | {
       readonly kind: "stream";
       readonly stream: ReadableStream<UIMessageChunk>;
+      /** Set when the route should buffer the stream for resuming; null for notices. */
+      readonly resumable: {
+        readonly conversationId: string;
+        readonly streamId: string;
+      } | null;
     };
 
 const bodySchema = z.object({
@@ -86,6 +102,39 @@ export const onAbort = (
       await reader.cancel(reason);
     },
   });
+};
+
+/**
+ * A limit notice (step 5): one assistant message holding a `data-error` part. It is not
+ * saved, takes no lock and makes no AI call.
+ */
+export const noticeStream = (
+  id: string,
+  kind: "limit_text" | "limit_run",
+): ReadableStream<UIMessageChunk> =>
+  createUIMessageStream({
+    generateId: () => id,
+    execute: ({ writer }) => {
+      writer.write({ type: "start", messageId: id });
+      writer.write({ type: "data-error", data: { kind, retry: false } });
+      writer.write({ type: "finish" });
+    },
+  });
+
+/**
+ * Which limit a typed message hits, if any (AC-8). Only typed text counts: card taps,
+ * approvals and retries pass. `typedInRun` counts typed messages already saved in the
+ * active run, so the one that would make it `perRun + 1` is refused.
+ */
+export const limitHit = (
+  turn: TurnKind,
+  typedInRun: number,
+  limits: ChatApiDeps["limits"],
+): "limit_text" | "limit_run" | null => {
+  if (turn.kind !== "text") return null;
+  if (turn.text.length > limits.maxChars) return "limit_text";
+  if (typedInRun >= limits.perRun) return "limit_run";
+  return null;
 };
 
 /** Appends the `finish` chunk the inner streams leave out, once they end cleanly. */
@@ -177,8 +226,8 @@ export const postChat = async (
   const body = bodySchema.safeParse(input.body);
   if (!body.success) return json(400, "invalid_request");
   // Checked before anything is written, so a bad message never creates a chat.
-  if (!classifyMessage(body.data.message).ok)
-    return json(400, "invalid_message");
+  const classified = classifyMessage(body.data.message);
+  if (!classified.ok) return json(400, "invalid_message");
   const { conversationId, message } = body.data;
 
   const context = await deps.turnContext(input.userId, conversationId);
@@ -186,6 +235,22 @@ export const postChat = async (
 
   // Made once, up front: a retried `onEnd` keeps the same id and `callKey`.
   const assistantId = deps.newId();
+
+  // Step 5: limits before the turn. Shown, never saved, no lock, no AI call.
+  const limit = limitHit(
+    classified.value.turn,
+    context.value.typedInRun,
+    deps.limits,
+  );
+  if (limit !== null) {
+    deps.log("chat_limit", { conversationId, limit });
+    return {
+      kind: "stream",
+      stream: noticeStream(assistantId, limit),
+      resumable: null,
+    };
+  }
+
   const turn = await deps.handleTurn({
     userId: input.userId,
     conversationId,
@@ -209,18 +274,26 @@ export const postChat = async (
       },
       onEnd: async ({ responseMessage }) => {
         // A busy notice is shown, never saved (AC-2).
-        if (!busy)
+        if (!busy) {
           await saveReply(deps, conversationId, {
             id: assistantId,
             parts: responseMessage.parts,
           });
+          // Saved, so a reload now reads the reply from the DB, not the stream.
+          await deps.finishStream(conversationId, assistantId);
+        }
         await release();
         deps.waitUntil(
           recordChatUsage(deps, conversationId, `${assistantId}:chat`, usage),
         );
       },
     });
-    return { kind: "stream", stream };
+    // A busy turn must not replace the running turn's resumable stream.
+    return {
+      kind: "stream",
+      stream,
+      resumable: busy ? null : { conversationId, streamId: assistantId },
+    };
   } catch (e) {
     await release();
     throw e;

@@ -7,7 +7,9 @@ import * as conversations from "@/db/queries/conversations";
 import * as messages from "@/db/queries/messages";
 import * as usage from "@/db/queries/usage";
 import { newId } from "@/db/id";
+import { env } from "@/lib/env";
 import { logEvent } from "@/lib/log";
+import { resumableStreams } from "@/lib/resumable";
 import type { ChatApiDeps } from "./chat-api";
 import { handleTurn } from "./turn";
 import { turnDeps } from "./turn-deps";
@@ -19,6 +21,11 @@ export const chatApiDeps: ChatApiDeps = {
   appendMessage: (ownerId, conversationId, message) =>
     messages.append(ownerId, conversationId, [message]),
   recordUsage: usage.record,
+  finishStream: resumableStreams.finish,
+  limits: {
+    maxChars: env.MAX_MESSAGE_CHARS,
+    perRun: env.RATE_LIMIT_MESSAGES_PER_RUN,
+  },
   waitUntil: (task) => {
     after(task);
   },

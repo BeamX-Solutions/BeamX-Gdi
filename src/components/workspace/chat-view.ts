@@ -432,3 +432,13 @@ export const lastTypedMessageId = (
       (m) =>
         m.role === "user" && m.parts.some((p) => parse(textPart, p) !== null),
     )?.id ?? null;
+
+/**
+ * The messages without the one a thread item came from (item ids are
+ * `<messageId>:<partIndex>`). "Got it" on a limit notice uses it: the notice was never
+ * saved, so dropping it on the client is the whole dismissal (spec 0007, AC-8).
+ */
+export const withoutMessageOf = <M extends { readonly id: string }>(
+  messages: readonly M[],
+  itemId: string,
+): M[] => messages.filter((m) => !itemId.startsWith(`${m.id}:`));

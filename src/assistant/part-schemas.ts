@@ -124,6 +124,9 @@ export const errorKinds = [
   "refusal",
   "complete_retry",
   "busy",
+  // Chat limit notices (spec 0007, AC-8): shown, never saved.
+  "limit_text",
+  "limit_run",
 ] as const;
 export type ErrorKind = (typeof errorKinds)[number];
 

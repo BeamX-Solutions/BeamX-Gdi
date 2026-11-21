@@ -30,6 +30,8 @@ export type ChatActions = {
   /** Sends the turn again (Retry after an AI error, Send again after `busy`). */
   readonly retryTurn: () => void;
   readonly openReport: (runId: string) => void;
+  /** Hides a notice that was never saved (a limit notice's Got it). */
+  readonly dismiss: (itemId: string) => void;
   readonly edit: (itemId: string | null) => void;
 };
 
@@ -144,9 +146,11 @@ export function ChatItem({
           action={{
             label: copy.actionLabel,
             onAction:
-              data.kind === "complete_retry" && runId !== undefined
-                ? () => actions.retryComplete(runId)
-                : actions.retryTurn,
+              data.kind === "limit_text" || data.kind === "limit_run"
+                ? () => actions.dismiss(item.id)
+                : data.kind === "complete_retry" && runId !== undefined
+                  ? () => actions.retryComplete(runId)
+                  : actions.retryTurn,
           }}
         />
       );

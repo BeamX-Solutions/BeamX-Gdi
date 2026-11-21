@@ -4,6 +4,7 @@ import {
   latestReport,
   latestToolSummary,
   threadItems,
+  withoutMessageOf,
   type ViewMessage,
 } from "./chat-view";
 
@@ -303,5 +304,13 @@ describe("lastTypedMessageId", () => {
         user("u2", answer("idea")),
       ]),
     ).toBe("u1");
+  });
+});
+
+describe("withoutMessageOf (spec 0007, AC-8)", () => {
+  it("drops only the message the item came from", () => {
+    const ms = [{ id: "a" }, { id: "b" }, { id: "ab" }];
+    expect(withoutMessageOf(ms, "b:0")).toEqual([{ id: "a" }, { id: "ab" }]);
+    expect(withoutMessageOf(ms, "a:2")).toEqual([{ id: "b" }, { id: "ab" }]);
   });
 });

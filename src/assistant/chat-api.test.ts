@@ -5,7 +5,12 @@ import type { UsageInput } from "@/db/queries/usage";
 import { err, ok } from "@/lib/result";
 import { makeRegistry } from "@/tools/_kit/registry";
 import { sampleTool } from "@/tools/test-tools/sample";
-import { postChat, type ChatApiDeps, type ChatResponse } from "./chat-api";
+import {
+  limitHit,
+  postChat,
+  type ChatApiDeps,
+  type ChatResponse,
+} from "./chat-api";
 import {
   handleTurn,
   type ChatUsage,
@@ -61,6 +66,7 @@ const fakeDeps = (over: Partial<ChatApiDeps> = {}) => {
   const usage: UsageInput[] = [];
   const pending: Promise<unknown>[] = [];
   const logs: string[] = [];
+  const finished: string[] = [];
   const deps: ChatApiDeps = {
     turnContext: async () =>
       ok({ active: { active: null, paused: [] }, typedInRun: 0 }),
@@ -73,6 +79,10 @@ const fakeDeps = (over: Partial<ChatApiDeps> = {}) => {
     recordUsage: async (input) => {
       usage.push(input);
     },
+    finishStream: async (_c, streamId) => {
+      finished.push(streamId);
+    },
+    limits: { maxChars: 4000, perRun: 40 },
     waitUntil: (task) => {
       pending.push(task);
     },
@@ -82,7 +92,7 @@ const fakeDeps = (over: Partial<ChatApiDeps> = {}) => {
     },
     ...over,
   };
-  return { deps, saved, usage, pending, logs };
+  return { deps, saved, usage, pending, logs, finished };
 };
 
 const readAll = async (response: ChatResponse) => {
@@ -453,5 +463,139 @@ describe("postChat over handleTurn: the lock covers the save (AC-2)", () => {
     expect(saved[0]?.message.parts).toEqual([
       expect.objectContaining({ type: "text", text: "Half a rep" }),
     ]);
+  });
+});
+
+const approvalTap = (id = MSG) => ({
+  id,
+  role: "user",
+  parts: [{ type: "tool-approval-response", approvalId: "a1", approved: true }],
+});
+
+const inRun = (typedInRun: number) => async () =>
+  ok({ active: { active: null, paused: [] }, typedInRun });
+
+describe("postChat: limits (spec 0007, AC-8)", () => {
+  it("refuses typed text over the limit with a notice, no turn and nothing saved", async () => {
+    const handle = vi.fn();
+    const { deps, saved } = fakeDeps({ handleTurn: handle });
+    const result = await postChat(deps, {
+      userId: USER,
+      body: { conversationId: CONV, message: typed("a".repeat(4001)) },
+    });
+    expect(result).toMatchObject({ kind: "stream", resumable: null });
+    expect(await readAll(result)).toEqual([
+      { type: "start", messageId: REPLY },
+      { type: "data-error", data: { kind: "limit_text", retry: false } },
+      { type: "finish" },
+    ]);
+    expect(handle).not.toHaveBeenCalled();
+    expect(saved).toEqual([]);
+  });
+
+  it("lets typed text of exactly the limit through", async () => {
+    const handle = vi.fn(async () => ok(turnOutput()));
+    const { deps } = fakeDeps({ handleTurn: handle });
+    await readAll(
+      await postChat(deps, {
+        userId: USER,
+        body: { conversationId: CONV, message: typed("a".repeat(4000)) },
+      }),
+    );
+    expect(handle).toHaveBeenCalledOnce();
+  });
+
+  it("refuses the 41st typed message in a run with a notice", async () => {
+    const handle = vi.fn();
+    const { deps } = fakeDeps({ handleTurn: handle, turnContext: inRun(40) });
+    const result = await postChat(deps, {
+      userId: USER,
+      body: { conversationId: CONV, message: typed("one more") },
+    });
+    expect(await readAll(result)).toContainEqual({
+      type: "data-error",
+      data: { kind: "limit_run", retry: false },
+    });
+    expect(handle).not.toHaveBeenCalled();
+  });
+
+  it("lets the 40th typed message through", async () => {
+    const handle = vi.fn(async () => ok(turnOutput()));
+    const { deps } = fakeDeps({ handleTurn: handle, turnContext: inRun(39) });
+    await readAll(
+      await postChat(deps, {
+        userId: USER,
+        body: { conversationId: CONV, message: typed("fortieth") },
+      }),
+    );
+    expect(handle).toHaveBeenCalledOnce();
+  });
+
+  it("never counts or refuses taps, even past the run limit", async () => {
+    const handle = vi.fn(async () => ok(turnOutput()));
+    const { deps } = fakeDeps({ handleTurn: handle, turnContext: inRun(99) });
+    await readAll(
+      await postChat(deps, {
+        userId: USER,
+        body: { conversationId: CONV, message: approvalTap() },
+      }),
+    );
+    expect(handle).toHaveBeenCalledOnce();
+  });
+
+  it("limitHit checks length before the run count", () => {
+    const limits = { maxChars: 10, perRun: 2 };
+    expect(limitHit({ kind: "text", text: "x".repeat(11) }, 5, limits)).toBe(
+      "limit_text",
+    );
+    expect(limitHit({ kind: "text", text: "ok" }, 2, limits)).toBe("limit_run");
+    expect(limitHit({ kind: "text", text: "ok" }, 1, limits)).toBeNull();
+  });
+});
+
+describe("postChat: resumable streams (spec 0007, AC-6)", () => {
+  it("marks a turn's stream resumable under the reply id", async () => {
+    const { deps } = fakeDeps();
+    const result = await postChat(deps, {
+      userId: USER,
+      body: { conversationId: CONV, message: typed("hi") },
+    });
+    expect(result).toMatchObject({
+      kind: "stream",
+      resumable: { conversationId: CONV, streamId: REPLY },
+    });
+  });
+
+  it("forgets the stream only after the reply is saved", async () => {
+    const order: string[] = [];
+    const { deps } = fakeDeps({
+      appendMessage: async () => {
+        order.push("save");
+        return ok(1);
+      },
+      finishStream: async () => {
+        order.push("finish");
+      },
+    });
+    await readAll(
+      await postChat(deps, {
+        userId: USER,
+        body: { conversationId: CONV, message: typed("hi") },
+      }),
+    );
+    expect(order).toEqual(["save", "finish"]);
+  });
+
+  it("never makes a busy turn resumable, so it can't replace the running one", async () => {
+    const { deps, finished } = fakeDeps({
+      handleTurn: async () => ok(turnOutput({ busy: true })),
+    });
+    const result = await postChat(deps, {
+      userId: USER,
+      body: { conversationId: CONV, message: typed("hi") },
+    });
+    expect(result).toMatchObject({ resumable: null });
+    await readAll(result);
+    expect(finished).toEqual([]);
   });
 });

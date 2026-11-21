@@ -79,7 +79,13 @@ export const reportErrorCopy: Readonly<
 };
 
 /** The `data-error` kinds the chat can show (spec 0006, "Message parts"). */
-export type ChatErrorKind = "ai_error" | "refusal" | "complete_retry" | "busy";
+export type ChatErrorKind =
+  | "ai_error"
+  | "refusal"
+  | "complete_retry"
+  | "busy"
+  | "limit_text"
+  | "limit_run";
 
 /**
  * Chat error card copy (spec 0006, AC-7, AC-14; spec 0007, AC-11). The action label is
@@ -102,5 +108,15 @@ export const chatErrorCopy: Readonly<Record<ChatErrorKind, ErrorCopy>> = {
     title: "One moment",
     message: "I'm still on your last message.",
     actionLabel: "Send again",
+  },
+  limit_text: {
+    title: "That message is too long",
+    message: "Please make it shorter, or send it in a few parts.",
+    actionLabel: "Got it",
+  },
+  limit_run: {
+    title: "This run has reached its message limit",
+    message: "You can still tap the cards to answer, or start a new chat.",
+    actionLabel: "Got it",
   },
 };
