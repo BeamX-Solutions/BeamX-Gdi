@@ -48,7 +48,11 @@ export const chatCharge = (
   return Math.min(cfg.chat.ceilingCredits, Math.max(1, credits));
 };
 
-/** Stop pressed: nothing before the first output; otherwise the real cost, or 1 if unknown. */
+/**
+ * A disconnect while resumable streams are off (spec 0004, AC-10): nothing before the
+ * first output; otherwise the real cost, or 1 if unknown. The name predates the decision
+ * that there is no chat Stop button.
+ */
 export const chatChargeOnStop = (
   costUsd: number | null,
   receivedOutput: boolean,

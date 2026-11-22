@@ -13,8 +13,10 @@
  * Paid chat (spec 0004, AC-9, AC-10): a metered turn (a typed message with no run in
  * progress) is free while today's allowance lasts. Past it, the ceiling is held before
  * the AI call (or the short balance notice is shown instead), and the hold is settled
- * once when the turn ends: charged on a reply, released on an AI error or a Stop before
- * any output. Whatever slips through is released by the daily sweep.
+ * once when the turn ends: charged on a reply, released on an AI error, or, only when
+ * resumable streams are off, on a disconnect before any output (spec 0004, AC-10; with
+ * resumable streams on, a disconnect never cuts the reply short). Whatever slips through
+ * is released by the daily sweep.
  */
 import { createUIMessageStream, type UIMessageChunk } from "ai";
 import { z } from "zod";
@@ -231,7 +233,10 @@ export const limitHit = (
   return null;
 };
 
-/** Chunks that are not the model's output, so a Stop before them charges nothing. */
+/**
+ * Chunks that are not the model's output, so a disconnect before them (resumable streams
+ * off) charges nothing.
+ */
 const SILENT_CHUNKS: ReadonlySet<string> = new Set([
   "start-step",
   "finish-step",
@@ -606,7 +611,9 @@ export const postChat = async (
   if (busy) dropBill();
   const live: ChatBill = busy ? { kind: "none" } : bill;
   // Settled once: at the clean end (before `finish`, so the chip's numbers ride on the
-  // reply), or on a cancel or stream error (Stop).
+  // reply), or on a cancel or stream error. A cancel only reaches here on a client
+  // disconnect while resumable streams are off: with them on, the Redis copy keeps the
+  // stream read to its end (spec 0004, AC-10).
   const billing = { settled: false, output: false };
   const settleOnce = async (end: () => Promise<ChatEnd>): Promise<ReplyEnd> => {
     if (billing.settled) return NOTHING;
@@ -647,8 +654,8 @@ export const postChat = async (
       },
       onEnd: async ({ responseMessage }) => {
         // A clean end settles the bill before `finish`, so reaching here unsettled means
-        // the client cancelled the response (Stop): the clean end will never come, and
-        // the bill is settled from whether output had arrived by then (AC-10).
+        // the client disconnected with resumable streams off: the clean end will never
+        // come, and the bill is settled from whether output had arrived by then (AC-10).
         if (!billing.settled)
           deps.waitUntil(
             settleOnce(async () => ({
