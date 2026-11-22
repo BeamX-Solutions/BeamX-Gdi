@@ -7,6 +7,7 @@ import * as credits from "@/db/queries/credits";
 import * as messages from "@/db/queries/messages";
 import * as runs from "@/db/queries/runs";
 import * as usage from "@/db/queries/usage";
+import { openCreditAccount } from "./billing-deps";
 import { toCreditSummary } from "@/billing/summary";
 import { newId } from "@/db/id";
 import { logEvent } from "@/lib/log";
@@ -18,7 +19,6 @@ import { getTool, tools } from "@/tools/registry";
 import { createAiTurn, type AiTurnDeps } from "./ai-turn";
 import { resolveModel } from "./model-provider";
 import type { SavedMessage } from "./parts";
-import { STARTER_GRANT } from "./tools/start-run";
 import type { TurnDeps } from "./turn";
 
 /** How many recent messages the card path reads (the open card and prefill lookups). */
@@ -80,7 +80,7 @@ const aiTurnDeps: AiTurnDeps = {
   tools,
   openChat,
   model: () => resolveModel("chat"),
-  ensureAccount: (ownerId) => credits.ensureAccount(ownerId, STARTER_GRANT),
+  ensureAccount: openCreditAccount,
   startRunWithHold: async (ownerId, conversationId, toolId, version, price) => {
     const started = await credits.startRunWithHold(
       ownerId,

@@ -12,6 +12,7 @@ const memoryStore = () => {
   const values = new Map<string, number | string>();
   const store: LimitStore = {
     read: async (_name, key) => Number(values.get(key) ?? 0),
+    tryRead: async (_name, key) => Number(values.get(key) ?? 0),
     count: async (_name, key) => {
       values.set(key, Number(values.get(key) ?? 0) + 1);
     },

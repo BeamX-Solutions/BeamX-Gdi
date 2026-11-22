@@ -89,6 +89,7 @@ const fakeDeps = (over: Partial<TurnDeps> = {}) => {
         },
       }),
       usage: Promise.resolve(AI_USAGE),
+      failed: Promise.resolve(false),
     }),
     newId: () => `id-${++ids.n}`,
     now: () => 0,

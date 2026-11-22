@@ -11,6 +11,7 @@ const base = {
   DATABASE_URL_UNPOOLED: "postgres://u:p@host/db",
   BETTER_AUTH_SECRET: "x".repeat(32),
   NEXT_PUBLIC_APP_URL: "https://beamx.test",
+  CRON_SECRET: "c".repeat(32),
 };
 
 const upstash = {
@@ -47,6 +48,33 @@ describe("envSchema: the Upstash variables behind the turn lock", () => {
     expect(envSchema(true).safeParse({ ...base, ...upstash }).success).toBe(
       true,
     );
+  });
+});
+
+describe("envSchema: CRON_SECRET for the daily billing job (spec 0004)", () => {
+  it("is optional in dev, CI and preview", () => {
+    const rest = { ...base, CRON_SECRET: undefined };
+    expect(envSchema(false).safeParse(rest).success).toBe(true);
+  });
+
+  it("fails a production deploy without it, or with an empty line", () => {
+    const rest = { ...base, CRON_SECRET: undefined };
+    for (const extra of [{}, { CRON_SECRET: "" }]) {
+      const result = envSchema(true).safeParse({
+        ...rest,
+        ...upstash,
+        ...extra,
+      });
+      expect(result.error?.issues.map((i) => i.path[0])).toEqual([
+        "CRON_SECRET",
+      ]);
+    }
+  });
+
+  it("refuses a secret under 16 characters", () => {
+    expect(
+      envSchema(false).safeParse({ ...base, CRON_SECRET: "short" }).success,
+    ).toBe(false);
   });
 });
 

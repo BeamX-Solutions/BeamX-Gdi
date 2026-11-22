@@ -36,8 +36,15 @@ export type AssistantToolDeps = Pick<StepDeps, "ownerOf"> & {
   ) => Promise<
     Result<unknown, { readonly code: "not_found_or_not_in_progress" }>
   >;
-  /** `credits.ensureAccount` with the starter grant bound. */
-  readonly ensureAccount: (ownerId: string) => Promise<unknown>;
+  /**
+   * Opens the credit account with its starter grant (`billing/chat-billing.ts`
+   * `accountOpener`): a guest from an IP past today's grant cap gets 0 (spec 0004, AC-11).
+   */
+  readonly ensureAccount: (
+    ownerId: string,
+    isGuest: boolean,
+    ip: string | null,
+  ) => Promise<unknown>;
   /** `credits.startRunWithHold`, reduced to what the tool reads. */
   readonly startRunWithHold: (
     ownerId: string,

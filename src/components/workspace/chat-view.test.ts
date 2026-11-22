@@ -299,6 +299,28 @@ describe("latestToolSummary (AC-9)", () => {
     ).toEqual({ key: "c2", summary: { available: 0, held: 30 } });
     expect(latestToolSummary([assistant("a1", text("x"))])).toBeNull();
   });
+
+  it("reads a paid chat reply's summary from its metadata (spec 0004)", () => {
+    const charged: ViewMessage = {
+      ...assistant("a3", text("Sure.")),
+      metadata: {
+        billing: {
+          kind: "charged",
+          credits: 1,
+          summary: { available: 26, held: 0 },
+        },
+      },
+    };
+    const free: ViewMessage = {
+      ...assistant("a4", text("Hi.")),
+      metadata: { billing: { kind: "free", freeLeft: 3 } },
+    };
+    expect(latestToolSummary([charged, free])).toEqual({
+      key: "a3:billing",
+      summary: { available: 26, held: 0 },
+    });
+    expect(latestToolSummary([free])).toBeNull();
+  });
 });
 
 describe("lastTypedMessageId", () => {
@@ -379,6 +401,11 @@ describe("takenUserMessageId (spec 0007, AC-2)", () => {
     const ms = [typed("u1", "hi"), notice("n", "busy")];
     expect(takenUserMessageId(ms, notice("n", "busy"))).toBeNull();
     expect(takenUserMessageId(ms, notice("n", "limit_run"))).toBeNull();
+    // Too few credits for a paid message (spec 0004): never taken either.
+    expect(takenUserMessageId(ms, notice("n", "chat_credits"))).toBeNull();
+    expect(
+      takenUserMessageId(ms, notice("n", "chat_credits_guest")),
+    ).toBeNull();
   });
 
   it("counts an AI error reply (the message was saved before the AI ran)", () => {

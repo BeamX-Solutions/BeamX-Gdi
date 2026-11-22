@@ -59,6 +59,12 @@ const schema = z.object({
   LIMIT_RUNS_PER_IP: limit(20),
   // New guests a day from one IP (AC-8).
   LIMIT_GUESTS_PER_IP: limit(30),
+  // Vercel Cron's bearer token for `/api/cron/billing` (spec 0004). Without it the cron
+  // route refuses every call. Required in production.
+  CRON_SECRET: z.preprocess(
+    (v) => (v === "" ? undefined : v),
+    z.string().min(16).optional(),
+  ),
   // "true" swaps every AI call for the scripted fake models in `src/lib/fake-model.ts`
   // (spec 0007), for `pnpm e2e`. Ignored on a production deploy, which refuses to boot
   // with it set (`envSchema`).
@@ -97,6 +103,13 @@ export const envSchema = (production: boolean) =>
           path: [name],
           message: `${name} is required in production (the chat turn lock)`,
         });
+    if (value.CRON_SECRET === undefined)
+      ctx.addIssue({
+        code: "custom",
+        path: ["CRON_SECRET"],
+        message:
+          "CRON_SECRET is required in production (the daily billing job)",
+      });
     if (value.E2E_FAKE_AI)
       ctx.addIssue({
         code: "custom",
@@ -142,6 +155,7 @@ export const env: Env = skip
       LIMIT_RUNS_PER_GUEST: rawLimit(process.env.LIMIT_RUNS_PER_GUEST, 3),
       LIMIT_RUNS_PER_IP: rawLimit(process.env.LIMIT_RUNS_PER_IP, 20),
       LIMIT_GUESTS_PER_IP: rawLimit(process.env.LIMIT_GUESTS_PER_IP, 30),
+      CRON_SECRET: process.env.CRON_SECRET || undefined,
       E2E_FAKE_AI: process.env.E2E_FAKE_AI === "true",
       VERCEL_ENV:
         process.env.VERCEL_ENV === "production" ||

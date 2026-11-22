@@ -5,6 +5,7 @@
  * these.
  */
 import { z } from "zod";
+import { creditSummarySchema } from "@/billing/summary";
 import type { QuestionProgress, QuestionView } from "@/tools/_contract";
 
 // ---------------------------------------------------------------------------
@@ -138,6 +139,12 @@ export const errorKinds = [
   "runs_daily",
   // A resent message that already has a saved reply: the client reloads the thread.
   "answered",
+  // Paid chat (spec 0004, AC-9, AC-10): too few credits for a paid message (a notice,
+  // never saved; guests get the sign up variant), and the once a day "chat now costs"
+  // card, saved with the reply that used the last free message.
+  "chat_credits",
+  "chat_credits_guest",
+  "free_chat_used",
 ] as const;
 export type ErrorKind = (typeof errorKinds)[number];
 
@@ -162,6 +169,24 @@ export type PrefillResponseData = z.infer<typeof prefillResponseData>;
 export type ReportData = z.infer<typeof reportData>;
 export type ErrorData = z.infer<typeof errorData>;
 export type RetryData = z.infer<typeof retryData>;
+
+/**
+ * An assistant message's metadata (spec 0004, `POST /api/chat` billing step): how the
+ * reply was paid, with the chip's numbers after a charge.
+ */
+export const chatMetadata = z.object({
+  billing: z
+    .discriminatedUnion("kind", [
+      z.object({ kind: z.literal("free"), freeLeft: z.int().nonnegative() }),
+      z.object({
+        kind: z.literal("charged"),
+        credits: z.int().nonnegative(),
+        summary: creditSummarySchema.optional(),
+      }),
+    ])
+    .optional(),
+});
+export type ChatMetadata = z.infer<typeof chatMetadata>;
 
 /** The data part types of a BeamX chat message, for `UIMessage<…, ChatDataParts>`. */
 export type ChatDataParts = {
