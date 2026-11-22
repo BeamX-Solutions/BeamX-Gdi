@@ -1,7 +1,7 @@
 # 0008. Abuse and AI cost guards
 
 **Date**: 2026-11-22
-**Status**: In Progress
+**Status**: Accepted
 
 ## Summary
 
