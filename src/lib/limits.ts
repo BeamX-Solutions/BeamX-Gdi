@@ -17,6 +17,7 @@ import { err, ok, type Result } from "./result";
 export type LimitConfig = {
   readonly spendCapUsd: number;
   readonly burstPerUser: number;
+  readonly burstCardsPerUser: number;
   readonly burstPerIp: number;
   readonly chatPerGuest: number;
   readonly chatsPerGuest: number;
@@ -28,6 +29,7 @@ export type LimitConfig = {
 export const limitConfig = (e: Env): LimitConfig => ({
   spendCapUsd: e.AI_DAILY_SPEND_CAP_USD,
   burstPerUser: e.LIMIT_BURST_PER_USER,
+  burstCardsPerUser: e.LIMIT_BURST_CARDS_PER_USER,
   burstPerIp: e.LIMIT_BURST_PER_IP,
   chatPerGuest: e.LIMIT_CHAT_PER_GUEST,
   chatsPerGuest: e.LIMIT_CHATS_PER_GUEST,
@@ -67,6 +69,7 @@ export const overLimit = (count: number, max: number): boolean => count >= max;
 /** The names logged with `limit_check_failed`. */
 export type LimitName =
   | "burst_user"
+  | "burst_cards"
   | "burst_ip"
   | "chat_daily"
   | "chats_daily"
@@ -77,7 +80,16 @@ export type LimitName =
   | "free_chat"
   | "guest_grant";
 
-export type BurstWindow = "user" | "ip";
+/** The per minute windows: AI turns per user, card taps per user, every POST per IP. */
+export type BurstWindow = "user" | "cards" | "ip";
+/** The per user windows a chat request is checked against (spec 0008, AC-7, AC-12). */
+export type UserBurstWindow = Exclude<BurstWindow, "ip">;
+
+const BURST_LIMIT_NAMES: Readonly<Record<BurstWindow, LimitName>> = {
+  user: "burst_user",
+  cards: "burst_cards",
+  ip: "burst_ip",
+};
 
 /**
  * The Redis side of every guard. Each method never throws: on an error it logs
@@ -187,7 +199,7 @@ export const redisLimitStore = (
   burst: (window, id) =>
     failOpen(
       log,
-      window === "user" ? "burst_user" : "burst_ip",
+      BURST_LIMIT_NAMES[window],
       true,
       async () => (await limiters[window](id)).success,
     ),
@@ -266,13 +278,22 @@ export const chatGuard = (deps: {
   readonly store: LimitStore;
   readonly now: () => Date;
 }) => ({
-  /** True when one more POST fits both per minute windows; no IP skips the IP one. */
-  burst: async (userId: string, ip: string | null): Promise<boolean> => {
+  /**
+   * Checks one more POST against the user's `window` and the IP window, in parallel (both
+   * are always consumed). Returns the window that refused it, or null when it fits. No IP
+   * skips the IP window.
+   */
+  burst: async (
+    userId: string,
+    ip: string | null,
+    window: UserBurstWindow,
+  ): Promise<BurstWindow | null> => {
     const [user, byIp] = await Promise.all([
-      deps.store.burst("user", userId),
+      deps.store.burst(window, userId),
       ip === null ? true : deps.store.burst("ip", ip),
     ]);
-    return user && byIp;
+    if (!user) return window;
+    return byIp ? null : "ip";
   },
   /** Typed messages and new chats today, read in parallel. */
   dailyCounts: async (userId: string): Promise<DailyCounts> => {
@@ -335,6 +356,11 @@ const makeStore = (e: Env): LimitStore => {
   });
   return redisLimitStore(redis, {
     user: slidingWindow(redis, "limit:burst:user", e.LIMIT_BURST_PER_USER),
+    cards: slidingWindow(
+      redis,
+      "limit:burst:cards",
+      e.LIMIT_BURST_CARDS_PER_USER,
+    ),
     ip: slidingWindow(redis, "limit:burst:ip", e.LIMIT_BURST_PER_IP),
   });
 };

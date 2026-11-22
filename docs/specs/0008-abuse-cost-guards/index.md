@@ -1,7 +1,7 @@
 # 0008. Abuse and AI cost guards
 
 **Date**: 2026-11-22
-**Status**: In Progress
+**Status**: Accepted
 
 ## Summary
 
@@ -164,7 +164,7 @@ Tracer Bullet: one guard end to end through every layer first (the spend total a
 5. [x] Chat route limits: burst windows first, daily chat check and count, `mayCreate` and `created` in `turnContext` (integration test) with the `chats_daily` notice; the new notice kinds and copy; tests, satisfies **AC-5**, **AC-6**, **AC-7**
 6. [x] Guest sign in IP cap in the auth route, counted on `200`, with the `guest_limit` card in the chat client's `send()`; tests, satisfies **AC-8**
 7. [x] `/design` showcase for the new notices, and an e2e check that a limit notice renders with axe clean (limits set to 1 through env in the test server), satisfies **AC-2**, **AC-5**, **AC-7**
-8. [ ] Card burst window: `LIMIT_BURST_CARDS_PER_USER` in `env.ts` (both the schema and the `SKIP_ENV_VALIDATION` path) and `.env.example`; `limitConfig.burstCardsPerUser`; in `limits.ts` a `cards` `BurstWindow` with its `limit:burst:cards` sliding window (the `redisLimitStore` limiter record gains `cards`; `openLimitStore` already allows every window and needs nothing), `burst_cards` in `LimitName` with the log name picked by a lookup instead of the two way ternary, and a `UserBurstWindow = "user" | "cards"` type; `chatGuard.burst(userId, ip, window)` returns the refusing window (`"user" | "cards" | "ip"`) or null; in `postChat`, parse and classify first, then burst with `burstWindow(classified)`, then the `400` for an unparsable body; the `slow_down` `chat_limit` log carries `window` (the refusing window, IP included); `mayCreate` false for any turn that is not typed, with `chat_limit` on such a turn answered `404`; update the burst fakes in `chat-api.test.ts`, `chat-billing.test.ts`, `spend-cap.test.ts` and `limits.test.ts`; unit tests in `limits.test.ts`, `chat-api.test.ts` and `chat-view.test.ts`, satisfies **AC-7**, **AC-12**
+8. [x] Card burst window: `LIMIT_BURST_CARDS_PER_USER` in `env.ts` (both the schema and the `SKIP_ENV_VALIDATION` path) and `.env.example`; `limitConfig.burstCardsPerUser`; in `limits.ts` a `cards` `BurstWindow` with its `limit:burst:cards` sliding window (the `redisLimitStore` limiter record gains `cards`; `openLimitStore` already allows every window and needs nothing), `burst_cards` in `LimitName` with the log name picked by a lookup instead of the two way ternary, and a `UserBurstWindow = "user" | "cards"` type; `chatGuard.burst(userId, ip, window)` returns the refusing window (`"user" | "cards" | "ip"`) or null; in `postChat`, parse and classify first, then burst with `burstWindow(classified)`, then the `400` for an unparsable body; the `slow_down` `chat_limit` log carries `window` (the refusing window, IP included); `mayCreate` false for any turn that is not typed, with `chat_limit` on such a turn answered `404`; update the burst fakes in `chat-api.test.ts`, `chat-billing.test.ts`, `spend-cap.test.ts` and `limits.test.ts`; unit tests in `limits.test.ts`, `chat-api.test.ts` and `chat-view.test.ts`, satisfies **AC-7**, **AC-12**
 
 ## Consequences
 

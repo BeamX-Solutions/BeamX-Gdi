@@ -4,21 +4,83 @@ import { billingConfig } from "@/billing/config";
 import type { TurnContext } from "@/db/queries/conversations";
 import type { NewMessage } from "@/db/queries/messages";
 import type { UsageInput } from "@/db/queries/usage";
+import type { BurstWindow } from "@/lib/limits";
 import { err, ok } from "@/lib/result";
 import { makeRegistry } from "@/tools/_kit/registry";
 import { sampleTool } from "@/tools/test-tools/sample";
 import {
+  burstWindow,
   limitHit,
   postChat,
   type ChatApiDeps,
   type ChatResponse,
 } from "./chat-api";
+import { classifyMessage } from "./parts";
 import {
   handleTurn,
   type ChatUsage,
   type TurnDeps,
   type TurnOutput,
 } from "./turn";
+
+describe("burstWindow (spec 0008, AC-7, AC-12)", () => {
+  const card = (type: string, data: unknown) =>
+    classifyMessage({ id: MSG, role: "user", parts: [{ type, data }] });
+
+  it("picks cards only for a well formed card tap", () => {
+    expect(
+      burstWindow(
+        card("data-answer", {
+          runId: "0190a000-0000-7000-8000-000000000b01",
+          questionId: "q1",
+          value: "a",
+        }),
+      ),
+    ).toBe("cards");
+    expect(
+      burstWindow(
+        card("data-retry", {
+          runId: "0190a000-0000-7000-8000-000000000b01",
+          action: "complete",
+        }),
+      ),
+    ).toBe("cards");
+  });
+
+  it("uses the strict user window for typed messages, approvals and anything unparsable", () => {
+    expect(burstWindow(classifyMessage(typed("hi")))).toBe("user");
+    expect(
+      burstWindow(
+        classifyMessage({
+          id: MSG,
+          role: "user",
+          parts: [
+            {
+              type: "tool-approval-response",
+              approvalId: "a1",
+              approved: true,
+            },
+          ],
+        }),
+      ),
+    ).toBe("user");
+    expect(burstWindow(null)).toBe("user");
+    expect(burstWindow(classifyMessage("junk"))).toBe("user");
+    // A card part mixed with text is refused by classifyMessage, so it stays strict.
+    expect(
+      burstWindow(
+        classifyMessage({
+          id: MSG,
+          role: "user",
+          parts: [
+            { type: "text", text: "hi" },
+            { type: "data-retry", data: { runId: "x" } },
+          ],
+        }),
+      ),
+    ).toBe("user");
+  });
+});
 
 // Spec 0007, AC-2 and the POST /api/chat flow: `postChat` with fake deps, and with the
 // real `handleTurn` over an in memory turn lock for the one writer per turn rules.
@@ -93,7 +155,7 @@ const fakeDeps = (over: Partial<ChatApiDeps> = {}) => {
       finished.push(streamId);
     },
     guards: {
-      burst: async () => true,
+      burst: async () => null,
       dailyCounts: async () => ({ chat: 0, chats: 0 }),
       countChat: async () => {},
       countChats: async () => {},
@@ -544,6 +606,22 @@ describe("postChat over handleTurn: the lock covers the save (AC-2)", () => {
   });
 });
 
+/** A card answer tap: a card turn, which never calls the AI (spec 0008, AC-12). */
+const cardAnswer = (id = MSG) => ({
+  id,
+  role: "user",
+  parts: [
+    {
+      type: "data-answer",
+      data: {
+        runId: "0190a000-0000-7000-8000-000000000b01",
+        questionId: "q1",
+        value: "a",
+      },
+    },
+  ],
+});
+
 const approvalTap = (id = MSG) => ({
   id,
   role: "user",
@@ -827,21 +905,21 @@ describe("postChat: abuse limits at chat (spec 0008, AC-5, AC-6, AC-7)", () => {
   /** Guards that record what was counted, with the counts a test sets. */
   const guards = (
     over: Partial<{
-      burst: boolean;
+      refuse: BurstWindow;
       chat: number;
       chats: number;
     }> = {},
   ) => {
     const calls = {
-      burst: [] as [string, string | null][],
+      burst: [] as [string, string | null, string][],
       chat: 0,
       chats: 0,
       read: 0,
     };
     const value: ChatApiDeps["guards"] = {
-      burst: async (userId, ip) => {
-        calls.burst.push([userId, ip]);
-        return over.burst ?? true;
+      burst: async (userId, ip, window) => {
+        calls.burst.push([userId, ip, window]);
+        return over.refuse ?? null;
       },
       dailyCounts: async () => {
         calls.read += 1;
@@ -867,7 +945,7 @@ describe("postChat: abuse limits at chat (spec 0008, AC-5, AC-6, AC-7)", () => {
   const settle = (pending: readonly Promise<unknown>[]) => Promise.all(pending);
 
   it("over the burst window, sends slow_down before reading the body or the DB", async () => {
-    const g = guards({ burst: false });
+    const g = guards({ refuse: "user" });
     const turnContext = vi.fn();
     const handle = vi.fn();
     const { deps, saved } = fakeDeps({
@@ -884,17 +962,82 @@ describe("postChat: abuse limits at chat (spec 0008, AC-5, AC-6, AC-7)", () => {
       }),
     );
     expect(kindOf(chunks)).toEqual(["slow_down"]);
-    expect(g.calls.burst).toEqual([[USER, IP]]);
+    // An unparsable body is checked against the strict user window (AC-7).
+    expect(g.calls.burst).toEqual([[USER, IP, "user"]]);
     expect(turnContext).not.toHaveBeenCalled();
     expect(handle).not.toHaveBeenCalled();
     expect(saved).toEqual([]);
   });
 
   it("the burst limit applies to signed in users too", async () => {
-    const g = guards({ burst: false });
+    const g = guards({ refuse: "user" });
     const { deps } = fakeDeps({ guards: g.value });
     const chunks = await readAll(await send(deps, typed("hi"), false));
     expect(kindOf(chunks)).toEqual(["slow_down"]);
+  });
+
+  it("an unparsable body that fits the window still gets its 400 (AC-7)", async () => {
+    const g = guards();
+    const { deps } = fakeDeps({ guards: g.value });
+    const result = await postChat(deps, {
+      userId: USER,
+      isGuest: false,
+      ip: IP,
+      body: "not even json",
+    });
+    expect(result).toMatchObject({ kind: "json", status: 400 });
+    expect(g.calls.burst).toEqual([[USER, IP, "user"]]);
+  });
+
+  it("card taps use the cards window, typed messages and approvals the user window (AC-7, AC-12)", async () => {
+    const g = guards();
+    const { deps } = fakeDeps({ guards: g.value });
+    await readAll(await send(deps, cardAnswer()));
+    await readAll(await send(deps, typed("hi", MSG2)));
+    await readAll(await send(deps, approvalTap(MSG2)));
+    expect(g.calls.burst.map(([, , window]) => window)).toEqual([
+      "cards",
+      "user",
+      "user",
+    ]);
+  });
+
+  it("a card tap over its window gets slow_down and logs the refusing window (AC-12)", async () => {
+    const g = guards({ refuse: "cards" });
+    const handle = vi.fn();
+    const logs: [string, unknown][] = [];
+    const { deps, saved } = fakeDeps({
+      guards: g.value,
+      handleTurn: handle,
+      log: (event, fields) => {
+        logs.push([event, fields]);
+      },
+    });
+    const chunks = await readAll(await send(deps, cardAnswer()));
+    expect(kindOf(chunks)).toEqual(["slow_down"]);
+    expect(handle).not.toHaveBeenCalled();
+    expect(saved).toEqual([]);
+    expect(logs).toContainEqual([
+      "chat_limit",
+      { conversationId: null, window: "cards", limit: "slow_down" },
+    ]);
+  });
+
+  it("only a typed message may create a chat; a card or approval to an unknown chat is a 404 (AC-12)", async () => {
+    for (const isGuest of [true, false]) {
+      const turnContext = vi.fn(async () =>
+        err({ code: "chat_limit" as const }),
+      );
+      const { deps } = fakeDeps({ guards: guards().value, turnContext });
+      for (const message of [cardAnswer(), approvalTap()]) {
+        const result = await send(deps, message, isGuest);
+        expect(result).toMatchObject({ kind: "json", status: 404 });
+      }
+      expect(turnContext.mock.calls.map((c) => c.at(3))).toEqual([
+        false,
+        false,
+      ]);
+    }
   });
 
   it("refuses a guest's 31st typed message with no run, without a turn", async () => {

@@ -48,8 +48,10 @@ const schema = z.object({
     (v) => (v === "" ? undefined : v),
     z.coerce.number().positive().default(20),
   ),
-  // Chat requests a minute, per user and per IP (AC-7).
+  // Chat requests a minute, per user and per IP (AC-7). Card taps (answers, prefill,
+  // retry), which never call the AI, have their own looser user window (AC-12).
   LIMIT_BURST_PER_USER: limit(10),
+  LIMIT_BURST_CARDS_PER_USER: limit(30),
   LIMIT_BURST_PER_IP: limit(60),
   // A guest's typed messages with no run in progress, and new chats, a day (AC-5, AC-6).
   LIMIT_CHAT_PER_GUEST: limit(30),
@@ -149,6 +151,10 @@ export const env: Env = skip
         Number(process.env.RATE_LIMIT_MESSAGES_PER_RUN) || 40,
       AI_DAILY_SPEND_CAP_USD: rawLimit(process.env.AI_DAILY_SPEND_CAP_USD, 20),
       LIMIT_BURST_PER_USER: rawLimit(process.env.LIMIT_BURST_PER_USER, 10),
+      LIMIT_BURST_CARDS_PER_USER: rawLimit(
+        process.env.LIMIT_BURST_CARDS_PER_USER,
+        30,
+      ),
       LIMIT_BURST_PER_IP: rawLimit(process.env.LIMIT_BURST_PER_IP, 60),
       LIMIT_CHAT_PER_GUEST: rawLimit(process.env.LIMIT_CHAT_PER_GUEST, 30),
       LIMIT_CHATS_PER_GUEST: rawLimit(process.env.LIMIT_CHATS_PER_GUEST, 20),

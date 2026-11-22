@@ -32,6 +32,7 @@ describe("limitConfig (AC-10)", () => {
     expect(limitConfig(e)).toEqual({
       spendCapUsd: 20,
       burstPerUser: 10,
+      burstCardsPerUser: 30,
       burstPerIp: 60,
       chatPerGuest: 30,
       chatsPerGuest: 20,
@@ -46,6 +47,7 @@ describe("limitConfig (AC-10)", () => {
       ...base,
       AI_DAILY_SPEND_CAP_USD: "2.5",
       LIMIT_BURST_PER_USER: "1",
+      LIMIT_BURST_CARDS_PER_USER: "8",
       LIMIT_BURST_PER_IP: "2",
       LIMIT_CHAT_PER_GUEST: "3",
       LIMIT_CHATS_PER_GUEST: "4",
@@ -56,6 +58,7 @@ describe("limitConfig (AC-10)", () => {
     expect(limitConfig(e)).toEqual({
       spendCapUsd: 2.5,
       burstPerUser: 1,
+      burstCardsPerUser: 8,
       burstPerIp: 2,
       chatPerGuest: 3,
       chatsPerGuest: 4,
@@ -137,6 +140,7 @@ const boom = async (): Promise<never> => {
 
 const allowAll = {
   user: async () => ({ success: true }),
+  cards: async () => ({ success: true }),
   ip: async () => ({ success: true }),
 };
 
@@ -198,22 +202,29 @@ describe("redisLimitStore", () => {
   it("asks the right window limiter for a burst check", async () => {
     const store = redisLimitStore(fakeRedis({}).redis, {
       user: async () => ({ success: false }),
+      cards: async () => ({ success: true }),
       ip: async () => ({ success: true }),
     });
     expect(await store.burst("user", "u1")).toBe(false);
+    expect(await store.burst("cards", "u1")).toBe(true);
     expect(await store.burst("ip", "1.2.3.4")).toBe(true);
   });
 
   it("fails open and logs limit_check_failed with the limit name (AC-9)", async () => {
     const log = vi.fn();
     const { redis } = fakeRedis({ get: boom, exec: boom, set: boom });
-    const store = redisLimitStore(redis, { user: boom, ip: boom }, log);
+    const store = redisLimitStore(
+      redis,
+      { user: boom, cards: boom, ip: boom },
+      log,
+    );
     expect(await store.read("runs_daily", "k")).toBe(0);
     await expect(store.count("chat_daily", "k")).resolves.toBeUndefined();
     expect(await store.addFloat("spend", "s", 1)).toBeNull();
     expect(await store.setOnce("spend", "t", "v", 1)).toBe(false);
     expect(await store.take("runs_daily", "r")).toBeNull();
     expect(await store.burst("user", "u1")).toBe(true);
+    expect(await store.burst("cards", "u1")).toBe(true);
     expect(await store.burst("ip", "1.2.3.4")).toBe(true);
     expect(log.mock.calls).toEqual([
       ["limit_check_failed", { limit: "runs_daily" }],
@@ -222,6 +233,7 @@ describe("redisLimitStore", () => {
       ["limit_check_failed", { limit: "spend" }],
       ["limit_check_failed", { limit: "runs_daily" }],
       ["limit_check_failed", { limit: "burst_user" }],
+      ["limit_check_failed", { limit: "burst_cards" }],
       ["limit_check_failed", { limit: "burst_ip" }],
     ]);
   });
@@ -319,7 +331,7 @@ describe("runGuard (AC-4)", () => {
 describe("chatGuard (AC-5, AC-6, AC-7)", () => {
   const NOW = new Date("2026-11-22T23:30:00Z"); // already the 23rd in Lagos
 
-  it("checks both burst windows, and skips the IP one with no IP", async () => {
+  it("checks the given user window and the IP window, and skips the IP one with no IP", async () => {
     const asked: string[] = [];
     const store: LimitStore = {
       ...openLimitStore,
@@ -329,9 +341,23 @@ describe("chatGuard (AC-5, AC-6, AC-7)", () => {
       },
     };
     const guard = chatGuard({ store, now: () => NOW });
-    expect(await guard.burst("u1", "1.2.3.4")).toBe(false);
-    expect(await guard.burst("u1", null)).toBe(true);
-    expect(asked).toEqual(["user:u1", "ip:1.2.3.4", "user:u1"]);
+    expect(await guard.burst("u1", "1.2.3.4", "user")).toBe("ip");
+    expect(await guard.burst("u1", null, "cards")).toBeNull();
+    expect(asked).toEqual(["user:u1", "ip:1.2.3.4", "cards:u1"]);
+  });
+
+  it("returns the refusing window, the user window first; both are consumed (AC-12)", async () => {
+    const asked: string[] = [];
+    const refuseAll: LimitStore = {
+      ...openLimitStore,
+      burst: async (window) => {
+        asked.push(window);
+        return false;
+      },
+    };
+    const guard = chatGuard({ store: refuseAll, now: () => NOW });
+    expect(await guard.burst("u1", "1.2.3.4", "cards")).toBe("cards");
+    expect(asked).toEqual(["cards", "ip"]);
   });
 
   it("reads and counts the Lagos day's keys", async () => {

@@ -74,3 +74,17 @@ _Steps derived from spec 0008 acceptance criteria. `/check verify` runs these; `
 - AC-7 · manual 10 · chat-api and limits tests · e2e
 - AC-8 · manual 11 · guest-limit and chat-request tests · e2e · value sourcing "sign in succeeded"
 - AC-9 · manual 12 · limits tests
+
+## Card burst window (AC-7, AC-12) · updated 2026-11-22
+
+### UI / manual
+- [ ] On a preview with Upstash set, as a guest, start a Stellar run and tap through every question as fast as you can → no "You're sending messages fast" notice mid run → AC-12
+- [ ] Set `LIMIT_BURST_CARDS_PER_USER=3`, tap 4 card answers within a minute → the 4th gets "You're sending messages fast", Got it makes the same card live again, and the next typed message still goes through → AC-7, AC-12
+- [ ] Send a card answer (or an approval) to a chat id that does not exist (for example with the network tab: replay a card POST with a fresh `conversationId`) → `404`, and no new chat appears in the DB → AC-12
+
+### Commands
+- [ ] `pnpm test src/lib/limits.test.ts src/assistant/chat-api.test.ts src/components/workspace/chat-view.test.ts` → the burst window, card tap and "only a typed message may create a chat" cases pass → AC-7, AC-12
+
+### Acceptance criteria coverage
+- AC-7 · manual step 2 · `burstWindow`, unparsable body and window choice tests
+- AC-12 · manual steps 1 to 3 · card window, refusing window log, 404 for non typed turns, Got it after a refused tap
