@@ -11,6 +11,10 @@ export const RESEND_WAIT_S = 60;
 
 export const SIGNED_IN_TOAST = "You're signed in. Your work is saved.";
 
+/** Shown on sign in to a guest with unspent credits (AC-7, spec 0004 AC-12). */
+export const FORFEIT_NOTE =
+  "Your chats and reports come with you. Free guest credits don't carry over if your account already has credits.";
+
 export type SignUpFields = {
   readonly name: string;
   readonly email: string;

@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/sheet";
 import { useIsDesktop } from "@/components/workspace/use-is-desktop";
 import {
+  FORFEIT_NOTE,
   RESEND_WAIT_S,
   SIGNED_IN_TOAST,
   authErrorMessage,
@@ -43,7 +44,9 @@ type Step =
   | { readonly kind: "code" }
   | { readonly kind: "password" }
   | { readonly kind: "exists"; readonly googleOnly: boolean }
-  | { readonly kind: "sign-in" };
+  | { readonly kind: "sign-in" }
+  | { readonly kind: "forgot" }
+  | { readonly kind: "reset" };
 
 const TITLES: Readonly<
   Record<Step["kind"], { readonly title: string; readonly description: string }>
@@ -67,6 +70,14 @@ const TITLES: Readonly<
   "sign-in": {
     title: "Sign in",
     description: "Welcome back. Your chats and reports come with you.",
+  },
+  forgot: {
+    title: "Reset your password",
+    description: "We'll email you a 6 digit code.",
+  },
+  reset: {
+    title: "Choose a new password",
+    description: "Enter the code we sent and your new password.",
   },
 };
 
@@ -102,12 +113,15 @@ export function AuthDialog({
   onOpenChange,
   onSignedIn,
   initialStep = "sign-up",
+  guestHasCredits = false,
 }: {
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
   /** Called once signed in, with the toast text. */
   readonly onSignedIn: (message: string) => void;
   readonly initialStep?: "sign-up" | "sign-in";
+  /** A guest with unspent credits: the sign in form says they don't carry over (AC-7). */
+  readonly guestHasCredits?: boolean;
 }) {
   const isDesktop = useIsDesktop();
   const [step, setStep] = useState<Step>({ kind: initialStep });
@@ -243,6 +257,61 @@ export function AuthDialog({
     if (problem !== undefined)
       return setError(problem || "Enter your password.");
     void run(async () => {
+      const signedIn = await authClient.signIn.email({
+        email: email.trim(),
+        password,
+      });
+      if (signedIn.error)
+        return setError(authErrorMessage(signedIn.error.code));
+      finish();
+    });
+  };
+
+  const startReset = (event: FormEvent) => {
+    event.preventDefault();
+    const problem = checkEmail(email);
+    if (problem) return setError(problem);
+    void run(async () => {
+      // Silent for an unknown email, so it never says whether an account exists (AC-10).
+      const sent = await authClient.emailOtp.requestPasswordReset({
+        email: email.trim(),
+      });
+      if (sent.error) return setError(authErrorMessage(sent.error.code));
+      setCode("");
+      setPassword("");
+      setResendIn(RESEND_WAIT_S);
+      setStep({ kind: "reset" });
+    });
+  };
+
+  const resendReset = () =>
+    void run(async () => {
+      const sent = await authClient.emailOtp.requestPasswordReset({
+        email: email.trim(),
+      });
+      if (sent.error) return setError(authErrorMessage(sent.error.code));
+      setCode("");
+      setResendIn(RESEND_WAIT_S);
+    });
+
+  const submitReset = (event: FormEvent) => {
+    event.preventDefault();
+    if (!isFullCode(code)) return setError("Enter the 6 digit code.");
+    const problem = checkPassword(password);
+    setFieldErrors(problem ? { password: problem } : {});
+    if (problem) return;
+    void run(async () => {
+      // Resets and signs out every session of the user (AC-10), then signs in here.
+      const reset = await authClient.emailOtp.resetPassword({
+        email: email.trim(),
+        otp: code,
+        password,
+      });
+      if (reset.error) {
+        setCode("");
+        if (needsNewCode(reset.error.code)) setResendIn(0);
+        return setError(authErrorMessage(reset.error.code));
+      }
       const signedIn = await authClient.signIn.email({
         email: email.trim(),
         password,
@@ -438,6 +507,11 @@ export function AuthDialog({
           onSubmit={submitSignIn}
           noValidate
         >
+          {guestHasCredits ? (
+            <p className="rounded-md border bg-muted px-3 py-2 text-sm text-muted-foreground">
+              {FORFEIT_NOTE}
+            </p>
+          ) : null}
           <Field id="auth-signin-email" label="Email">
             <Input
               id="auth-signin-email"
@@ -461,6 +535,16 @@ export function AuthDialog({
           <Button type="submit" disabled={busy}>
             {busy ? "Signing in…" : "Sign in"}
           </Button>
+          <Button
+            type="button"
+            variant="link"
+            onClick={() => {
+              setError(null);
+              setStep({ kind: "forgot" });
+            }}
+          >
+            Forgot password?
+          </Button>
           <SwitchLink
             prompt="New to BeamX?"
             action="Create an account"
@@ -469,6 +553,96 @@ export function AuthDialog({
               setStep({ kind: "sign-up" });
             }}
           />
+        </form>
+      ) : null}
+      {step.kind === "forgot" ? (
+        <form className="flex flex-col gap-4" onSubmit={startReset} noValidate>
+          <Field id="auth-forgot-email" label="Email">
+            <Input
+              id="auth-forgot-email"
+              type="email"
+              autoComplete="email"
+              inputMode="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </Field>
+          <ErrorText error={error} />
+          <Button type="submit" disabled={busy}>
+            {busy ? "Sending code…" : "Send code"}
+          </Button>
+          <Button
+            type="button"
+            variant="link"
+            onClick={() => {
+              setError(null);
+              setStep({ kind: "sign-in" });
+            }}
+          >
+            Back to sign in
+          </Button>
+        </form>
+      ) : null}
+
+      {step.kind === "reset" ? (
+        <form className="flex flex-col gap-4" onSubmit={submitReset} noValidate>
+          <p className="text-sm text-muted-foreground">
+            If an account uses{" "}
+            <span className="font-medium text-foreground">{email}</span>, a code
+            is on its way. It expires in 10 minutes.
+          </p>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="auth-reset-code">Code</Label>
+            <InputOTP
+              id="auth-reset-code"
+              maxLength={6}
+              inputMode="numeric"
+              pattern="^[0-9]*$"
+              autoComplete="one-time-code"
+              value={code}
+              onChange={setCode}
+            >
+              <InputOTPGroup>
+                {[0, 1, 2, 3, 4, 5].map((i) => (
+                  <InputOTPSlot key={i} index={i} />
+                ))}
+              </InputOTPGroup>
+            </InputOTP>
+          </div>
+          <Field
+            id="auth-reset-password"
+            label="New password"
+            hint="At least 8 characters."
+            error={fieldErrors.password}
+          >
+            <Input
+              id="auth-reset-password"
+              type="password"
+              autoComplete="new-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              aria-invalid={fieldErrors.password ? true : undefined}
+              aria-describedby={
+                fieldErrors.password
+                  ? "auth-reset-password-error"
+                  : "auth-reset-password-hint"
+              }
+            />
+          </Field>
+          <ErrorText error={error} />
+          <Button type="submit" disabled={busy || !isFullCode(code)}>
+            {busy ? "Saving…" : "Reset password"}
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            disabled={busy || resendIn > 0}
+            onClick={resendReset}
+          >
+            {resendIn > 0
+              ? `Send a new code in ${resendIn}s`
+              : "Send a new code"}
+          </Button>
         </form>
       ) : null}
     </div>

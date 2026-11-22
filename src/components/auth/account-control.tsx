@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useContext, useState } from "react";
 import { LogOutIcon, UserRoundIcon } from "lucide-react";
 import { authClient } from "@/auth/client";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { LiveCreditSummary } from "@/components/credits/credit-chip";
+import { useNotice } from "@/components/workspace/notice-context";
 import { AuthDialog } from "./auth-dialog";
 
 /**
@@ -21,13 +23,18 @@ import { AuthDialog } from "./auth-dialog";
  * signed in. Nothing while the session loads, so the header never flickers.
  */
 export function AccountControl({
-  onNotice,
+  availableCredits,
 }: {
-  /** Shows the after sign in toast. */
-  readonly onNotice?: (message: string) => void;
+  /**
+   * The credits the header's server read found (`credits.getSummary`), 0 with no
+   * account. A guest with any sees the forfeit note on sign in (AC-7).
+   */
+  readonly availableCredits: number;
 }) {
   const session = authClient.useSession();
   const router = useRouter();
+  const { show } = useNotice();
+  const live = useContext(LiveCreditSummary);
   const [open, setOpen] = useState(false);
 
   if (session.isPending) return null;
@@ -42,8 +49,9 @@ export function AccountControl({
         <AuthDialog
           open={open}
           onOpenChange={setOpen}
+          guestHasCredits={(live?.available ?? availableCredits) > 0}
           onSignedIn={(message) => {
-            onNotice?.(message);
+            show(message);
             // The header chip and the chat page read the session on the server.
             router.refresh();
           }}

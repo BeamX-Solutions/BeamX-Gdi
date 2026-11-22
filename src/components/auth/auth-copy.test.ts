@@ -4,11 +4,19 @@ import {
   checkEmail,
   checkPassword,
   checkSignUp,
+  FORFEIT_NOTE,
   isFullCode,
   needsNewCode,
 } from "./auth-copy";
 
-// Spec 0009, AC-2, AC-3, AC-5: the auth dialog's checks and messages.
+// Spec 0009, AC-2, AC-3, AC-5, AC-7: the auth dialog's checks and messages.
+
+describe("FORFEIT_NOTE (AC-7)", () => {
+  it("says chats and reports move, and only free credits may not", () => {
+    expect(FORFEIT_NOTE).toContain("chats and reports come with you");
+    expect(FORFEIT_NOTE).toContain("already has credits");
+  });
+});
 
 describe("checkSignUp (AC-2)", () => {
   it("passes a complete form", () => {

@@ -14,7 +14,6 @@ import { v7 as newId } from "uuid";
 import type { ChatUIMessage } from "@/assistant/chat-page";
 import type { AnswerData, PrefillResponseData } from "@/assistant/part-schemas";
 import { authClient } from "@/auth/client";
-import { AccountControl } from "@/components/auth/account-control";
 import type { CreditSummary } from "@/billing/summary";
 import { Suggestion, Suggestions } from "@/components/ai-elements/suggestion";
 import { LiveCreditSummary } from "@/components/credits/credit-chip";
@@ -88,15 +87,11 @@ function ChatFrame({
   // The after sign in toast (spec 0009, AC-6), announced by the Thread.
   const [notice, setNotice] = useState<string | null>(null);
   const clearNotice = useCallback(() => setNotice(null), []);
+  const noticeValue = useMemo(() => ({ notice, show: setNotice }), [notice]);
   return (
-    <NoticeContext.Provider value={notice}>
+    <NoticeContext.Provider value={noticeValue}>
       <WorkspaceShell
-        header={
-          <Header>
-            {chip}
-            <AccountControl onNotice={setNotice} />
-          </Header>
-        }
+        header={<Header>{chip}</Header>}
         rail={<HistoryRail items={[]} />}
         report={report}
         reportTitle={reportName}

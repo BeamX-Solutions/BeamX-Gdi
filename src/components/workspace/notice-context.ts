@@ -3,10 +3,18 @@
 import { createContext, useContext } from "react";
 
 /**
- * A short confirmation the workspace is showing as a toast (spec 0009, AC-6), or null.
- * The Thread reads it and announces it through its one polite live region, so the toast
- * itself stays visual only.
+ * A short confirmation the workspace shows as a toast (spec 0009, AC-6). The Thread reads
+ * `notice` and announces it through its one polite live region, so the toast itself stays
+ * visual only. `show` sets it from anywhere in the shell (the header's account control).
  */
-export const NoticeContext = createContext<string | null>(null);
+export type NoticeValue = {
+  readonly notice: string | null;
+  readonly show: (message: string) => void;
+};
 
-export const useNotice = (): string | null => useContext(NoticeContext);
+export const NoticeContext = createContext<NoticeValue>({
+  notice: null,
+  show: () => {},
+});
+
+export const useNotice = (): NoticeValue => useContext(NoticeContext);

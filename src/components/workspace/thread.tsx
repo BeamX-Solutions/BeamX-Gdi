@@ -41,7 +41,7 @@ export function Thread({
   label,
 }: ThreadProps) {
   // The status line shows `status`; the live region also speaks a workspace notice.
-  const notice = useNotice();
+  const { notice } = useNotice();
   const spoken = status ?? notice;
   const [tracked, setTracked] = useState({
     messages,
