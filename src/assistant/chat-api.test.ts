@@ -173,13 +173,16 @@ describe("postChat: input and ownership (AC-2, AC-7)", () => {
     await readAll(
       await postChat(deps, {
         userId: USER,
-        isGuest: false,
-        ip: null,
+        isGuest: true,
+        ip: "1.2.3.4",
         body: { conversationId: CONV, message: typed("hi") },
       }),
     );
+    // The guest flag and IP reach the tools for the run limits (spec 0008).
     expect(handle).toHaveBeenCalledWith(
-      expect.objectContaining({ context: { ownerId: USER, active } }),
+      expect.objectContaining({
+        context: { ownerId: USER, active, isGuest: true, ip: "1.2.3.4" },
+      }),
     );
   });
 });

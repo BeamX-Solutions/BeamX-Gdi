@@ -11,6 +11,7 @@ import { Redis } from "@upstash/redis";
 import { localDate } from "@/billing/pricing";
 import { env, type Env } from "./env";
 import { logEvent } from "./log";
+import { err, ok, type Result } from "./result";
 
 /** Every limit number and the spend cap (AC-10). */
 export type LimitConfig = {
@@ -84,6 +85,10 @@ export type LimitStore = {
   readonly read: (name: LimitName, key: string) => Promise<number>;
   /** Adds one to `key`, setting its 48 hour expiry if it has none. */
   readonly count: (name: LimitName, key: string) => Promise<void>;
+  /** `count` that returns the new value, or null on an error (the caller allows). */
+  readonly take: (name: LimitName, key: string) => Promise<number | null>;
+  /** Takes one back from `key` (undoes a `take`). */
+  readonly giveBack: (name: LimitName, key: string) => Promise<void>;
   /** Adds `by` to the float at `key` (48 hour expiry); the new total, or null. */
   readonly addFloat: (
     name: LimitName,
@@ -139,6 +144,19 @@ export const redisLimitStore = (
     failOpen(log, name, undefined, async () => {
       await redis.pipeline().incr(key).expire(key, DAILY_TTL_S, "NX").exec();
     }),
+  take: (name, key) =>
+    failOpen(log, name, null, async () => {
+      const [value] = await redis
+        .pipeline()
+        .incr(key)
+        .expire(key, DAILY_TTL_S, "NX")
+        .exec<[number, number]>();
+      return toNumber(value);
+    }),
+  giveBack: (name, key) =>
+    failOpen(log, name, undefined, async () => {
+      await redis.decr(key);
+    }),
   addFloat: (name, key, by) =>
     failOpen(log, name, null, async () => {
       const [total] = await redis
@@ -169,9 +187,61 @@ export const redisLimitStore = (
 export const openLimitStore: LimitStore = {
   read: async () => 0,
   count: async () => {},
+  take: async () => null,
+  giveBack: async () => {},
   addFloat: async () => null,
   setOnce: async () => false,
   burst: async () => true,
+};
+
+/** The keys one run took, handed back to `giveBackRun` if the run does not start. */
+export type RunTicket = { readonly keys: readonly string[] };
+
+export type RunLimitError = { readonly code: "run_limit" };
+
+/**
+ * The guest run limits (AC-4), atomic: `takeRun` adds one to the guest's and the IP's
+ * run counters at once, and refuses (giving both back) when either goes over. With no
+ * IP, only the guest's counter is used. A key whose `INCR` failed is not in the ticket,
+ * so it is never given back. `giveBackRun` undoes a run that then failed to start.
+ */
+export const runGuard = (deps: {
+  readonly store: LimitStore;
+  readonly config: Pick<LimitConfig, "runsPerGuest" | "runsPerIp">;
+  readonly now: () => Date;
+}) => {
+  const giveBackRun = async (ticket: RunTicket): Promise<void> => {
+    await Promise.all(
+      ticket.keys.map((key) => deps.store.giveBack("runs_daily", key)),
+    );
+  };
+  const takeRun = async (
+    userId: string,
+    ip: string | null,
+  ): Promise<Result<RunTicket, RunLimitError>> => {
+    const day = lagosDate(deps.now());
+    const wanted = [
+      { key: limitKeys.runsUser(userId, day), max: deps.config.runsPerGuest },
+      ...(ip === null
+        ? []
+        : [{ key: limitKeys.runsIp(ip, day), max: deps.config.runsPerIp }]),
+    ];
+    const taken = await Promise.all(
+      wanted.map(async (w) => ({
+        ...w,
+        value: await deps.store.take("runs_daily", w.key),
+      })),
+    );
+    const ticket: RunTicket = {
+      keys: taken.flatMap((t) => (t.value === null ? [] : [t.key])),
+    };
+    // `value` is the count including this run, so the 4th of 3 is over.
+    const over = taken.some((t) => t.value !== null && t.value > t.max);
+    if (!over) return ok(ticket);
+    await giveBackRun(ticket);
+    return err({ code: "run_limit" });
+  };
+  return { takeRun, giveBackRun };
 };
 
 const slidingWindow = (redis: Redis, prefix: string, max: number) => {
@@ -200,3 +270,11 @@ const makeStore = (e: Env): LimitStore => {
 /** The store and config for this deploy. */
 export const limitStore: LimitStore = makeStore(env);
 export const limits: LimitConfig = limitConfig(env);
+
+const liveRuns = runGuard({
+  store: limitStore,
+  config: limits,
+  now: () => new Date(),
+});
+export const takeRun = liveRuns.takeRun;
+export const giveBackRun = liveRuns.giveBackRun;

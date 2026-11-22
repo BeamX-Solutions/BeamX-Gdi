@@ -11,7 +11,9 @@ import type {
 } from "@/db/queries/credits";
 import type { AbandonError, ResumeError } from "@/db/queries/runs";
 import type { CreditSummary } from "@/billing/summary";
+import type { RunLimitError, RunTicket } from "@/lib/limits";
 import type { Result } from "@/lib/result";
+import type { SpendCapError } from "@/lib/spend-cap";
 import type { ToolModule, UnknownTool } from "@/tools/registry";
 import type { LogFn, NotFound, StepDeps } from "../card-steps";
 import type { AnswerSource } from "../parts";
@@ -74,6 +76,15 @@ export type AssistantToolDeps = Pick<StepDeps, "ownerOf"> & {
     ownerId: string,
     runId: string,
   ) => Promise<Result<unknown, AbandonError>>;
+  /** The guest guards at Approve (spec 0008, AC-2, AC-4). Each allows on a Redis error. */
+  readonly limits: {
+    readonly guestSpendCap: () => Promise<Result<void, SpendCapError>>;
+    readonly takeRun: (
+      userId: string,
+      ip: string | null,
+    ) => Promise<Result<RunTicket, RunLimitError>>;
+    readonly giveBackRun: (ticket: RunTicket) => Promise<void>;
+  };
   readonly log: LogFn;
 };
 
@@ -107,7 +118,9 @@ export type ToolEvent =
       readonly kind: "show";
       readonly runId: string;
       readonly questionId: string;
-    };
+    }
+  /** A guest's run was refused by a limit: the turn appends its card (spec 0008). */
+  | { readonly kind: "refused"; readonly reason: "runs_daily" | "spend_cap" };
 
 /** The turn's owner. A write that meets a guest link moves it (spec 0006, "Owner"). */
 export type OwnerBox = { current: string };
@@ -116,6 +129,10 @@ export type ToolEnv = {
   readonly deps: AssistantToolDeps;
   readonly conversationId: string;
   readonly owner: OwnerBox;
+  /** A guest (anonymous session), read once by the chat route (spec 0008). */
+  readonly isGuest: boolean;
+  /** The client IP for the IP run limit, or null when unknown. */
+  readonly ip: string | null;
   readonly record: (event: ToolEvent) => void;
   /** What the tools did so far this turn, oldest first. */
   readonly recorded: () => readonly ToolEvent[];

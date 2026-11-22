@@ -15,6 +15,14 @@ const memoryStore = () => {
     count: async (_name, key) => {
       values.set(key, Number(values.get(key) ?? 0) + 1);
     },
+    take: async (_name, key) => {
+      const next = Number(values.get(key) ?? 0) + 1;
+      values.set(key, next);
+      return next;
+    },
+    giveBack: async (_name, key) => {
+      values.set(key, Number(values.get(key) ?? 0) - 1);
+    },
     addFloat: async (_name, key, by) => {
       // Yield first, so two parallel calls interleave like real requests.
       await Promise.resolve();

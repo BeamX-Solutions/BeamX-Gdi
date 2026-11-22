@@ -21,6 +21,15 @@ import type { ThreadItem } from "./chat-view";
 import { ViewReportCard } from "./view-report-card";
 import { useWorkspace } from "./workspace-context";
 
+/** Limit and spend notices (spec 0008): the gauge icon, and Got it dismisses them. */
+const limitKinds: ReadonlySet<string> = new Set([
+  "spend_cap",
+  "slow_down",
+  "chat_daily",
+  "chats_daily",
+  "runs_daily",
+]);
+
 /** What a card tap does; the chat turns each into one user message. */
 export type ChatActions = {
   readonly answer: (data: AnswerData) => void;
@@ -144,7 +153,7 @@ export function ChatItem({
       const runId = data.runId;
       return (
         <ErrorCard
-          kind={data.kind === "spend_cap" ? "spend_cap" : "ai_error"}
+          kind={limitKinds.has(data.kind) ? "spend_cap" : "ai_error"}
           title={copy.title}
           message={copy.message}
           action={{
@@ -152,7 +161,7 @@ export function ChatItem({
             onAction:
               data.kind === "limit_text" ||
               data.kind === "limit_run" ||
-              data.kind === "spend_cap"
+              limitKinds.has(data.kind)
                 ? () => actions.dismiss(item.id)
                 : data.kind === "complete_retry" && runId !== undefined
                   ? () => actions.retryComplete(runId)

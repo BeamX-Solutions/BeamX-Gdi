@@ -31,12 +31,14 @@ import {
 import {
   busyRetryPlan,
   isAnsweredNotice,
+  isNoticeItem,
   latestReport,
   latestToolSummary,
   refusedText,
   takenUserMessageId,
   threadItems,
   withoutMessageOf,
+  withoutPartOf,
   type ThreadItem,
   type ViewMessage,
 } from "./chat-view";
@@ -346,6 +348,12 @@ function LiveChat({
     reload: () => window.location.reload(),
     openReport: setSelectedRun,
     dismiss: (itemId) => {
+      const view = messages as readonly ViewMessage[];
+      // A card saved with a reply (a refused Approve): hide just that card.
+      if (!isNoticeItem(view, itemId)) {
+        setMessages((ms) => withoutPartOf(ms, itemId));
+        return;
+      }
       // The refused text goes back in the composer, so a long message is not lost.
       const text = refusedText(messages as readonly ViewMessage[], itemId);
       setMessages((ms) => withoutMessageOf(ms, itemId));

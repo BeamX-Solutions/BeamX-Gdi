@@ -5,8 +5,10 @@ import {
   latestToolSummary,
   threadItems,
   withoutMessageOf,
+  withoutPartOf,
   busyRetryPlan,
   isAnsweredNotice,
+  isNoticeItem,
   refusedText,
   takenUserMessageId,
   type ViewMessage,
@@ -463,5 +465,51 @@ describe("isAnsweredNotice", () => {
     expect(isAnsweredNotice(notice("n", "answered"))).toBe(true);
     expect(isAnsweredNotice(notice("n", "busy"))).toBe(false);
     expect(isAnsweredNotice(said("a", "hello"))).toBe(false);
+  });
+});
+
+describe("Got it on limit cards (spec 0008)", () => {
+  const runsCard = {
+    type: "data-error",
+    data: { kind: "runs_daily", retry: false },
+  };
+  const reply: ViewMessage = {
+    id: "r",
+    role: "assistant",
+    parts: [{ type: "text", text: "Sorry about that." }, runsCard],
+  };
+  const tap: ViewMessage = { id: "t", role: "user", parts: [answer("idea")] };
+
+  it("tells a whole notice from a card saved with a reply", () => {
+    expect(isNoticeItem([notice("n", "chat_daily")], "n:0")).toBe(true);
+    expect(isNoticeItem([tap, reply], "r:1")).toBe(false);
+  });
+
+  it("hides only the saved card, keeping the reply and the tap", () => {
+    const after = withoutPartOf([tap, reply], "r:1");
+    expect(after.map((m) => m.id)).toEqual(["t", "r"]);
+    expect(after[1]?.parts).toEqual([
+      { type: "text", text: "Sorry about that." },
+    ]);
+  });
+
+  it("shows the runs card while its reply is the last message", () => {
+    expect(
+      threadItems([tap, reply], null).some(
+        (i) => i.kind === "error" && i.data.kind === "runs_daily",
+      ),
+    ).toBe(true);
+  });
+
+  it("new chat notices never mark the message as taken", () => {
+    const typed: ViewMessage = {
+      id: "u",
+      role: "user",
+      parts: [{ type: "text", text: "hi" }],
+    };
+    for (const kind of ["slow_down", "chat_daily", "chats_daily"]) {
+      const n = notice("n", kind);
+      expect(takenUserMessageId([typed, n], n)).toBeNull();
+    }
   });
 });

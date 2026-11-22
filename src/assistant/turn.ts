@@ -66,6 +66,10 @@ export type AiTurnContext = {
   readonly active: ActiveRead;
   /** Free chat messages left today, when #7's route knows it (spec 0004). */
   readonly freeMessagesLeft?: number;
+  /** A guest, for the run limits at Approve (spec 0008). */
+  readonly isGuest: boolean;
+  /** The client IP for the IP run limit, or null when unknown. */
+  readonly ip: string | null;
   readonly turn:
     | { readonly kind: "text"; readonly text: string }
     | {
@@ -120,6 +124,10 @@ export type TurnInput = {
     readonly ownerId: string;
     readonly active?: ActiveRead;
     readonly freeMessagesLeft?: number;
+    /** A guest, read once by the route (spec 0008); false when not given. */
+    readonly isGuest?: boolean;
+    /** The client IP, or null when unknown or not given. */
+    readonly ip?: string | null;
   };
 };
 
@@ -431,6 +439,8 @@ export const handleTurn = async (
         ...(input.context?.freeMessagesLeft === undefined
           ? {}
           : { freeMessagesLeft: input.context.freeMessagesLeft }),
+        isGuest: input.context?.isGuest ?? false,
+        ip: input.context?.ip ?? null,
         turn,
       });
       deps.log("assistant_turn", {

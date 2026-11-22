@@ -127,8 +127,15 @@ export const errorKinds = [
   // Chat limit notices (spec 0007, AC-8): shown, never saved.
   "limit_text",
   "limit_run",
-  // The daily AI spend cap for guests (spec 0008, AC-2): shown, never saved.
+  // The daily AI spend cap for guests (spec 0008, AC-2): a notice at chat (never
+  // saved), or a card after a refused Approve (saved with the reply).
   "spend_cap",
+  // Abuse limits (spec 0008): burst, daily chat and new chats are notices (never
+  // saved); the daily runs card follows a refused Approve (saved with the reply).
+  "slow_down",
+  "chat_daily",
+  "chats_daily",
+  "runs_daily",
   // A resent message that already has a saved reply: the client reloads the thread.
   "answered",
 ] as const;

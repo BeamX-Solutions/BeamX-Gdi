@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Redis } from "@upstash/redis";
+import type { LimitName, LimitStore } from "./limits";
 
 vi.hoisted(() => {
   process.env.SKIP_ENV_VALIDATION = "1";
@@ -14,6 +15,7 @@ const {
   openLimitStore,
   overLimit,
   redisLimitStore,
+  runGuard,
 } = await import("./limits");
 
 const base = {
@@ -117,6 +119,10 @@ const fakeRedis = (opts: {
     exec: vi.fn(opts.exec ?? (async () => [1, 1])),
   };
   const redis = {
+    decr: vi.fn(async (...a: unknown[]) => {
+      calls.push(["decr", ...a]);
+      return 0;
+    }),
     get: vi.fn(opts.get ?? (async () => null)),
     set: vi.fn(opts.set ?? (async () => "OK")),
     pipeline: () => pipeline,
@@ -140,6 +146,18 @@ describe("redisLimitStore", () => {
     expect(calls).toEqual([
       ["incr", "k"],
       ["expire", "k", DAILY_TTL_S, "NX"],
+    ]);
+  });
+
+  it("take returns the new count, with the expiry in the same pipeline", async () => {
+    const { redis, calls } = fakeRedis({ exec: async () => [4, 1] });
+    const store = redisLimitStore(redis, allowAll);
+    expect(await store.take("runs_daily", "r")).toBe(4);
+    await store.giveBack("runs_daily", "r");
+    expect(calls).toEqual([
+      ["incr", "r"],
+      ["expire", "r", DAILY_TTL_S, "NX"],
+      ["decr", "r"],
     ]);
   });
 
@@ -193,6 +211,7 @@ describe("redisLimitStore", () => {
     await expect(store.count("chat_daily", "k")).resolves.toBeUndefined();
     expect(await store.addFloat("spend", "s", 1)).toBeNull();
     expect(await store.setOnce("spend", "t", "v", 1)).toBe(false);
+    expect(await store.take("runs_daily", "r")).toBeNull();
     expect(await store.burst("user", "u1")).toBe(true);
     expect(await store.burst("ip", "1.2.3.4")).toBe(true);
     expect(log.mock.calls).toEqual([
@@ -200,6 +219,7 @@ describe("redisLimitStore", () => {
       ["limit_check_failed", { limit: "chat_daily" }],
       ["limit_check_failed", { limit: "spend" }],
       ["limit_check_failed", { limit: "spend" }],
+      ["limit_check_failed", { limit: "runs_daily" }],
       ["limit_check_failed", { limit: "burst_user" }],
       ["limit_check_failed", { limit: "burst_ip" }],
     ]);
@@ -211,5 +231,86 @@ describe("openLimitStore (no Upstash variables)", () => {
     expect(await openLimitStore.read("chat_daily", "k")).toBe(0);
     expect(await openLimitStore.burst("user", "u1")).toBe(true);
     expect(await openLimitStore.addFloat("spend", "s", 5)).toBeNull();
+  });
+});
+
+/** An in memory store for the run guard: real counts, yielding like Redis. */
+const countingStore = (failing: ReadonlySet<string> = new Set()) => {
+  const values = new Map<string, number>();
+  const store = {
+    ...openLimitStore,
+    take: async (_name: LimitName, key: string) => {
+      await Promise.resolve();
+      if (failing.has(key)) return null;
+      const next = (values.get(key) ?? 0) + 1;
+      values.set(key, next);
+      return next;
+    },
+    giveBack: async (_name: LimitName, key: string) => {
+      values.set(key, (values.get(key) ?? 0) - 1);
+    },
+  };
+  return { store, values };
+};
+
+describe("runGuard (AC-4)", () => {
+  const NOW = new Date("2026-11-22T10:00:00Z");
+  const USER = "limit:runs:user:g1:2026-11-22";
+  const IP = "limit:runs:ip:1.2.3.4:2026-11-22";
+  const guard = (store: LimitStore, runsPerGuest = 3, runsPerIp = 20) =>
+    runGuard({ store, config: { runsPerGuest, runsPerIp }, now: () => NOW });
+
+  it("allows 3 runs a day and refuses the 4th, giving both counts back", async () => {
+    const { store, values } = countingStore();
+    const { takeRun } = guard(store);
+    for (let i = 0; i < 3; i += 1)
+      expect((await takeRun("g1", "1.2.3.4")).ok).toBe(true);
+    expect(await takeRun("g1", "1.2.3.4")).toEqual({
+      ok: false,
+      error: { code: "run_limit" },
+    });
+    expect(values.get(USER)).toBe(3);
+    expect(values.get(IP)).toBe(3);
+  });
+
+  it("refuses the 21st from one IP across guests", async () => {
+    const { store, values } = countingStore();
+    const { takeRun } = guard(store, 3, 2);
+    expect((await takeRun("a", "1.2.3.4")).ok).toBe(true);
+    expect((await takeRun("b", "1.2.3.4")).ok).toBe(true);
+    expect((await takeRun("c", "1.2.3.4")).ok).toBe(false);
+    expect(values.get("limit:runs:user:c:2026-11-22")).toBe(0);
+    expect(values.get(IP)).toBe(2);
+  });
+
+  it("starts only one of two parallel runs at the limit", async () => {
+    const { store } = countingStore();
+    const { takeRun } = guard(store, 1);
+    const results = await Promise.all([
+      takeRun("g1", null),
+      takeRun("g1", null),
+    ]);
+    expect(results.filter((r) => r.ok)).toHaveLength(1);
+  });
+
+  it("giveBackRun undoes a run that failed to start", async () => {
+    const { store, values } = countingStore();
+    const { takeRun, giveBackRun } = guard(store);
+    const ticket = await takeRun("g1", "1.2.3.4");
+    if (!ticket.ok) throw new Error("expected a ticket");
+    await giveBackRun(ticket.value);
+    expect(values.get(USER)).toBe(0);
+    expect(values.get(IP)).toBe(0);
+  });
+
+  it("skips the IP counter with no IP, and never gives back a failed take", async () => {
+    const { store, values } = countingStore(new Set([USER]));
+    const { takeRun, giveBackRun } = guard(store);
+    const ticket = await takeRun("g1", "1.2.3.4");
+    expect(ticket).toEqual({ ok: true, value: { keys: [IP] } });
+    if (ticket.ok) await giveBackRun(ticket.value);
+    expect(values.has(USER)).toBe(false);
+    const noIp = await guard(countingStore().store).takeRun("g1", null);
+    expect(noIp).toEqual({ ok: true, value: { keys: [USER] } });
   });
 });

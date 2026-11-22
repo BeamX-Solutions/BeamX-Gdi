@@ -11,11 +11,13 @@ import { asOwner } from "../card-steps";
 import type { ToolEnv } from "./env";
 import {
   cardBalance,
+  guardedStart,
   holdFailure,
   quoteRun,
   serverField,
   withSummary,
   type HoldFailure,
+  type RunGuardFailure,
   type WithSummary,
 } from "./money";
 
@@ -67,6 +69,7 @@ export type RestartRunOutput = WithSummary<
       readonly error: "previous_not_completed" | "price_changed";
     }
   | HoldFailure
+  | RunGuardFailure
 >;
 
 export const restartRunTool = (env: ToolEnv) =>
@@ -105,66 +108,71 @@ export const restartRunTool = (env: ToolEnv) =>
       if (!priceStillValid(shownPrice, price))
         return done({ ok: false, error: "price_changed" });
 
-      await deps.ensureAccount(env.owner.current);
-      const copied = await asOwner(deps, conversationId, env.owner, (id) =>
-        deps.startFromWithHold(id, previousRunId, picked.version, price),
-      );
-      env.owner.current = copied.owner.current;
-      if (copied.result.ok) {
-        const runId = copied.result.value.runId;
+      // Every restart starts a new run (a copy or a fresh one), so a guest's restart
+      // passes the spend cap and the daily run limits first (spec 0008, AC-4).
+      const start = async (): Promise<RestartRunOutput> => {
+        await deps.ensureAccount(env.owner.current);
+        const copied = await asOwner(deps, conversationId, env.owner, (id) =>
+          deps.startFromWithHold(id, previousRunId, picked.version, price),
+        );
+        env.owner.current = copied.owner.current;
+        if (copied.result.ok) {
+          const runId = copied.result.value.runId;
+          env.record({
+            kind: "started",
+            runId,
+            toolId: picked.id,
+            from: { kind: "copy" },
+          });
+          return {
+            ok: true,
+            runId,
+            toolName: picked.name,
+            freshStart: false,
+          };
+        }
+
+        const failed = copied.result.error;
+        switch (failed.code) {
+          case "version_changed":
+            break;
+          case "previous_not_completed":
+            return { ok: false, error: "previous_not_completed" };
+          case "no_conversation":
+            return { ok: false, error: "not_found" };
+          case "insufficient_credits":
+          case "run_in_progress":
+          case "not_paused":
+          case "already_held":
+          case "not_found":
+            return holdFailure(failed, price);
+          default: {
+            const unreachable: never = failed;
+            return unreachable;
+          }
+        }
+
+        // The tool changed version: a fresh run of the same tool at the same price.
+        const fresh = await asOwner(deps, conversationId, env.owner, (id) =>
+          deps.startRunWithHold(
+            id,
+            conversationId,
+            picked.id,
+            picked.version,
+            price,
+          ),
+        );
+        env.owner.current = fresh.owner.current;
+        if (!fresh.result.ok) return holdFailure(fresh.result.error, price);
+        const runId = fresh.result.value.runId;
         env.record({
           kind: "started",
           runId,
           toolId: picked.id,
-          from: { kind: "copy" },
+          from: { kind: "offer", previousRunId },
         });
-        return done({
-          ok: true,
-          runId,
-          toolName: picked.name,
-          freshStart: false,
-        });
-      }
-
-      const failed = copied.result.error;
-      switch (failed.code) {
-        case "version_changed":
-          break;
-        case "previous_not_completed":
-          return done({ ok: false, error: "previous_not_completed" });
-        case "no_conversation":
-          return done({ ok: false, error: "not_found" });
-        case "insufficient_credits":
-        case "run_in_progress":
-        case "not_paused":
-        case "already_held":
-        case "not_found":
-          return done(holdFailure(failed, price));
-        default: {
-          const unreachable: never = failed;
-          return unreachable;
-        }
-      }
-
-      // The tool changed version: a fresh run of the same tool at the same price.
-      const fresh = await asOwner(deps, conversationId, env.owner, (id) =>
-        deps.startRunWithHold(
-          id,
-          conversationId,
-          picked.id,
-          picked.version,
-          price,
-        ),
-      );
-      env.owner.current = fresh.owner.current;
-      if (!fresh.result.ok) return done(holdFailure(fresh.result.error, price));
-      const runId = fresh.result.value.runId;
-      env.record({
-        kind: "started",
-        runId,
-        toolId: picked.id,
-        from: { kind: "offer", previousRunId },
-      });
-      return done({ ok: true, runId, toolName: picked.name, freshStart: true });
+        return { ok: true, runId, toolName: picked.name, freshStart: true };
+      };
+      return done(await guardedStart(env, start));
     },
   });

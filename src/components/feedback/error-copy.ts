@@ -87,6 +87,10 @@ export type ChatErrorKind =
   | "limit_text"
   | "limit_run"
   | "spend_cap"
+  | "slow_down"
+  | "chat_daily"
+  | "chats_daily"
+  | "runs_daily"
   | "answered";
 
 /**
@@ -122,6 +126,27 @@ export const chatErrorCopy: Readonly<Record<ChatErrorKind, ErrorCopy>> = {
     actionLabel: "Got it",
   },
   spend_cap: errorCopy.spend_cap,
+  // Abuse limits (spec 0008, "Friendly notices").
+  slow_down: {
+    title: "You're sending messages fast",
+    message: "Wait a few seconds, then send again.",
+    actionLabel: "Got it",
+  },
+  chat_daily: {
+    title: "You've reached today's chat limit",
+    message: "Come back tomorrow to keep chatting, or start a tool run.",
+    actionLabel: "Got it",
+  },
+  chats_daily: {
+    title: "You've started a lot of chats today",
+    message: "Carry on in one of your chats, or come back tomorrow.",
+    actionLabel: "Got it",
+  },
+  runs_daily: {
+    title: "You've used today's free runs",
+    message: "Come back tomorrow to start another.",
+    actionLabel: "Got it",
+  },
   answered: {
     title: "Already answered",
     message: "Loading the reply to that message.",

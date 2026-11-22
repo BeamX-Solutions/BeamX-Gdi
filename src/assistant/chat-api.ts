@@ -301,7 +301,12 @@ export const postChat = async (
     userId: input.userId,
     conversationId,
     message,
-    context: { ownerId: input.userId, active: context.value.active },
+    context: {
+      ownerId: input.userId,
+      active: context.value.active,
+      isGuest: input.isGuest,
+      ip: input.ip,
+    },
   });
   if (!turn.ok)
     return turn.error.code === "not_found"
