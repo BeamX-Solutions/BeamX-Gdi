@@ -52,3 +52,16 @@ Option 1 fits every force: it reuses the Redis the app already runs, keeps the F
 Failing open was chosen over failing closed because a Redis blip should not lock real users out, and spend is still bounded by the Anthropic console's monthly limit. The turn lock keeps failing closed (spec 0006), because there a missed lock means a duplicate run, not a missed limit.
 
 The spend pause sits at Approve and at chat, not inside the report runner, so a guest who already holds credits for a claimed report always gets it. Run limits count on start, not on proposal, so a guest is never charged a limit for a confirm card they declined.
+
+## Update 2026-11-22: the burst limit during runs (AC-12)
+
+**Context.** After the first build, guests tapping quickly through a Stellar run (about 10 question cards, plus the first message and the Approve tap) could hit "You're sending messages fast" partway through. Every `POST /api/chat` shared one 10 a minute window per user, but card taps (answers, prefill responses, retries) take the card path in `turn.ts` and never call the AI. The per chat turn lock already runs them one at a time.
+
+**Options considered.**
+
+- **A separate, looser per user window for card turns (chosen).** AI turns keep 10 a minute; card turns get 30. Pros: the strict window stays on the turns that spend money; normal tapping never trips; a script is still bounded per user. Cons: one more env var and Redis key; the body must be classified before the burst check.
+- **Exempt card turns from the per user window.** Pros: simplest. Cons: only the IP window and the turn lock bound them, so nothing per user stops a script hammering card answers across chats.
+- **Raise the single window to about 30.** Pros: an env change only. Cons: loosens the guard on paid AI turns threefold.
+- **Keep it as is.** Pros: no work. Cons: the main guest flow breaks mid run, right before a public link.
+
+**Rationale.** The burst limit exists to protect AI spend, so the window should follow what a turn can cost, not just that a request arrived. 30 a minute is one tap every 2 seconds held for a full minute, faster than anyone reads a card. Approve and Stop stay in the strict window because they lead to an AI call and can hold credits, and a run has only one or two of them. An unparsable body counts in the strict window, as before, so junk is never free. Card taps still count toward the IP window, which stays the outer fence for every request; 60 a minute leaves room for a few people on one carrier IP. A refused tap reuses the `slow_down` notice, because Got it already makes the card live again, so there is no new copy or showcase entry to keep.

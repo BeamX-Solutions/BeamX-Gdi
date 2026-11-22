@@ -47,7 +47,8 @@ Built so far: milestone 1 tasks 1 to 3 (billing core: config, pricing, migration
 - [ ] With a run in progress, type a side question past the allowance → no hold, no charge, the free counter does not move → AC-9
 - [ ] With fewer than 3 credits available past the allowance, a typed message gets "Not enough credits to keep chatting" (a guest: "You've used today's free messages"), no AI call, nothing saved; Got it puts the text back → AC-10, AC-21
 - [ ] Force an AI error on a paid message (bad `ANTHROPIC_API_KEY` in dev) → the hold is released as `chat_error`, nothing charged → AC-10
-- [ ] With Upstash unset in dev, press Stop before any text arrives on a paid message → the hold is released, nothing charged; Stop after text started → 1 or more credits charged → AC-10 (see the note on resumable streams below)
+- [ ] With Upstash unset in dev, close the tab before any text arrives on a paid message → the hold is released, nothing charged; close it after text started → 1 or more credits charged → AC-10
+- [ ] With Upstash set, close the tab mid reply on a paid message, then reopen the chat → the reply resumes or shows in full, the ledger shows exactly one `chat` charge for the finished reply, and the chat hold is `charged`, not `released` → AC-10 (Redis down is covered by the `resumable.test.ts` drain test, not by hand)
 - [ ] Point `UPSTASH_REDIS_REST_URL` at a dead host and send a typed message → it is treated as paid (holds 3 if the balance covers it, else the short balance card), never a 500 → AC-9
 - [ ] Four new guests from one IP approve a run in the same Lagos day → the first three get 30 credits, the fourth gets an account with 0 and sees the guest short balance card; `billing:guest-grant:<ip>:<lagosDate>` reads 3 → AC-11
 - [ ] Pause a run, set its `tool_run.updated_at` 31 days back, call `GET /api/cron/billing` with `Authorization: Bearer $CRON_SECRET` → `{ releasedIdle: 1 }`, the hold `released` (`idle`); resuming shows the confirm card at today's price, and the answers are kept → AC-7
@@ -70,7 +71,7 @@ Built so far: milestone 1 tasks 1 to 3 (billing core: config, pricing, migration
 - [ ] Starter grant amount: 30, or 0 when the IP counter is at 3; signed in users and guests with no IP are never capped → AC-11
 
 ### Known gap
-- Stop with resumable streams on (Upstash set, so production): the server tees the stream into Redis and keeps generating after a client Stop, so the turn ends cleanly and is charged as a finished reply. "Stop before any output costs nothing" holds only where resumable streams are off. Needs a decision (`/architect credits & billing`).
+- Stop with resumable streams on (Upstash set, so production): the server tees the stream into Redis and keeps generating after a client Stop, so the turn ends cleanly and is charged as a finished reply. "Stop before any output costs nothing" holds only where resumable streams are off. Decided 2026-11-22: this is the intended behaviour, there is no chat Stop (AC-10 updated).
 
 ### Acceptance criteria coverage (milestone 2)
 - AC-2 (resume `price_changed`), AC-7 · manual idle sweep steps · credits integration tests · `resume-run` tool (built with spec 0006)

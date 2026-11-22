@@ -1,11 +1,11 @@
 # 0008. Abuse and AI cost guards
 
 **Date**: 2026-11-22
-**Status**: Accepted
+**Status**: In Progress
 
 ## Summary
 
-Guests can chat and start tool runs for free, and every message is a paid AI call, so this feature puts a ceiling on both before any public link goes out. It adds a daily AI spend cap ($20 by default), daily limits per guest and per IP (internet address) on runs, typed messages, new chats and new guests, and a short burst limit on the chat. Every limit lives in Upstash Redis, comes from env, resets at Lagos midnight, and shows a friendly notice instead of an AI call. Signed in users (after #8) only meet the burst limit.
+Guests can chat and start tool runs for free, and every message is a paid AI call, so this feature puts a ceiling on both before any public link goes out. It adds a daily AI spend cap ($20 by default), daily limits per guest and per IP (internet address) on runs, typed messages, new chats and new guests, and a short burst limit on the chat. The burst limit is strict for turns that can call the AI (typed messages, Approve) and looser for card taps, which never call the AI, so a guest tapping quickly through a run is not stopped halfway. Every limit lives in Upstash Redis, comes from env, resets at Lagos midnight, and shows a friendly notice instead of an AI call. Signed in users (after #8) only meet the burst limit.
 
 ## Requirements
 
@@ -21,7 +21,8 @@ Guests can chat and start tool runs for free, and every message is a paid AI cal
 - **AC-4**: A guest's Approve that would start their 4th run of the Lagos day (`LIMIT_RUNS_PER_GUEST`, default 3), or the 21st from their IP (`LIMIT_RUNS_PER_IP`, default 20), is refused with a friendly notice, no hold and no run started. Only runs that actually start count; a restart counts as a new run, a resume does not.
 - **AC-5**: A guest's typed message sent with no run in progress in that chat, past `LIMIT_CHAT_PER_GUEST` (default 30) in the Lagos day, gets a friendly notice, with no AI call and nothing saved. Only accepted messages count; taps, and messages during a run in progress, never count.
 - **AC-6**: A guest's message that would create their 21st new chat of the Lagos day (`LIMIT_CHATS_PER_GUEST`, default 20) gets a friendly notice, and no conversation row is created. Messages to a chat that already exists are never refused by this limit.
-- **AC-7**: `POST /api/chat` from one user more than `LIMIT_BURST_PER_USER` times a minute (default 10), or from one IP more than `LIMIT_BURST_PER_IP` times a minute (default 60), gets a friendly "slow down" notice with no AI call and nothing saved. This applies to guests and signed in users alike.
+- **AC-7**: `POST /api/chat` with an AI turn (a typed message, an approval response, or a body that fails to parse) from one user more than `LIMIT_BURST_PER_USER` times a minute (default 10), or any `POST /api/chat` from one IP more than `LIMIT_BURST_PER_IP` times a minute (default 60), gets a friendly "slow down" notice with no AI call and nothing saved (a body that fails to parse still gets its `400`). This applies to guests and signed in users alike.
+- **AC-12**: A card turn (a `data-answer`, `data-prefill-response` or `data-retry` message, which never calls the AI) counts against its own per user window, `LIMIT_BURST_CARDS_PER_USER` a minute (default 30), never against `LIMIT_BURST_PER_USER`, and still counts against the IP window. Over it, the tap gets the same `slow_down` notice, nothing is saved, and Got it makes the card live again. A guest answering a full Stellar run as fast as they can read is never refused. Only a typed message may create a chat: any other turn (card or approval) sent to a chat id that does not exist gets `404 not_found` and creates no row, for guests and signed in users alike.
 - **AC-8**: `POST /api/auth/sign-in/anonymous` from an IP that already created `LIMIT_GUESTS_PER_IP` guests (default 30) that Lagos day returns `429 {"code":"guest_limit"}`, no guest is created, and the client shows a friendly card.
 - **AC-9**: When Upstash is unreachable or a limit check throws, the request goes through and `limit_check_failed` is logged with the limit name. No limit ever turns into a 500.
 - **AC-10**: Every limit number and the cap come from env through `src/lib/env.ts`, with the defaults above, and are listed in `.env.example`. All daily counters reset at midnight `Africa/Lagos`.
@@ -41,7 +42,8 @@ All guards are Upstash Redis counters, `@upstash/ratelimit` sliding windows for 
 
 | Key | Type, expiry | Counts | Limit (env) |
 |---|---|---|---|
-| `limit:burst:user:<userId>` | `@upstash/ratelimit` sliding window, 1 minute | every `POST /api/chat` | `LIMIT_BURST_PER_USER` = 10 |
+| `limit:burst:user:<userId>` | `@upstash/ratelimit` sliding window, 1 minute | every `POST /api/chat` that is not a card turn (typed, approval, unparsable) | `LIMIT_BURST_PER_USER` = 10 |
+| `limit:burst:cards:<userId>` | sliding window, 1 minute | every `POST /api/chat` card turn (answer, prefill response, retry) | `LIMIT_BURST_CARDS_PER_USER` = 30 |
 | `limit:burst:ip:<ip>` | sliding window, 1 minute | every `POST /api/chat` | `LIMIT_BURST_PER_IP` = 60 |
 | `limit:chat:<userId>:<lagosDate>` | `INCR`, 48h | guest typed messages with no run in progress, once accepted | `LIMIT_CHAT_PER_GUEST` = 30 |
 | `limit:chats:<userId>:<lagosDate>` | `INCR`, 48h | new chats actually created by a guest | `LIMIT_CHATS_PER_GUEST` = 20 |
@@ -58,15 +60,15 @@ The run counters are atomic instead, because an extra run costs credits and AI s
 **Where each guard runs** (order matters: cheap and Redis only first, before the Frankfurt round trip):
 
 1. `POST /api/chat` (`src/app/api/chat/route.ts` → `assistant/chat-api.ts`). The route reads `sessionUser(headers)` (`{ id, isAnonymous }`) and `clientIp(headers)` once at request start and passes `isGuest` and `ip` into `postChat`; the guest flag is fixed for the whole request, even if the guest links an account mid turn. Check order, first refusal wins:
-   1. Burst (AC-7), user and IP windows in parallel, after BotID and the session but before the body is parsed.
-   2. Body parse and `classifyMessage` as today.
+   1. Body parse and `classifyMessage` as today (Zod only, no I/O). Their result only picks the burst window here; a failure is answered after step 2.
+   2. Burst (AC-7, AC-12), after BotID and the session: the user window chosen by the pure `burstWindow(classified)` helper (`"cards"` only when `bodySchema` and `classifyMessage` both pass and the kind is `answer`, `prefill_response` or `retry`; otherwise `"user"`, including a `bodySchema` failure, a `classifyMessage` failure, and a message mixing a card part with other parts, which `classifyMessage` already refuses) and the IP window, in parallel. Refused: the `slow_down` notice. Then an unparsable body returns its `400` as today, so junk still costs a slot in the strict window. Both windows are always consumed, even when one refuses (accepted, as before).
    3. For guests, read the `limit:chats` count, then `turnContext` with `mayCreate` (below).
    4. The `answered` early return (a resent message that has a reply) as today.
    5. New chat refused (`chat_limit` from `turnContext`): the `chats_daily` notice (AC-6).
    6. Only for a guest's typed message (`turn.kind === "text"`) that is not a resend (`!message.saved`): the spend cap (AC-2), then the daily chat limit when no run is in progress (AC-5). Approval taps are never checked here: the route cannot tell whether an approval starts, resumes or stops a run, so the run guard lives in the tools (step 3 below).
    7. The existing text length and per run limits (spec 0007).
    8. After `handleTurn`: when the turn ran (`turn.ok` and `!busy`) and `metered` is true (a typed message with no run in progress, already computed by `handleTurn`), count the typed message (AC-5); when `turnContext` reported `created`, count the new chat (AC-6). A resend (`message.saved`) is never counted again.
-2. New chats (AC-6): the route reads the guest's `limit:chats` counter before `turnContext` and passes `mayCreate = count < limit` (always true for signed in users). In the same `db.batch`, the insert becomes `INSERT … SELECT … WHERE <mayCreate> ON CONFLICT DO NOTHING RETURNING id`, so `created` is true only when this request made the row (false on a conflict or when not allowed). If the owner read then finds no row (a new id with `mayCreate` false), `turnContext` returns `err({ code: "chat_limit" })`; an existing chat returns its context as today, whatever `mayCreate` is. One DB round trip is kept.
+2. New chats (AC-6, AC-12): the route reads the guest's `limit:chats` counter before `turnContext` and passes `mayCreate = isText && count < limit` (for signed in users, `mayCreate = isText`): only a typed message may create a chat. When `turnContext` returns `chat_limit` for a turn that is not typed, the route answers `404 not_found`, not the `chats_daily` notice. In the same `db.batch`, the insert becomes `INSERT … SELECT … WHERE <mayCreate> ON CONFLICT DO NOTHING RETURNING id`, so `created` is true only when this request made the row (false on a conflict or when not allowed). If the owner read then finds no row (a new id with `mayCreate` false), `turnContext` returns `err({ code: "chat_limit" })`; an existing chat returns its context as today, whatever `mayCreate` is. One DB round trip is kept.
 3. Run approval (AC-2, AC-4): the guest flag and IP travel `postChat` → `handleTurn` input `context` (new `isGuest` and `ip` fields on `TurnInput.context`) → `AiTurnContext` → `ToolEnv` (new `isGuest` and `ip` fields), and the tools get a `limits` dependency on `AssistantToolDeps` (`guestSpendCap`, `takeRun`, `giveBackRun`). In the `startRun` tool, and in `restartRun` only on its new run path (`startFromWithHold`), for guests and before the hold: the spend cap, then `takeRun(userId, ip)` (the atomic `INCR` above). Over a limit, the tool returns a new `StartRunOutput` error, `run_limit` or `spend_cap`, and holds nothing; if the hold then fails, `giveBackRun` undoes the count. `restartRun`'s resume path (`resumeRunWithHold`) and `resumeRun` are never limited or counted.
    - Delivery: `ai-turn.ts`, which already reads the tool events after the stream, appends a `data-error` part (`runs_daily` or `spend_cap`) when a money tool returned one of these errors, the same way it appends other cards. The instructions tell the model these two errors are shown by a card, so it replies with at most one short line. This reply is saved like any tool result; the card is live while it is the last message and drops out as the chat moves on.
 4. Guest sign in (AC-8): in `src/app/api/auth/[...all]/route.ts`, after BotID, the IP counter is checked; over it returns `429 {"code":"guest_limit"}`. It is counted only when Better Auth's response is `200`. A guest with a session never calls this route (the client signs in only when there is no session, spec 0007). In the chat client, `authClient.signIn.anonymous()` returns `{ error }` with status 429, which `send()` maps to a new `guest_limit` failure card beside the existing `sign_in` card.
@@ -112,6 +114,9 @@ The run counters are atomic instead, because an extra run costs credits and AI s
 | AC-2, AC-5 | "a run in progress" | `turnContext().active.active?.run.status === "in_progress"` (already read) |
 | AC-2 | "Approve that starts a run" | the approval resolves to `startRun` or `restartRun` (checked inside those tools) |
 | AC-5 | "typed message" | `classifyMessage` turn kind `text` (spec 0007) |
+| AC-7, AC-12 | which user burst window | `burstWindow(classified)`: turn kind `answer`, `prefill_response`, `retry` → `cards`; `text`, `approval`, or any parse failure → `user` |
+| AC-7, AC-12 | which window refused (log) | `chatGuard.burst` returns the refusing window (`"user" \| "cards" \| "ip"`) or null when allowed |
+| AC-12 | may this turn create a chat | `classifyMessage` turn kind `text` (and, for guests, the AC-6 count) |
 | AC-5 | message accepted, no run in progress | `handleTurn` output `metered` true, with `turn.ok` and `!busy` |
 | AC-2, AC-5 | resend, never checked or counted again | `turnContext` `message.saved` (spec 0007 review fix) |
 | AC-8 | sign in succeeded | Better Auth response status `200` |
@@ -129,7 +134,7 @@ The run counters are atomic instead, because an extra run costs credits and AI s
 
 **Configuration required**:
 - `AI_DAILY_SPEND_CAP_USD` (default 20)
-- `LIMIT_BURST_PER_USER` (10), `LIMIT_BURST_PER_IP` (60)
+- `LIMIT_BURST_PER_USER` (10), `LIMIT_BURST_CARDS_PER_USER` (30), `LIMIT_BURST_PER_IP` (60)
 - `LIMIT_CHAT_PER_GUEST` (30), `LIMIT_CHATS_PER_GUEST` (20)
 - `LIMIT_RUNS_PER_GUEST` (3), `LIMIT_RUNS_PER_IP` (20)
 - `LIMIT_GUESTS_PER_IP` (30)
@@ -142,7 +147,8 @@ The run counters are atomic instead, because an extra run costs credits and AI s
 - Run limits: the 4th guest Approve of the day gets the `runs_daily` card with nothing held; a failed hold gives the count back; two parallel Approves at the limit start only one run; a resume, and a restart that resumes, are not counted; a restart that starts a new run is, verifies **AC-4**
 - Daily chat: the 31st typed message with no run is refused; messages during a run in progress, taps, busy turns and resends never count, verifies **AC-5**
 - New chats: the 21st fresh id gets `chats_daily` and no row; a message to an existing chat passes, verifies **AC-6**
-- Burst: the 11th POST in a minute from one user gets `slow_down`; a signed in user is limited too, verifies **AC-7**
+- Burst: the 11th typed or approval POST in a minute from one user gets `slow_down`; a signed in user is limited too; an unparsable body counts in the user window and still gets `400`, verifies **AC-7**
+- Card burst: 25 card answers in a minute plus one typed message and one Approve all pass; the 31st card turn in a minute gets `slow_down`; card turns never use up the 10 a minute window, so a typed message right after 20 taps passes; card turns still count toward the IP window; a Redis error in the cards window logs `limit_check_failed` with `burst_cards` and allows; a card answer or an approval sent to a fresh chat id gets `404` and creates no row (guest and signed in); Got it on a `slow_down` notice after a refused card tap drops both and makes the card live again (`chat-view.test.ts`), verifies **AC-12**
 - Guests per IP: the 31st anonymous sign in from one IP gets `429 guest_limit` and no user row, verifies **AC-8**
 - Redis down: every guard allows and logs `limit_check_failed`; no 500, verifies **AC-9**
 - Config: env overrides change each limit; the Lagos day boundary rolls the keys at 23:00 UTC, verifies **AC-10**
@@ -158,6 +164,7 @@ Tracer Bullet: one guard end to end through every layer first (the spend total a
 5. [x] Chat route limits: burst windows first, daily chat check and count, `mayCreate` and `created` in `turnContext` (integration test) with the `chats_daily` notice; the new notice kinds and copy; tests, satisfies **AC-5**, **AC-6**, **AC-7**
 6. [x] Guest sign in IP cap in the auth route, counted on `200`, with the `guest_limit` card in the chat client's `send()`; tests, satisfies **AC-8**
 7. [x] `/design` showcase for the new notices, and an e2e check that a limit notice renders with axe clean (limits set to 1 through env in the test server), satisfies **AC-2**, **AC-5**, **AC-7**
+8. [ ] Card burst window: `LIMIT_BURST_CARDS_PER_USER` in `env.ts` (both the schema and the `SKIP_ENV_VALIDATION` path) and `.env.example`; `limitConfig.burstCardsPerUser`; in `limits.ts` a `cards` `BurstWindow` with its `limit:burst:cards` sliding window (the `redisLimitStore` limiter record gains `cards`; `openLimitStore` already allows every window and needs nothing), `burst_cards` in `LimitName` with the log name picked by a lookup instead of the two way ternary, and a `UserBurstWindow = "user" | "cards"` type; `chatGuard.burst(userId, ip, window)` returns the refusing window (`"user" | "cards" | "ip"`) or null; in `postChat`, parse and classify first, then burst with `burstWindow(classified)`, then the `400` for an unparsable body; the `slow_down` `chat_limit` log carries `window` (the refusing window, IP included); `mayCreate` false for any turn that is not typed, with `chat_limit` on such a turn answered `404`; update the burst fakes in `chat-api.test.ts`, `chat-billing.test.ts`, `spend-cap.test.ts` and `limits.test.ts`; unit tests in `limits.test.ts`, `chat-api.test.ts` and `chat-view.test.ts`, satisfies **AC-7**, **AC-12**
 
 ## Consequences
 
@@ -170,7 +177,8 @@ Tracer Bullet: one guard end to end through every layer first (the spend total a
 - The chat, chat count and guest counters can overshoot under parallel requests (check, then count); run counters cannot.
 - Signed in users' spend is bounded only by the Anthropic console's monthly limit (they are never paused, by design).
 - Failing open means an Upstash outage removes the guards for its duration; spend is still bounded by the console limit.
-- Users behind one carrier IP share the IP limits; the defaults are loose to soften that.
+- Users behind one carrier IP share the IP limits; the defaults are loose to soften that. Card taps count toward the IP window too, so several people on one IP tapping through runs at once can reach 60 a minute sooner.
+- A script can send up to 30 card turns a minute per user. Each is a DB round trip with no AI call, serialized per chat by the turn lock, and can never create a chat, so the cost is small.
 - `spend:<date>` can drift a little from the `ai_usage` sum (a Redis write can fail after the row is saved); `ai_usage` stays the truth for billing and audits.
 - Two more Redis round trips on a chat turn (the burst windows run in parallel; the daily reads run in parallel), each a few milliseconds from Vercel `fra1` to Upstash `eu-central-1`.
 
