@@ -37,11 +37,44 @@ describe("conversations.turnContext", () => {
       active: { active: null, paused: [] },
       typedInRun: 0,
       message: { saved: false, answered: false },
+      created: true,
     });
     expect(unwrap(await conversations.ownerOf(id))).toBe(userId);
 
     const again = await conversations.turnContext(userId, id, newId());
-    expect(again.ok).toBe(true);
+    expect(again.ok && again.value.created).toBe(false);
+  });
+
+  it("with mayCreate false, a new id is chat_limit and no row is made (spec 0008, AC-6)", async () => {
+    const userId = await tracker.guest();
+    const id = newId();
+    expect(await conversations.turnContext(userId, id, newId(), false)).toEqual(
+      { ok: false, error: { code: "chat_limit" } },
+    );
+    expect(await conversations.ownerOf(id)).toEqual({
+      ok: false,
+      error: { code: "not_found" },
+    });
+  });
+
+  it("with mayCreate false, an existing chat still returns its context", async () => {
+    const userId = await tracker.guest();
+    const id = newId();
+    unwrap(await conversations.turnContext(userId, id, newId()));
+    const context = unwrap(
+      await conversations.turnContext(userId, id, newId(), false),
+    );
+    expect(context.created).toBe(false);
+  });
+
+  it("with mayCreate false, another user's chat is still other_owner", async () => {
+    const owner = await tracker.guest();
+    const stranger = await tracker.guest();
+    const id = newId();
+    unwrap(await conversations.turnContext(owner, id, newId()));
+    expect(
+      await conversations.turnContext(stranger, id, newId(), false),
+    ).toEqual({ ok: false, error: { code: "other_owner" } });
   });
 
   it("refuses another user's chat and writes nothing to it", async () => {

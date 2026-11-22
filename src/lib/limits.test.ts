@@ -16,6 +16,7 @@ const {
   overLimit,
   redisLimitStore,
   runGuard,
+  chatGuard,
 } = await import("./limits");
 
 const base = {
@@ -312,5 +313,48 @@ describe("runGuard (AC-4)", () => {
     expect(values.has(USER)).toBe(false);
     const noIp = await guard(countingStore().store).takeRun("g1", null);
     expect(noIp).toEqual({ ok: true, value: { keys: [USER] } });
+  });
+});
+
+describe("chatGuard (AC-5, AC-6, AC-7)", () => {
+  const NOW = new Date("2026-11-22T23:30:00Z"); // already the 23rd in Lagos
+
+  it("checks both burst windows, and skips the IP one with no IP", async () => {
+    const asked: string[] = [];
+    const store: LimitStore = {
+      ...openLimitStore,
+      burst: async (window, id) => {
+        asked.push(`${window}:${id}`);
+        return window !== "ip";
+      },
+    };
+    const guard = chatGuard({ store, now: () => NOW });
+    expect(await guard.burst("u1", "1.2.3.4")).toBe(false);
+    expect(await guard.burst("u1", null)).toBe(true);
+    expect(asked).toEqual(["user:u1", "ip:1.2.3.4", "user:u1"]);
+  });
+
+  it("reads and counts the Lagos day's keys", async () => {
+    const reads: string[] = [];
+    const counts: string[] = [];
+    const store: LimitStore = {
+      ...openLimitStore,
+      read: async (_name, key) => {
+        reads.push(key);
+        return key.startsWith("limit:chats:") ? 2 : 7;
+      },
+      count: async (_name, key) => {
+        counts.push(key);
+      },
+    };
+    const guard = chatGuard({ store, now: () => NOW });
+    expect(await guard.dailyCounts("g1")).toEqual({ chat: 7, chats: 2 });
+    await guard.countChat("g1");
+    await guard.countChats("g1");
+    expect(reads).toEqual([
+      "limit:chat:g1:2026-11-23",
+      "limit:chats:g1:2026-11-23",
+    ]);
+    expect(counts).toEqual(reads);
   });
 });

@@ -155,7 +155,7 @@ Tracer Bullet: one guard end to end through every layer first (the spend total a
 2. [x] Spend total: `withSpend` around `usage.record` in the three deps files, `addSpend`, the tripped marker and log; tests, satisfies **AC-1**, **AC-3**
 3. [x] Guest spend cap at chat: `sessionUser` (`isAnonymous`), `checkSpendCap` filled in, the `spend_cap` notice in `chat-api.ts` for typed messages; the report path's hook always allows; tests, satisfies **AC-2** (chat), **AC-11**
 4. [x] Run approval: `isGuest` and `ip` through `TurnInput.context`, `AiTurnContext` and `ToolEnv`; the `limits` tool dependency; guest spend cap and atomic run counters in `startRun` and `restartRun`'s new run path; the `run_limit` and `spend_cap` outputs turned into cards in `ai-turn.ts`, with the one line instruction; tests, satisfies **AC-2** (Approve), **AC-4**
-5. Chat route limits: burst windows first, daily chat check and count, `mayCreate` and `created` in `turnContext` (integration test) with the `chats_daily` notice; the new notice kinds and copy; tests, satisfies **AC-5**, **AC-6**, **AC-7**
+5. [x] Chat route limits: burst windows first, daily chat check and count, `mayCreate` and `created` in `turnContext` (integration test) with the `chats_daily` notice; the new notice kinds and copy; tests, satisfies **AC-5**, **AC-6**, **AC-7**
 6. Guest sign in IP cap in the auth route, counted on `200`, with the `guest_limit` card in the chat client's `send()`; tests, satisfies **AC-8**
 7. `/design` showcase for the new notices, and an e2e check that a limit notice renders with axe clean (limits set to 1 through env in the test server), satisfies **AC-2**, **AC-5**, **AC-7**
 

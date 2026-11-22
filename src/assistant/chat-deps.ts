@@ -8,6 +8,7 @@ import * as messages from "@/db/queries/messages";
 import * as usage from "@/db/queries/usage";
 import { newId } from "@/db/id";
 import { env } from "@/lib/env";
+import { chatGuards, limits } from "@/lib/limits";
 import { guestSpendCap, withSpend } from "@/lib/spend-cap";
 import { logEvent } from "@/lib/log";
 import { resumableStreams } from "@/lib/resumable";
@@ -23,10 +24,13 @@ export const chatApiDeps: ChatApiDeps = {
     messages.append(ownerId, conversationId, [message]),
   recordUsage: withSpend(usage.record),
   guestSpendCap,
+  guards: chatGuards,
   finishStream: resumableStreams.finish,
   limits: {
     maxChars: env.MAX_MESSAGE_CHARS,
     perRun: env.RATE_LIMIT_MESSAGES_PER_RUN,
+    chatPerGuest: limits.chatPerGuest,
+    chatsPerGuest: limits.chatsPerGuest,
   },
   waitUntil: (task) => {
     after(task);

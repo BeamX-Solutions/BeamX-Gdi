@@ -151,7 +151,7 @@ spec [0008](../specs/0008-abuse-cost-guards/index.md) · code in `src/lib` (`lim
 - [ ] Build it: `/develop abuse & ai cost guards`
   - [x] Thin thread: client IP and limits modules, env config, the spend total on every AI call with the tripped marker, and the guest spend cap at chat (AC-1, AC-2, AC-3, AC-9, AC-10, AC-11)
   - [x] Run approval: guest flag and IP into the tools, guest spend cap and atomic run limits in startRun and restartRun, the cards in the turn (AC-2, AC-4)
-  - [ ] Chat route limits: burst windows, daily guest chat, new chat bound in turnContext, the new notices (AC-5, AC-6, AC-7)
+  - [x] Chat route limits: burst windows, daily guest chat, new chat bound in turnContext, the new notices (AC-5, AC-6, AC-7)
   - [ ] Guest sign in IP cap with its client card, the /design showcase and an e2e notice check (AC-8, AC-2, AC-5, AC-7)
 - [ ] Verify it: `/check verify abuse & ai cost guards`
 - [ ] Test it: `/test abuse & ai cost guards`

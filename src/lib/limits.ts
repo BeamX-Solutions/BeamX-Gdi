@@ -244,6 +244,48 @@ export const runGuard = (deps: {
   return { takeRun, giveBackRun };
 };
 
+/** A guest's daily chat counts (AC-5, AC-6). */
+export type DailyCounts = { readonly chat: number; readonly chats: number };
+
+/**
+ * The chat route's guards (AC-5, AC-6, AC-7). Daily counts are "check, then count on
+ * success": the route reads them, and counts only what happened.
+ */
+export const chatGuard = (deps: {
+  readonly store: LimitStore;
+  readonly now: () => Date;
+}) => ({
+  /** True when one more POST fits both per minute windows; no IP skips the IP one. */
+  burst: async (userId: string, ip: string | null): Promise<boolean> => {
+    const [user, byIp] = await Promise.all([
+      deps.store.burst("user", userId),
+      ip === null ? true : deps.store.burst("ip", ip),
+    ]);
+    return user && byIp;
+  },
+  /** Typed messages and new chats today, read in parallel. */
+  dailyCounts: async (userId: string): Promise<DailyCounts> => {
+    const day = lagosDate(deps.now());
+    const [chat, chats] = await Promise.all([
+      deps.store.read("chat_daily", limitKeys.chat(userId, day)),
+      deps.store.read("chats_daily", limitKeys.chats(userId, day)),
+    ]);
+    return { chat, chats };
+  },
+  countChat: (userId: string): Promise<void> =>
+    deps.store.count(
+      "chat_daily",
+      limitKeys.chat(userId, lagosDate(deps.now())),
+    ),
+  countChats: (userId: string): Promise<void> =>
+    deps.store.count(
+      "chats_daily",
+      limitKeys.chats(userId, lagosDate(deps.now())),
+    ),
+});
+
+export type ChatGuard = ReturnType<typeof chatGuard>;
+
 const slidingWindow = (redis: Redis, prefix: string, max: number) => {
   const limiter = new Ratelimit({
     redis,
@@ -277,4 +319,8 @@ const liveRuns = runGuard({
   now: () => new Date(),
 });
 export const takeRun = liveRuns.takeRun;
+export const chatGuards: ChatGuard = chatGuard({
+  store: limitStore,
+  now: () => new Date(),
+});
 export const giveBackRun = liveRuns.giveBackRun;
