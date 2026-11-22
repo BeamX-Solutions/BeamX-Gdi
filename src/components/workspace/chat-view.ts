@@ -13,6 +13,7 @@
  */
 import { z } from "zod";
 import {
+  chatMetadata,
   answerData,
   errorData,
   prefillData,
@@ -33,6 +34,8 @@ export type ViewMessage = {
   readonly id: string;
   readonly role: "system" | "user" | "assistant";
   readonly parts: readonly unknown[];
+  /** The reply's metadata; a paid chat reply carries the chip's numbers (spec 0004). */
+  readonly metadata?: unknown;
 };
 
 export type ApprovalState = "pending" | "approved" | "declined" | "expired";
@@ -403,22 +406,29 @@ export const latestReport = (items: readonly ThreadItem[]): ReportData | null =>
   items.flatMap((i) => (i.kind === "report" ? [i.data] : [])).at(-1) ?? null;
 
 /**
- * The newest credit summary a money tool returned (spec 0007, AC-9), keyed by its tool
- * call, so the chip can tell a new one from one it has already shown. Pure.
+ * The newest credit summary in the thread (spec 0007, AC-9): one a money tool returned,
+ * keyed by its tool call, or one a paid chat reply carries in its metadata (spec 0004),
+ * keyed by the message. The key lets the chip tell a new one from one it has shown. Pure.
  */
 export const latestToolSummary = (
   messages: readonly ViewMessage[],
 ): { readonly key: string; readonly summary: CreditSummary } | null => {
-  const found = messages.flatMap((m) =>
-    m.parts.flatMap((part) => {
+  const found = messages.flatMap((m) => {
+    const fromTools = m.parts.flatMap((part) => {
       const tool = parse(toolPart, part);
       if (tool?.state !== "output-available") return [];
       const out = parse(summaryOutput, tool.output);
       return out === null
         ? []
         : [{ key: tool.toolCallId, summary: out.summary }];
-    }),
-  );
+    });
+    const meta = parse(chatMetadata, m.metadata);
+    const fromReply =
+      meta?.billing?.kind === "charged" && meta.billing.summary !== undefined
+        ? [{ key: `${m.id}:billing`, summary: meta.billing.summary }]
+        : [];
+    return [...fromTools, ...fromReply];
+  });
   return found.at(-1) ?? null;
 };
 
@@ -461,6 +471,8 @@ const refusalKinds: ReadonlySet<ErrorData["kind"]> = new Set([
   "slow_down",
   "chat_daily",
   "chats_daily",
+  "chat_credits",
+  "chat_credits_guest",
 ]);
 
 /**

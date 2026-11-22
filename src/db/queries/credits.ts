@@ -3,6 +3,7 @@ import { db } from "../client";
 import { billingAssertCode, isUniqueViolation } from "../errors";
 import { newId } from "../id";
 import { creditAccount, creditHold, toolRun } from "../schema";
+import { releaseRunHoldCtes } from "./credit-holds";
 import {
   resumeStatements,
   selectRun,
@@ -366,6 +367,163 @@ export const holdExistingRun = async (
   } catch (e) {
     return err(await mapHoldFailure(e, userId));
   }
+};
+
+/**
+ * Holds the chat ceiling for one paid chat reply (spec 0004, AC-10), keyed by the
+ * assistant message id. One statement: the account's `held` goes up only when
+ * `balance - held` covers `amount`, and the hold row is written from that update, so the
+ * check and the write cannot be split. No account, or too little, is
+ * `insufficient_credits` with the available balance (0 with no account).
+ */
+export const holdForChat = async (
+  userId: string,
+  messageId: string,
+  amount: number,
+): Promise<
+  Result<
+    { readonly holdId: string },
+    { readonly code: "insufficient_credits"; readonly available: number }
+  >
+> => {
+  const holdId = newId();
+  const [held, account] = await db.batch([
+    db.execute(sql`
+      WITH a AS (
+        UPDATE credit_account
+        SET held = held + ${amount}::int, last_activity_at = now(), updated_at = now()
+        WHERE user_id = ${userId}::uuid AND balance - held >= ${amount}::int
+        RETURNING user_id
+      )
+      INSERT INTO credit_hold (id, user_id, purpose, message_id, amount)
+      SELECT ${holdId}::uuid, user_id, 'chat', ${messageId}::uuid, ${amount}::int FROM a
+      RETURNING id
+    `),
+    db
+      .select({ balance: creditAccount.balance, held: creditAccount.held })
+      .from(creditAccount)
+      .where(eq(creditAccount.userId, userId)),
+  ]);
+  if (held.rows.length > 0) return ok({ holdId });
+  const a = account[0];
+  return err({
+    code: "insufficient_credits",
+    available: a ? a.balance - a.held : 0,
+  });
+};
+
+/**
+ * Settles a chat hold once (AC-10). `charged > 0`: the hold becomes `charged` with
+ * `min(charged, amount)`, the account `balance -= charged, held -= amount` (the rest is
+ * released in the same update), and one `chat_charge` ledger entry, key
+ * `charge:<holdId>`. `charged = 0`: the hold is released as `chat_error`. A hold that is
+ * no longer active changes nothing and returns null; otherwise the account summary
+ * after the write. It follows the hold's own `user_id`, so a guest link mid turn is fine.
+ */
+export const settleChat = async (
+  holdId: string,
+  charged: number,
+): Promise<Summary | null> => {
+  const result =
+    charged > 0
+      ? await db.execute(sql`
+          WITH h AS (
+            UPDATE credit_hold
+            SET status = 'charged', charged_amount = LEAST(${charged}::int, amount), settled_at = now()
+            WHERE id = ${holdId}::uuid AND status = 'active' AND purpose = 'chat'
+            RETURNING id, user_id, amount, charged_amount
+          ), a AS (
+            UPDATE credit_account acc
+            SET balance = acc.balance - h.charged_amount, held = acc.held - h.amount,
+                last_activity_at = now(), updated_at = now()
+            FROM h WHERE acc.user_id = h.user_id
+            RETURNING acc.user_id, acc.balance, acc.held, acc.last_activity_at
+          ), l AS (
+            INSERT INTO credit_ledger (id, user_id, kind, amount, balance_after, hold_id, idempotency_key)
+            SELECT ${newId()}::uuid, a.user_id, 'chat_charge', -h.charged_amount, a.balance, h.id, 'charge:' || h.id
+            FROM h JOIN a ON a.user_id = h.user_id
+            ON CONFLICT (idempotency_key) DO NOTHING
+            RETURNING id
+          )
+          SELECT balance, held, last_activity_at FROM a
+        `)
+      : await db.execute(sql`
+          WITH h AS (
+            UPDATE credit_hold
+            SET status = 'released', release_reason = 'chat_error', settled_at = now()
+            WHERE id = ${holdId}::uuid AND status = 'active' AND purpose = 'chat'
+            RETURNING user_id, amount
+          ), a AS (
+            UPDATE credit_account acc
+            SET held = acc.held - h.amount, updated_at = now()
+            FROM h WHERE acc.user_id = h.user_id
+            RETURNING acc.balance, acc.held, acc.last_activity_at
+          )
+          SELECT balance, held, last_activity_at FROM a
+        `);
+  const row = result.rows[0] as
+    | { balance: number; held: number; last_activity_at: string | Date }
+    | undefined;
+  if (!row) return null;
+  const balance = Number(row.balance);
+  const held = Number(row.held);
+  return {
+    balance,
+    held,
+    available: balance - held,
+    lastActivityAt:
+      row.last_activity_at instanceof Date
+        ? row.last_activity_at.toISOString()
+        : String(row.last_activity_at),
+  };
+};
+
+/**
+ * The daily sweep of stale holds (spec 0004, AC-7, AC-10), one statement per kind:
+ * - run holds whose run has had no activity (`tool_run.updated_at`) for `idleDays`, and
+ *   whose report is not `generating`, are released as `idle`;
+ * - chat holds still active `chatStaleMinutes` after they were placed (a timeout, a
+ *   disconnect, a crash) are released as `chat_error`.
+ * Nothing is charged. Returns how many of each were released.
+ */
+export const releaseIdleHolds = async (
+  idleDays: number,
+  chatStaleMinutes: number,
+): Promise<{ readonly idle: number; readonly chat: number }> => {
+  const idleRuns = sql`
+    SELECT h.run_id FROM credit_hold h
+    JOIN tool_run r ON r.id = h.run_id
+    WHERE h.status = 'active' AND h.purpose = 'run'
+      AND r.updated_at < now() - make_interval(days => ${idleDays}::int)
+      AND NOT EXISTS (
+        SELECT 1 FROM report p WHERE p.run_id = r.id AND p.status = 'generating'
+      )
+  `;
+  const [runs, chats] = await db.batch([
+    db.execute(sql`
+      WITH ${releaseRunHoldCtes(idleRuns, "idle")}
+      SELECT count(*)::int AS released FROM rh
+    `),
+    db.execute(sql`
+      WITH h AS (
+        UPDATE credit_hold
+        SET status = 'released', release_reason = 'chat_error', settled_at = now()
+        WHERE status = 'active' AND purpose = 'chat'
+          AND created_at < now() - make_interval(mins => ${chatStaleMinutes}::int)
+        RETURNING user_id, amount
+      ), a AS (
+        UPDATE credit_account acc
+        SET held = acc.held - x.total, updated_at = now()
+        FROM (SELECT user_id, sum(amount)::int AS total FROM h GROUP BY user_id) x
+        WHERE acc.user_id = x.user_id
+        RETURNING acc.user_id
+      )
+      SELECT count(*)::int AS released FROM h
+    `),
+  ]);
+  const count = (r: { rows: unknown[] }) =>
+    Number((r.rows[0] as { released?: number } | undefined)?.released ?? 0);
+  return { idle: count(runs), chat: count(chats) };
 };
 
 /**

@@ -72,7 +72,10 @@ export type LimitName =
   | "chats_daily"
   | "runs_daily"
   | "guests_daily"
-  | "spend";
+  | "spend"
+  // Spec 0004's billing counters share the store.
+  | "free_chat"
+  | "guest_grant";
 
 export type BurstWindow = "user" | "ip";
 
@@ -83,6 +86,11 @@ export type BurstWindow = "user" | "ip";
 export type LimitStore = {
   /** The number at `key`, 0 when unset or on an error. */
   readonly read: (name: LimitName, key: string) => Promise<number>;
+  /**
+   * `read` that tells an error apart: null on a Redis error, so a caller can fail
+   * closed (spec 0004, AC-9 treats an unknown free count as paid).
+   */
+  readonly tryRead: (name: LimitName, key: string) => Promise<number | null>;
   /** Adds one to `key`, setting its 48 hour expiry if it has none. */
   readonly count: (name: LimitName, key: string) => Promise<void>;
   /** `count` that returns the new value, or null on an error (the caller allows). */
@@ -140,6 +148,8 @@ export const redisLimitStore = (
 ): LimitStore => ({
   read: (name, key) =>
     failOpen(log, name, 0, async () => toNumber(await redis.get(key))),
+  tryRead: (name, key) =>
+    failOpen(log, name, null, async () => toNumber(await redis.get(key))),
   count: (name, key) =>
     failOpen(log, name, undefined, async () => {
       await redis.pipeline().incr(key).expire(key, DAILY_TTL_S, "NX").exec();
@@ -186,6 +196,7 @@ export const redisLimitStore = (
 /** No Upstash variables (dev, CI): every limit allows, like the turn lock. */
 export const openLimitStore: LimitStore = {
   read: async () => 0,
+  tryRead: async () => 0,
   count: async () => {},
   take: async () => null,
   giveBack: async () => {},

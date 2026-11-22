@@ -28,6 +28,9 @@ const limitKinds: ReadonlySet<string> = new Set([
   "chat_daily",
   "chats_daily",
   "runs_daily",
+  "chat_credits",
+  "chat_credits_guest",
+  "free_chat_used",
 ]);
 
 /** What a card tap does; the chat turns each into one user message. */

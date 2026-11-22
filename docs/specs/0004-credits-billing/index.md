@@ -268,11 +268,11 @@ Ordered Tracer Bullet: milestone 1 is one thin, real thread (a guest pays for a 
 5. Header balance chip (available balance), satisfies **AC-14**
 
 **Milestone 2: hold lifecycle and paid chat**
-6. `resumeRun` with conditional approval and `resumeRunWithHold`; `price_changed` path, satisfies **AC-2**, **AC-7**
-7. `/api/cron/billing` with `CRON_SECRET` and the `vercel.json` entry; `releaseIdleHolds` job (run holds idle 30 days, skipping `generating` reports; chat holds older than 15 minutes), satisfies **AC-7**, **AC-10**
-8. Chat billing in the chat route: Redis free counter, run in progress exemption, ceiling hold, `onFinish` settle with `chatCharge`, error release, stop partial charge, the once a day notice, satisfies **AC-9**, **AC-10**, **AC-21**
-9. Guest grant IP cap in `ensureAccount`, satisfies **AC-11**
-10. Multi phase charge once test (a fake phased tool until Luna lands in #12), satisfies **AC-6**
+6. [x] `resumeRun` with conditional approval and `resumeRunWithHold`; `price_changed` path, satisfies **AC-2**, **AC-7**
+7. [x] `/api/cron/billing` with `CRON_SECRET` and the `vercel.json` entry; `releaseIdleHolds` job (run holds idle 30 days, skipping `generating` reports; chat holds older than 15 minutes), satisfies **AC-7**, **AC-10**
+8. [x] Chat billing in the chat route: Redis free counter, run in progress exemption, ceiling hold, `onFinish` settle with `chatCharge`, error release, stop partial charge, the once a day notice, satisfies **AC-9**, **AC-10**, **AC-21**
+9. [x] Guest grant IP cap in `ensureAccount`, satisfies **AC-11**
+10. [x] Multi phase charge once test (a fake phased tool until Luna lands in #12), satisfies **AC-6**
 
 **Milestone 3: buying credits (needs #8 sign up)**
 11. Migration 2: `payment` table and enum, plus the `credit_ledger.payment_id` FK, satisfies **AC-13**

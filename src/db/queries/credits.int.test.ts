@@ -1,6 +1,7 @@
 import { afterAll, describe, expect, it } from "vitest";
 import { sql } from "drizzle-orm";
 import { db } from "../client";
+import { newId } from "../id";
 import * as conversations from "./conversations";
 import * as credits from "./credits";
 import { releaseRunHolds } from "./credit-holds";
@@ -425,6 +426,182 @@ describe("startFromWithHold (spec 0006)", () => {
       error: { code: "not_found" },
     });
     expect(await credits.getSummary(u)).toMatchObject({ held: 30 });
+    await expectBooksBalance(u);
+  });
+});
+
+// Spec 0004, milestone 2: paid chat holds, the daily sweep, and one charge across phases.
+
+const MESSAGE = () => newId();
+
+const holdRow = async (holdId: string) => {
+  const r = await db.execute(sql`
+    SELECT status, release_reason, charged_amount FROM credit_hold WHERE id = ${holdId}::uuid
+  `);
+  return r.rows[0] as
+    | {
+        status: string;
+        release_reason: string | null;
+        charged_amount: number | null;
+      }
+    | undefined;
+};
+
+describe("chat holds (AC-10)", () => {
+  it("holds the ceiling, then charges the real amount and releases the rest", async () => {
+    const u = await funded(30);
+    const { holdId } = unwrap(await credits.holdForChat(u, MESSAGE(), 3));
+    expect((await credits.getSummary(u))?.held).toBe(3);
+
+    const after = await credits.settleChat(holdId, 1);
+    expect(after).toMatchObject({ balance: 29, held: 0, available: 29 });
+    expect(await holdRow(holdId)).toMatchObject({
+      status: "charged",
+      charged_amount: 1,
+    });
+    expect(await ledgerKinds(u)).toEqual([
+      ["starter_grant", 30],
+      ["chat_charge", -1],
+    ]);
+    await expectBooksBalance(u);
+  });
+
+  it("settles only once: a second settle changes nothing", async () => {
+    const u = await funded(30);
+    const { holdId } = unwrap(await credits.holdForChat(u, MESSAGE(), 3));
+    await credits.settleChat(holdId, 2);
+    expect(await credits.settleChat(holdId, 2)).toBeNull();
+    expect(await credits.settleChat(holdId, 0)).toBeNull();
+    expect((await credits.getSummary(u))?.balance).toBe(28);
+    await expectBooksBalance(u);
+  });
+
+  it("never charges more than was held", async () => {
+    const u = await funded(30);
+    const { holdId } = unwrap(await credits.holdForChat(u, MESSAGE(), 3));
+    await credits.settleChat(holdId, 9);
+    expect((await credits.getSummary(u))?.balance).toBe(27);
+    await expectBooksBalance(u);
+  });
+
+  it("charging 0 releases the hold as chat_error with no ledger entry", async () => {
+    const u = await funded(30);
+    const { holdId } = unwrap(await credits.holdForChat(u, MESSAGE(), 3));
+    expect(await credits.settleChat(holdId, 0)).toMatchObject({
+      balance: 30,
+      held: 0,
+    });
+    expect(await holdRow(holdId)).toMatchObject({
+      status: "released",
+      release_reason: "chat_error",
+    });
+    expect(await ledgerKinds(u)).toEqual([["starter_grant", 30]]);
+  });
+
+  it("refuses a hold the available balance does not cover, with the available amount", async () => {
+    const u = await funded(2);
+    expect(await credits.holdForChat(u, MESSAGE(), 3)).toEqual({
+      ok: false,
+      error: { code: "insufficient_credits", available: 2 },
+    });
+    expect((await credits.getSummary(u))?.held).toBe(0);
+  });
+
+  it("is insufficient_credits with 0 available when there is no account", async () => {
+    const u = await t.guest();
+    expect(await credits.holdForChat(u, MESSAGE(), 3)).toEqual({
+      ok: false,
+      error: { code: "insufficient_credits", available: 0 },
+    });
+  });
+
+  it("two racing chat holds on 4 credits: exactly one wins", async () => {
+    const u = await funded(4);
+    const results = await Promise.all([
+      credits.holdForChat(u, MESSAGE(), 3),
+      credits.holdForChat(u, MESSAGE(), 3),
+    ]);
+    expect(results.filter((r) => r.ok)).toHaveLength(1);
+    await expectBooksBalance(u);
+  });
+});
+
+describe("the daily hold sweep (AC-7, AC-10)", () => {
+  it("releases a run hold idle 31 days, then resuming needs a new hold", async () => {
+    const u = await funded(100);
+    const { run } = unwrap(await startPaid(u, 30));
+    await db.execute(sql`
+      UPDATE tool_run SET updated_at = now() - interval '31 days' WHERE id = ${run.id}::uuid
+    `);
+    const swept = await credits.releaseIdleHolds(30, 15);
+    expect(swept.idle).toBeGreaterThanOrEqual(1);
+    expect(await credits.activeRunHold(u, run.id)).toBeNull();
+    expect((await credits.getSummary(u))?.held).toBe(0);
+    await expectBooksBalance(u);
+  });
+
+  it("keeps a run hold with recent activity", async () => {
+    const u = await funded(100);
+    const { run } = unwrap(await startPaid(u, 30));
+    await credits.releaseIdleHolds(30, 15);
+    expect(await credits.activeRunHold(u, run.id)).not.toBeNull();
+  });
+
+  it("skips an idle run whose report is generating", async () => {
+    const u = await funded(100);
+    const run = await claimedRun(u, 30);
+    await db.execute(sql`
+      UPDATE tool_run SET updated_at = now() - interval '31 days' WHERE id = ${run.id}::uuid
+    `);
+    await credits.releaseIdleHolds(30, 15);
+    expect(await credits.activeRunHold(u, run.id)).not.toBeNull();
+  });
+
+  it("releases a chat hold still active after 15 minutes as chat_error", async () => {
+    const u = await funded(30);
+    const { holdId } = unwrap(await credits.holdForChat(u, MESSAGE(), 3));
+    const fresh = unwrap(await credits.holdForChat(u, MESSAGE(), 3));
+    await db.execute(sql`
+      UPDATE credit_hold SET created_at = now() - interval '16 minutes' WHERE id = ${holdId}::uuid
+    `);
+    await credits.releaseIdleHolds(30, 15);
+    expect(await holdRow(holdId)).toMatchObject({
+      status: "released",
+      release_reason: "chat_error",
+    });
+    expect((await holdRow(fresh.holdId))?.status).toBe("active");
+    expect((await credits.getSummary(u))?.held).toBe(3);
+    await expectBooksBalance(u);
+  });
+});
+
+describe("a phased report is charged once (AC-6)", () => {
+  it("fails partway, resumes from the failed phase, and charges once when ready", async () => {
+    const u = await funded(100);
+    const run = await claimedRun(u, 50);
+    // Attempt 1 saves two phases, then fails on the third: the hold stays.
+    unwrap(await reports.savePhase(run.id, 1, "one", { a: 1 }));
+    unwrap(await reports.savePhase(run.id, 1, "two", { b: 2 }));
+    unwrap(
+      await reports.markFailed(run.id, 1, { kind: "timeout", message: "slow" }),
+    );
+    expect((await credits.getSummary(u))?.held).toBe(50);
+    expect(await ledgerKinds(u)).toEqual([["starter_grant", 100]]);
+
+    // Attempt 2 resumes with the saved phases and finishes the plan.
+    unwrap(await reports.claim(u, run.id));
+    unwrap(await reports.savePhase(run.id, 2, "three", { c: 3 }));
+    unwrap(
+      await reports.markReady(run.id, 2, { one: 1, two: 2, three: 3 }, "m"),
+    );
+    // A replay of the ready call charges nothing more.
+    expect((await reports.markReady(run.id, 2, { x: 1 }, "m")).ok).toBe(false);
+
+    expect(await ledgerKinds(u)).toEqual([
+      ["starter_grant", 100],
+      ["run_charge", -50],
+    ]);
+    expect(await credits.getSummary(u)).toMatchObject({ balance: 50, held: 0 });
     await expectBooksBalance(u);
   });
 });

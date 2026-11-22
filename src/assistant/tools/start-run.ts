@@ -93,7 +93,7 @@ export const startRunTool = (env: ToolEnv) =>
       // A guest's run passes the spend cap and the daily run limits first (spec 0008).
       return done(
         await guardedStart(env, async (): Promise<StartRunOutput> => {
-          await deps.ensureAccount(env.owner.current);
+          await deps.ensureAccount(env.owner.current, env.isGuest, env.ip);
           const { owner, result } = await asOwner(
             deps,
             conversationId,

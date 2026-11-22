@@ -462,6 +462,8 @@ export const sumUsage = (steps: readonly StepUsage[]): ChatUsage | null => {
 };
 
 const NO_USAGE: Promise<ChatUsage | null> = Promise.resolve(null);
+const FAILED: Promise<boolean> = Promise.resolve(true);
+const NOT_FAILED: Promise<boolean> = Promise.resolve(false);
 
 /**
  * Builds `TurnDeps.aiTurn`. The stream holds no start or finish chunk (#7 wraps it).
@@ -473,7 +475,11 @@ export const createAiTurn =
     const started = deps.now();
     const chat = await deps.openChat(ctx.ownerId, ctx.conversationId);
     if (!chat.ok)
-      return { stream: partsStream([AI_ERROR], deps.newId), usage: NO_USAGE };
+      return {
+        stream: partsStream([AI_ERROR], deps.newId),
+        usage: NO_USAGE,
+        failed: FAILED,
+      };
     const history = chat.value.messages;
 
     if (
@@ -486,6 +492,7 @@ export const createAiTurn =
           deps.newId,
         ),
         usage: NO_USAGE,
+        failed: NOT_FAILED,
       };
 
     const noteFor = (read: ActiveRead) => {
@@ -554,11 +561,16 @@ export const createAiTurn =
     const introduced = new Set<string>();
     // Each finished step's usage, read once the stream's work ends.
     const steps: StepUsage[] = [];
-    const settled: { resolve: (usage: ChatUsage | null) => void } = {
-      resolve: () => {},
-    };
+    const settled: {
+      resolve: (usage: ChatUsage | null) => void;
+      fail: (failed: boolean) => void;
+      failed: boolean;
+    } = { resolve: () => {}, fail: () => {}, failed: true };
     const usage = new Promise<ChatUsage | null>((resolve) => {
       settled.resolve = resolve;
+    });
+    const failed = new Promise<boolean>((resolve) => {
+      settled.fail = resolve;
     });
 
     const result = streamText({
@@ -626,6 +638,8 @@ export const createAiTurn =
       const steps = await Promise.resolve(result.steps)
         .then((s) => s.length)
         .catch(() => 0);
+      // The AI call finished (a refusal included); `finish` null means it failed.
+      settled.failed = finish === null;
       if (finish === "content-filter")
         deps.log("assistant_refusal", { conversationId: ctx.conversationId });
       const parts =
@@ -656,9 +670,10 @@ export const createAiTurn =
           await writeTurn(writer);
         } finally {
           settled.resolve(sumUsage(steps));
+          settled.fail(settled.failed);
         }
       },
     });
 
-    return { stream, usage };
+    return { stream, usage, failed };
   };

@@ -59,6 +59,9 @@ const notices = [
   { kind: "slow_down", title: "You're sending messages fast" },
   { kind: "chat_daily", title: "You've reached today's chat limit" },
   { kind: "chats_daily", title: "You've started a lot of chats today" },
+  // Paid chat (spec 0004, AC-10): too few credits for a paid message.
+  { kind: "chat_credits", title: "Not enough credits to keep chatting" },
+  { kind: "chat_credits_guest", title: "You've used today's free messages" },
 ] as const;
 
 for (const { kind, title } of notices) {
@@ -121,6 +124,9 @@ test("/design shows every limit notice, and Got it dismisses one", async ({
     "chats_daily",
     "runs_daily",
     "spend_cap",
+    "chat_credits",
+    "chat_credits_guest",
+    "free_chat_used",
     "guest_limit",
   ])
     await expect(page.getByTestId(`notice-${id}`)).toBeVisible();

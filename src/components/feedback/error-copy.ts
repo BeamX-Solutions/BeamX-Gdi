@@ -1,3 +1,4 @@
+import { billingConfig } from "@/billing/config";
 import type { ReportError } from "@/db/queries/reports";
 import type { ErrorKind } from "./error-card";
 
@@ -91,7 +92,12 @@ export type ChatErrorKind =
   | "chat_daily"
   | "chats_daily"
   | "runs_daily"
-  | "answered";
+  | "answered"
+  | "chat_credits"
+  | "chat_credits_guest"
+  | "free_chat_used";
+
+const ceiling = billingConfig.chat.ceilingCredits;
 
 /**
  * Chat error card copy (spec 0006, AC-7, AC-14; spec 0007, AC-11). The action label is
@@ -151,5 +157,22 @@ export const chatErrorCopy: Readonly<Record<ChatErrorKind, ErrorCopy>> = {
     title: "Already answered",
     message: "Loading the reply to that message.",
     actionLabel: "Reload",
+  },
+  // Paid chat (spec 0004, AC-9, AC-10, AC-11).
+  chat_credits: {
+    title: "Not enough credits to keep chatting",
+    message: `Each message now uses up to ${ceiling} credits. Your free messages come back tomorrow.`,
+    actionLabel: "Got it",
+  },
+  chat_credits_guest: {
+    title: "You've used today's free messages",
+    message:
+      "Free accounts are coming soon, with more credits. Come back tomorrow to keep chatting.",
+    actionLabel: "Got it",
+  },
+  free_chat_used: {
+    title: "That was your last free message today",
+    message: `From now on each message uses about 1 credit, never more than ${ceiling}. Free messages come back tomorrow.`,
+    actionLabel: "Got it",
   },
 };

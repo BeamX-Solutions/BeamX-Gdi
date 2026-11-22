@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { UIMessageChunk } from "ai";
+import { billingConfig } from "@/billing/config";
 import type { TurnContext } from "@/db/queries/conversations";
 import type { NewMessage } from "@/db/queries/messages";
 import type { UsageInput } from "@/db/queries/usage";
@@ -28,6 +29,7 @@ const CONV = "0190a000-0000-7000-8000-000000000c01";
 const MSG = "0190a000-0000-7000-8000-000000000d01";
 const MSG2 = "0190a000-0000-7000-8000-000000000d02";
 const REPLY = "0190a000-0000-7000-8000-000000000e01";
+const HOLD = "0190a000-0000-7000-8000-000000000f01";
 
 const USAGE: ChatUsage = {
   model: "claude-opus-5-5",
@@ -58,6 +60,7 @@ const turnOutput = (over: Partial<TurnOutput> = {}): TurnOutput => ({
   metered: true,
   busy: false,
   usage: Promise.resolve(USAGE),
+  failed: Promise.resolve(false),
   release: vi.fn(async () => {}),
   ...over,
 });
@@ -96,6 +99,15 @@ const fakeDeps = (over: Partial<ChatApiDeps> = {}) => {
       countChats: async () => {},
     },
     limits: { maxChars: 4000, perRun: 40, chatPerGuest: 30, chatsPerGuest: 20 },
+    billing: {
+      config: billingConfig,
+      freeUsed: async () => 0,
+      countFree: async () => {},
+      noticeOnce: async () => false,
+      openAccount: async () => ({ created: false, granted: 0 }),
+      holdChat: async () => ok({ holdId: HOLD }),
+      settleChat: async () => ({ available: 27, held: 0 }),
+    },
     waitUntil: (task) => {
       pending.push(task);
     },
@@ -190,7 +202,14 @@ describe("postChat: input and ownership (AC-2, AC-7)", () => {
     // The guest flag and IP reach the tools for the run limits (spec 0008).
     expect(handle).toHaveBeenCalledWith(
       expect.objectContaining({
-        context: { ownerId: USER, active, isGuest: true, ip: "1.2.3.4" },
+        context: {
+          ownerId: USER,
+          active,
+          // A typed message with no run: the first of 5 free guest messages.
+          freeMessagesLeft: 4,
+          isGuest: true,
+          ip: "1.2.3.4",
+        },
       }),
     );
   });
@@ -208,7 +227,10 @@ describe("postChat: one writer per turn (AC-2)", () => {
       }),
     );
     expect(chunks.at(0)).toEqual({ type: "start", messageId: REPLY });
-    expect(chunks.at(-1)).toEqual({ type: "finish" });
+    expect(chunks.at(-1)).toEqual({
+      type: "finish",
+      messageMetadata: { billing: { kind: "free", freeLeft: 9 } },
+    });
     expect(saved).toEqual([
       {
         ownerId: USER,
@@ -422,7 +444,11 @@ const realTurnDeps = (
     saveAnswer: async () => err({ code: "not_found_or_not_in_progress" }),
     complete: async () => ok({}),
     getTool: registry.getTool,
-    aiTurn: async () => ({ stream: aiStream(), usage: Promise.resolve(null) }),
+    aiTurn: async () => ({
+      stream: aiStream(),
+      usage: Promise.resolve(null),
+      failed: Promise.resolve(false),
+    }),
     newId: () => `tok-${++ids.n}`,
     now: () => 0,
     log: () => {},
@@ -1012,5 +1038,280 @@ describe("postChat: abuse limits at chat (spec 0008, AC-5, AC-6, AC-7)", () => {
     expect(g.calls.read).toBe(0);
     expect(turnContext).toHaveBeenCalledWith(USER, CONV, MSG, true);
     expect(handle).toHaveBeenCalledOnce();
+  });
+});
+
+describe("postChat: paid chat (spec 0004, AC-9, AC-10, AC-11)", () => {
+  const RUN = "0190a000-0000-7000-8000-000000000b01";
+  const send = (deps: ChatApiDeps, message: unknown, isGuest = false) =>
+    postChat(deps, {
+      userId: USER,
+      isGuest,
+      ip: "102.89.1.2",
+      body: { conversationId: CONV, message },
+    });
+
+  const kindOf = (chunks: readonly UIMessageChunk[]) =>
+    chunks.flatMap((c) =>
+      c.type === "data-error"
+        ? [(c as { data: { kind: string } }).data.kind]
+        : [],
+    );
+
+  /** Billing fakes that record each call; `used` is today's free count. */
+  const billing = (
+    over: Partial<ChatApiDeps["billing"]> & { used?: number | null } = {},
+  ) => {
+    const { used = 0, ...rest } = over;
+    const calls = {
+      hold: vi.fn(async () => ok({ holdId: HOLD })),
+      settle: vi.fn<ChatApiDeps["billing"]["settleChat"]>(async () => ({
+        available: 26,
+        held: 0,
+      })),
+      countFree: vi.fn<ChatApiDeps["billing"]["countFree"]>(async () => {}),
+      openAccount: vi.fn<ChatApiDeps["billing"]["openAccount"]>(async () => ({
+        created: true,
+        granted: 30,
+      })),
+      freeUsed: vi.fn(async () => used),
+    };
+    const value: ChatApiDeps["billing"] = {
+      config: billingConfig,
+      freeUsed: calls.freeUsed,
+      countFree: calls.countFree,
+      noticeOnce: async () => true,
+      openAccount: calls.openAccount,
+      holdChat: calls.hold,
+      settleChat: calls.settle,
+      ...rest,
+    };
+    return { value, calls };
+  };
+
+  const ACCOUNT_FREE = billingConfig.chat.freePerDay.account;
+
+  it("holds the ceiling past the allowance, then charges the real cost once", async () => {
+    const b = billing({ used: ACCOUNT_FREE });
+    const { deps, pending } = fakeDeps({ billing: b.value });
+    const chunks = await readAll(await send(deps, typed("one more question")));
+    await Promise.all(pending);
+    expect(b.calls.openAccount).toHaveBeenCalledWith(USER, false, "102.89.1.2");
+    expect(b.calls.hold).toHaveBeenCalledWith(
+      USER,
+      REPLY,
+      billingConfig.chat.ceilingCredits,
+    );
+    expect(b.calls.settle).toHaveBeenCalledOnce();
+    const [holdId, credits] = b.calls.settle.mock.calls[0] ?? [];
+    expect(holdId).toBe(HOLD);
+    expect(credits).toBeGreaterThanOrEqual(1);
+    expect(credits).toBeLessThanOrEqual(billingConfig.chat.ceilingCredits);
+    expect(chunks.at(-1)).toEqual({
+      type: "finish",
+      messageMetadata: {
+        billing: {
+          kind: "charged",
+          credits,
+          summary: { available: 26, held: 0 },
+        },
+      },
+    });
+    expect(b.calls.countFree).not.toHaveBeenCalled();
+  });
+
+  it("shows the short balance notice instead of the AI call when the ceiling is not covered", async () => {
+    const b = billing({
+      used: ACCOUNT_FREE,
+      holdChat: async () =>
+        err({ code: "insufficient_credits" as const, available: 2 }),
+    });
+    const handle = vi.fn();
+    const { deps, saved } = fakeDeps({ billing: b.value, handleTurn: handle });
+    const chunks = await readAll(await send(deps, typed("hi")));
+    expect(kindOf(chunks)).toEqual(["chat_credits"]);
+    expect(handle).not.toHaveBeenCalled();
+    expect(saved).toEqual([]);
+  });
+
+  it("gives a guest the sign up variant of the short balance notice", async () => {
+    const b = billing({
+      used: billingConfig.chat.freePerDay.guest,
+      holdChat: async () =>
+        err({ code: "insufficient_credits" as const, available: 0 }),
+    });
+    const { deps } = fakeDeps({ billing: b.value });
+    const chunks = await readAll(await send(deps, typed("hi"), true));
+    expect(kindOf(chunks)).toEqual(["chat_credits_guest"]);
+    expect(b.calls.openAccount).toHaveBeenCalledWith(USER, true, "102.89.1.2");
+  });
+
+  it("treats an unknown free count (Redis down) as paid", async () => {
+    const b = billing({ used: null });
+    const { deps, pending } = fakeDeps({ billing: b.value });
+    await readAll(await send(deps, typed("hi")));
+    await Promise.all(pending);
+    expect(b.calls.hold).toHaveBeenCalledOnce();
+  });
+
+  it("releases the hold (charges 0) when the AI call failed", async () => {
+    const b = billing({ used: ACCOUNT_FREE });
+    const { deps, pending } = fakeDeps({
+      billing: b.value,
+      handleTurn: async () => ok(turnOutput({ failed: Promise.resolve(true) })),
+    });
+    await readAll(await send(deps, typed("hi")));
+    await Promise.all(pending);
+    expect(b.calls.settle).toHaveBeenCalledWith(HOLD, 0);
+  });
+
+  /** An inner stream the test ends by hand, after the client has pressed Stop. */
+  const heldOpen = () => {
+    const ctl: { c: ReadableStreamDefaultController<UIMessageChunk> | null } = {
+      c: null,
+    };
+    const stream = new ReadableStream<UIMessageChunk>({
+      start: (c) => {
+        ctl.c = c;
+      },
+    });
+    return { stream, ctl };
+  };
+
+  it("charges nothing on a Stop before any output", async () => {
+    const b = billing({ used: ACCOUNT_FREE });
+    const inner = heldOpen();
+    const { deps } = fakeDeps({
+      billing: b.value,
+      handleTurn: async () => ok(turnOutput({ stream: inner.stream })),
+    });
+    const response = await send(deps, typed("hi"));
+    if (response.kind !== "stream") throw new Error("expected a stream");
+    const reader = response.stream.getReader();
+    await reader.read(); // the start chunk
+    await reader.cancel();
+    inner.ctl.c?.close(); // the turn ends on the server after the Stop
+    await vi.waitFor(() =>
+      expect(b.calls.settle).toHaveBeenCalledWith(HOLD, 0),
+    );
+  });
+
+  it("charges the cost so far on a Stop after output started", async () => {
+    const b = billing({ used: ACCOUNT_FREE });
+    const inner = heldOpen();
+    const { deps } = fakeDeps({
+      billing: b.value,
+      handleTurn: async () => ok(turnOutput({ stream: inner.stream })),
+    });
+    const response = await send(deps, typed("hi"));
+    if (response.kind !== "stream") throw new Error("expected a stream");
+    const reader = response.stream.getReader();
+    await reader.read(); // the start chunk
+    inner.ctl.c?.enqueue({ type: "text-start", id: "t" });
+    inner.ctl.c?.enqueue({ type: "text-delta", id: "t", delta: "Half" });
+    for (;;) {
+      const next = await reader.read();
+      if (next.done || next.value.type === "text-delta") break;
+    }
+    await reader.cancel();
+    inner.ctl.c?.close();
+    await vi.waitFor(() => expect(b.calls.settle).toHaveBeenCalledOnce());
+    expect(b.calls.settle.mock.calls[0]?.[1]).toBeGreaterThanOrEqual(1);
+  });
+
+  it("releases the hold of a busy turn", async () => {
+    const b = billing({ used: ACCOUNT_FREE });
+    const { deps, pending } = fakeDeps({
+      billing: b.value,
+      handleTurn: async () => ok(turnOutput({ busy: true, metered: false })),
+    });
+    await readAll(await send(deps, typed("hi")));
+    await Promise.all(pending);
+    expect(b.calls.settle).toHaveBeenCalledWith(HOLD, 0);
+    expect(b.calls.settle).toHaveBeenCalledOnce();
+  });
+
+  it("counts a free reply, and adds the once a day notice on the last free one", async () => {
+    const b = billing({ used: ACCOUNT_FREE - 1 });
+    const { deps } = fakeDeps({ billing: b.value });
+    const chunks = await readAll(await send(deps, typed("hi")));
+    expect(b.calls.countFree).toHaveBeenCalledWith(USER);
+    expect(b.calls.hold).not.toHaveBeenCalled();
+    expect(kindOf(chunks)).toEqual(["free_chat_used"]);
+    expect(chunks.at(-1)).toEqual({
+      type: "finish",
+      messageMetadata: { billing: { kind: "free", freeLeft: 0 } },
+    });
+  });
+
+  it("shows the last free notice only when it was not shown today", async () => {
+    const b = billing({
+      used: ACCOUNT_FREE - 1,
+      noticeOnce: async () => false,
+    });
+    const { deps } = fakeDeps({ billing: b.value });
+    const chunks = await readAll(await send(deps, typed("hi")));
+    expect(kindOf(chunks)).toEqual([]);
+  });
+
+  it("does not count a free reply that failed", async () => {
+    const b = billing({ used: 0 });
+    const { deps } = fakeDeps({
+      billing: b.value,
+      handleTurn: async () => ok(turnOutput({ failed: Promise.resolve(true) })),
+    });
+    await readAll(await send(deps, typed("hi")));
+    expect(b.calls.countFree).not.toHaveBeenCalled();
+  });
+
+  it("never bills a typed message while a run is in progress", async () => {
+    const b = billing({ used: ACCOUNT_FREE });
+    const { deps } = fakeDeps({
+      billing: b.value,
+      handleTurn: async () => ok(turnOutput({ metered: false })),
+      turnContext: async () =>
+        ok({
+          active: {
+            active: {
+              run: {
+                id: RUN,
+                toolId: "sample",
+                toolVersion: "2",
+                status: "in_progress",
+              },
+              answers: [],
+            },
+            paused: [],
+          } as unknown as TurnContext["active"],
+          typedInRun: 0,
+          message: { saved: false, answered: false },
+          created: false,
+        }),
+    });
+    await readAll(await send(deps, typed("what does that mean?")));
+    expect(b.calls.hold).not.toHaveBeenCalled();
+    expect(b.calls.countFree).not.toHaveBeenCalled();
+  });
+
+  it("never reads or bills a card tap", async () => {
+    const b = billing({ used: ACCOUNT_FREE });
+    const { deps } = fakeDeps({
+      billing: b.value,
+      handleTurn: async () => ok(turnOutput({ metered: false })),
+    });
+    await readAll(
+      await send(deps, {
+        id: MSG2,
+        role: "user",
+        parts: [
+          {
+            type: "data-answer",
+            data: { runId: RUN, questionId: "q1", value: "a" },
+          },
+        ],
+      }),
+    );
+    expect(b.calls.freeUsed).not.toHaveBeenCalled();
+    expect(b.calls.hold).not.toHaveBeenCalled();
   });
 });

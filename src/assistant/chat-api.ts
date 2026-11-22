@@ -9,9 +9,23 @@
  * Limits (AC-8, and spec 0008's abuse limits) are checked before the turn: a notice
  * stream, never saved, with no lock and no AI call. A turn's stream is resumable (AC-6): the route buffers a copy under the
  * assistant message id, and `onEnd` forgets it once the reply is saved.
+ *
+ * Paid chat (spec 0004, AC-9, AC-10): a metered turn (a typed message with no run in
+ * progress) is free while today's allowance lasts. Past it, the ceiling is held before
+ * the AI call (or the short balance notice is shown instead), and the hold is settled
+ * once when the turn ends: charged on a reply, released on an AI error or a Stop before
+ * any output. Whatever slips through is released by the daily sweep.
  */
 import { createUIMessageStream, type UIMessageChunk } from "ai";
 import { z } from "zod";
+import {
+  chatSettleAmount,
+  planChat,
+  type ChatEnd,
+  type ChatPlan,
+} from "@/billing/chat-billing";
+import type { BillingConfig } from "@/billing/config";
+import type { CreditSummary } from "@/billing/summary";
 import type { TurnContext, TurnContextError } from "@/db/queries/conversations";
 import type { NewMessage } from "@/db/queries/messages";
 import type { UsageInput } from "@/db/queries/usage";
@@ -19,6 +33,7 @@ import { costUsd } from "@/lib/ai-cost";
 import type { ChatGuard } from "@/lib/limits";
 import { ok, type Result } from "@/lib/result";
 import type { SpendCapError } from "@/lib/spend-cap";
+import type { ChatMetadata } from "./part-schemas";
 import { classifyMessage, type TurnKind } from "./parts";
 import type { ChatUsage, TurnError, TurnInput, TurnOutput } from "./turn";
 
@@ -61,6 +76,37 @@ export type ChatApiDeps = {
     readonly perRun: number;
     readonly chatPerGuest: number;
     readonly chatsPerGuest: number;
+  };
+  /** Paid chat (spec 0004, AC-9 to AC-11). Redis reads never throw. */
+  readonly billing: {
+    readonly config: Pick<BillingConfig, "ngnPerCredit" | "chat">;
+    /** Free messages used today, or null when Redis could not say (then paid). */
+    readonly freeUsed: (userId: string) => Promise<number | null>;
+    /** Counts a completed free reply. */
+    readonly countFree: (userId: string) => Promise<void>;
+    /** True only the first time today: the "chat now costs" notice shows once. */
+    readonly noticeOnce: (userId: string) => Promise<boolean>;
+    /** Opens the credit account with the starter grant (guest IP cap applies). */
+    readonly openAccount: (
+      userId: string,
+      isGuest: boolean,
+      ip: string | null,
+    ) => Promise<unknown>;
+    readonly holdChat: (
+      userId: string,
+      messageId: string,
+      amount: number,
+    ) => Promise<
+      Result<
+        { readonly holdId: string },
+        { readonly code: "insufficient_credits"; readonly available: number }
+      >
+    >;
+    /** Charges (`charged > 0`) or releases (`0`) the hold; the chip's numbers after. */
+    readonly settleChat: (
+      holdId: string,
+      charged: number,
+    ) => Promise<CreditSummary | null>;
   };
   /** Keeps work alive after the response ends (Next's `after`). */
   readonly waitUntil: (task: Promise<unknown>) => void;
@@ -129,7 +175,9 @@ export type NoticeKind =
   | "spend_cap"
   | "slow_down"
   | "chat_daily"
-  | "chats_daily";
+  | "chats_daily"
+  | "chat_credits"
+  | "chat_credits_guest";
 
 /**
  * A limit notice (step 5): one assistant message holding a `data-error` part. It is not
@@ -164,17 +212,125 @@ export const limitHit = (
   return null;
 };
 
-/** Appends the `finish` chunk the inner streams leave out, once they end cleanly. */
-const withFinish = (
+/** Chunks that are not the model's output, so a Stop before them charges nothing. */
+const SILENT_CHUNKS: ReadonlySet<string> = new Set([
+  "start-step",
+  "finish-step",
+]);
+
+type ReplyEnd = {
+  readonly chunks: readonly UIMessageChunk[];
+  readonly metadata?: ChatMetadata;
+};
+
+const NOTHING: ReplyEnd = { chunks: [] };
+
+/**
+ * Passes `stream` through, calls `onOutput` at each chunk of real output, and once it
+ * ends cleanly runs `beforeFinish` (which may add chunks and metadata), then appends
+ * the `finish` chunk the inner streams leave out.
+ */
+export const withFinish = (
   stream: ReadableStream<UIMessageChunk>,
+  onOutput: () => void = () => {},
+  beforeFinish: () => Promise<ReplyEnd> = async () => NOTHING,
 ): ReadableStream<UIMessageChunk> =>
   stream.pipeThrough(
     new TransformStream<UIMessageChunk, UIMessageChunk>({
-      flush: (controller) => {
-        controller.enqueue({ type: "finish" });
+      transform: (chunk, controller) => {
+        if (!SILENT_CHUNKS.has(chunk.type)) onOutput();
+        controller.enqueue(chunk);
+      },
+      flush: async (controller) => {
+        const extra = await beforeFinish();
+        for (const chunk of extra.chunks) controller.enqueue(chunk);
+        controller.enqueue(
+          extra.metadata === undefined
+            ? { type: "finish" }
+            : { type: "finish", messageMetadata: extra.metadata },
+        );
       },
     }),
   );
+
+/** How a turn is paid: not metered, free, or a paid turn with its ceiling hold. */
+type ChatBill =
+  | { readonly kind: "none" }
+  | {
+      readonly kind: "free";
+      readonly plan: Extract<ChatPlan, { kind: "free" }>;
+    }
+  | { readonly kind: "paid"; readonly holdId: string };
+
+/**
+ * Settles a turn's bill (spec 0004, AC-9, AC-10). A paid turn's hold is charged from the
+ * turn's real cost, or released; a free turn that completed is counted, and the one that
+ * used the last free message adds the once a day notice. Returns what the reply's end
+ * carries. Never throws: a failed settle is logged and the daily sweep releases the hold.
+ */
+export const settleBill = async (
+  deps: Pick<ChatApiDeps, "billing" | "log">,
+  bill: ChatBill,
+  userId: string,
+  end: ChatEnd,
+  usage: Promise<ChatUsage | null>,
+): Promise<ReplyEnd> => {
+  try {
+    switch (bill.kind) {
+      case "none":
+        return NOTHING;
+      case "free": {
+        if (end.kind !== "completed") return NOTHING;
+        await deps.billing.countFree(userId);
+        const notice: UIMessageChunk[] =
+          bill.plan.last && (await deps.billing.noticeOnce(userId))
+            ? [
+                {
+                  type: "data-error",
+                  data: { kind: "free_chat_used", retry: false },
+                },
+              ]
+            : [];
+        return {
+          chunks: notice,
+          metadata: { billing: { kind: "free", freeLeft: bill.plan.left } },
+        };
+      }
+      case "paid": {
+        const totals = await usage;
+        const cost = totals === null ? null : costUsd(totals.model, totals);
+        const credits = chatSettleAmount(
+          end,
+          cost !== null && cost.ok ? Number(cost.value) : null,
+          deps.billing.config,
+        );
+        const summary = await deps.billing.settleChat(bill.holdId, credits);
+        deps.log("chat_charge", {
+          holdId: bill.holdId,
+          credits,
+          end: end.kind,
+        });
+        return {
+          chunks: [],
+          metadata: {
+            billing: {
+              kind: "charged",
+              credits,
+              ...(summary === null ? {} : { summary }),
+            },
+          },
+        };
+      }
+      default: {
+        const unreachable: never = bill;
+        return unreachable;
+      }
+    }
+  } catch {
+    deps.log("chat_settle_failed", { kind: bill.kind });
+    return NOTHING;
+  }
+};
 
 /** Records the AI turn's `ai_usage` row once its usage settles (step 7.3). */
 const recordChatUsage = async (
@@ -284,9 +440,12 @@ export const postChat = async (
 
   // A guest's daily counts, and for a typed message the spend cap, read in parallel
   // before the DB round trip (spec 0008). Signed in users skip both.
-  const [counts, cap] = await Promise.all([
+  // Today's free chat count, read for every typed message (spec 0004, AC-9).
+  const isText = classified.value.turn.kind === "text";
+  const [counts, cap, freeUsed] = await Promise.all([
     input.isGuest ? deps.guards.dailyCounts(input.userId) : null,
     typed ? deps.guestSpendCap() : ok(undefined),
+    isText ? deps.billing.freeUsed(input.userId) : null,
   ]);
   // Same rule as `overLimit`: with a limit of 20, a count of 20 refuses the 21st.
   const mayCreate = counts === null || counts.chats < deps.limits.chatsPerGuest;
@@ -349,36 +508,121 @@ export const postChat = async (
     };
   }
 
-  const turn = await deps.handleTurn({
-    userId: input.userId,
-    conversationId,
-    message,
-    context: {
-      ownerId: input.userId,
-      active: context.value.active,
-      isGuest: input.isGuest,
-      ip: input.ip,
-    },
-  });
-  if (!turn.ok)
+  // Paid chat (spec 0004): the rule `handleTurn` meters by, decided here so the ceiling
+  // is held, or the short balance notice shown, before the turn takes the lock.
+  const plan =
+    isText && !runInProgress
+      ? planChat(
+          freeUsed,
+          deps.billing.config.chat.freePerDay[
+            input.isGuest ? "guest" : "account"
+          ],
+        )
+      : null;
+  const bill = await (async (): Promise<ChatBill | null> => {
+    if (plan === null) return { kind: "none" };
+    if (plan.kind === "free") return { kind: "free", plan };
+    await deps.billing.openAccount(input.userId, input.isGuest, input.ip);
+    const held = await deps.billing.holdChat(
+      input.userId,
+      assistantId,
+      deps.billing.config.chat.ceilingCredits,
+    );
+    return held.ok ? { kind: "paid", holdId: held.value.holdId } : null;
+  })();
+  // Too little to cover the ceiling (AC-10): no AI call, nothing saved.
+  if (bill === null)
+    return notice(input.isGuest ? "chat_credits_guest" : "chat_credits", {
+      conversationId,
+    });
+  // A paid hold that never reaches a turn is released at once.
+  const dropBill = () => {
+    if (bill.kind === "paid")
+      deps.waitUntil(
+        settleBill(deps, bill, input.userId, { kind: "failed" }, NO_USAGE),
+      );
+  };
+
+  const turn = await deps
+    .handleTurn({
+      userId: input.userId,
+      conversationId,
+      message,
+      context: {
+        ownerId: input.userId,
+        active: context.value.active,
+        ...(plan === null
+          ? {}
+          : { freeMessagesLeft: plan.kind === "free" ? plan.left : 0 }),
+        isGuest: input.isGuest,
+        ip: input.ip,
+      },
+    })
+    .catch((e: unknown) => {
+      dropBill();
+      throw e;
+    });
+  if (!turn.ok) {
+    dropBill();
     return turn.error.code === "not_found"
       ? json(404, "not_found")
       : json(400, "invalid_message");
+  }
 
-  const { stream: inner, busy, metered, usage, release } = turn.value;
+  const { stream: inner, busy, metered, usage, failed, release } = turn.value;
+  if (busy) dropBill();
+  const live: ChatBill = busy ? { kind: "none" } : bill;
+  // Settled once: at the clean end (before `finish`, so the chip's numbers ride on the
+  // reply), or on a cancel or stream error (Stop).
+  const billing = { settled: false, output: false };
+  const settleOnce = async (end: () => Promise<ChatEnd>): Promise<ReplyEnd> => {
+    if (billing.settled) return NOTHING;
+    billing.settled = true;
+    return settleBill(deps, live, input.userId, await end(), usage);
+  };
   try {
     if (metered)
       deps.log("chat_metered", { conversationId, messageId: assistantId });
     // The turn ran on a new typed message with no run in progress: count it (AC-5).
     if (guestTyped && metered && !busy)
       deps.waitUntil(deps.guards.countChat(input.userId));
+    const stopped = async () => {
+      deps.waitUntil(
+        settleOnce(async () => ({
+          kind: "stopped",
+          receivedOutput: billing.output,
+        })),
+      );
+      await release();
+    };
     const stream = createUIMessageStream({
       generateId: () => assistantId,
       execute: ({ writer }) => {
         writer.write({ type: "start", messageId: assistantId });
-        writer.merge(withFinish(onAbort(inner, release)));
+        writer.merge(
+          withFinish(
+            onAbort(inner, stopped),
+            () => {
+              billing.output = true;
+            },
+            () =>
+              settleOnce(async () =>
+                (await failed) ? { kind: "failed" } : { kind: "completed" },
+              ),
+          ),
+        );
       },
       onEnd: async ({ responseMessage }) => {
+        // A clean end settles the bill before `finish`, so reaching here unsettled means
+        // the client cancelled the response (Stop): the clean end will never come, and
+        // the bill is settled from whether output had arrived by then (AC-10).
+        if (!billing.settled)
+          deps.waitUntil(
+            settleOnce(async () => ({
+              kind: "stopped",
+              receivedOutput: billing.output,
+            })),
+          );
         // A busy notice is shown, never saved (AC-2).
         if (!busy) {
           await saveReply(deps, conversationId, {
@@ -401,7 +645,10 @@ export const postChat = async (
       resumable: busy ? null : { conversationId, streamId: assistantId },
     };
   } catch (e) {
+    dropBill();
     await release();
     throw e;
   }
 };
+
+const NO_USAGE: Promise<ChatUsage | null> = Promise.resolve(null);

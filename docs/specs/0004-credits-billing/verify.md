@@ -37,3 +37,45 @@ Built so far: milestone 1 tasks 1 to 3 (billing core: config, pricing, migration
 
 - Covered now: AC-3, AC-4, AC-5, AC-7 (query layer), AC-11 (grant only; IP cap with task 9), AC-12, AC-18 (config and pricing), AC-19 (credit rows), AC-20 (SQL invariants; daily drift job with task 19)
 - Not yet built: AC-1, AC-2, AC-8, AC-14, AC-21 (tasks 4 and 5, after #7) · AC-6, AC-9, AC-10 (milestone 2) · AC-13 (milestone 3) · AC-15, AC-16, AC-17 (milestone 4)
+
+## Milestone 2: hold lifecycle and paid chat · updated 2026-11-22
+
+### UI / manual
+- [ ] As a signed in user (or a guest), send 10 typed messages (5 as a guest) with no run in progress → each is free; Upstash shows `billing:free-chat:<userId>:<lagosDate>` counting up; no `chat_charge` ledger entry → AC-9
+- [ ] The reply that uses the last free message ends with "That was your last free message today"; send another and the card does not appear again that day → AC-9
+- [ ] The next typed message holds 3 (`credit_hold` purpose `chat`, `active`), then charges 1 to 3 credits: one `chat_charge` entry, the hold `charged`, and the header chip drops by the charge without a reload → AC-10
+- [ ] With a run in progress, type a side question past the allowance → no hold, no charge, the free counter does not move → AC-9
+- [ ] With fewer than 3 credits available past the allowance, a typed message gets "Not enough credits to keep chatting" (a guest: "You've used today's free messages"), no AI call, nothing saved; Got it puts the text back → AC-10, AC-21
+- [ ] Force an AI error on a paid message (bad `ANTHROPIC_API_KEY` in dev) → the hold is released as `chat_error`, nothing charged → AC-10
+- [ ] With Upstash unset in dev, press Stop before any text arrives on a paid message → the hold is released, nothing charged; Stop after text started → 1 or more credits charged → AC-10 (see the note on resumable streams below)
+- [ ] Point `UPSTASH_REDIS_REST_URL` at a dead host and send a typed message → it is treated as paid (holds 3 if the balance covers it, else the short balance card), never a 500 → AC-9
+- [ ] Four new guests from one IP approve a run in the same Lagos day → the first three get 30 credits, the fourth gets an account with 0 and sees the guest short balance card; `billing:guest-grant:<ip>:<lagosDate>` reads 3 → AC-11
+- [ ] Pause a run, set its `tool_run.updated_at` 31 days back, call `GET /api/cron/billing` with `Authorization: Bearer $CRON_SECRET` → `{ releasedIdle: 1 }`, the hold `released` (`idle`); resuming shows the confirm card at today's price, and the answers are kept → AC-7
+- [ ] Same call without the header, or with a wrong token → 401, nothing released → AC-7
+- [ ] Place a chat hold and set its `created_at` 16 minutes back, then call the cron → released as `chat_error` → AC-10
+- [ ] Open `/design` → the Limit notices block also shows the two short balance notices and the last free message card; Got it dismisses each → AC-9, AC-10
+
+### Commands
+- [ ] `pnpm test src/billing src/assistant/chat-api.test.ts src/components/workspace/chat-view.test.ts src/lib/env.test.ts` → all pass → AC-9, AC-10, AC-11, AC-21
+- [ ] `pnpm test:integration src/db/queries/credits.int.test.ts` on a throwaway Neon branch → the chat hold, sweep, and "phased report is charged once" cases pass → AC-6, AC-7, AC-10
+- [ ] `SKIP_ENV_VALIDATION=1 ENABLE_DESIGN_PAGE=true pnpm build && pnpm e2e e2e/limits.spec.ts` → the two new notices render, pass axe, and give the text back → AC-10, AC-21
+
+### Value sourcing
+- [ ] Today's date for the allowance: a message at 22:59 UTC counts on today's key, one at 23:00 UTC on tomorrow's (`chat-billing.test.ts`) → AC-9
+- [ ] Free messages left: `freePerDay` (10 account, 5 guest) minus the Redis count; the reply metadata carries `freeLeft` → AC-9
+- [ ] Run in progress: only `tool_run.status = 'in_progress'` in this chat exempts a message; a paused run does not → AC-9
+- [ ] Ceiling to hold: `billingConfig.chat.ceilingCredits` (3); changing it changes new holds only → AC-10, AC-18
+- [ ] Credits charged: `chatCharge(costUsd)` over the turn's `ai_usage` cost; a charge never exceeds the hold → AC-10
+- [ ] Notice shown today: `billing:free-notice:<userId>:<lagosDate>` set once (48 hour expiry) → AC-9
+- [ ] Starter grant amount: 30, or 0 when the IP counter is at 3; signed in users and guests with no IP are never capped → AC-11
+
+### Known gap
+- Stop with resumable streams on (Upstash set, so production): the server tees the stream into Redis and keeps generating after a client Stop, so the turn ends cleanly and is charged as a finished reply. "Stop before any output costs nothing" holds only where resumable streams are off. Needs a decision (`/architect credits & billing`).
+
+### Acceptance criteria coverage (milestone 2)
+- AC-2 (resume `price_changed`), AC-7 · manual idle sweep steps · credits integration tests · `resume-run` tool (built with spec 0006)
+- AC-6 · "a phased report is charged once" integration test
+- AC-9 · manual free steps · chat-api and chat-billing tests · value sourcing rows
+- AC-10 · manual paid, error, Stop and sweep steps · chat-api, chat-billing and credits integration tests (Stop gap above)
+- AC-11 (IP cap) · manual four guests step · chat-billing tests
+- AC-21 · short balance notices in e2e and chat-view tests

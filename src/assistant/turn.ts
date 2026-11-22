@@ -150,6 +150,11 @@ export type AiTurnResult = {
    * the steps that ran, or null when no step reported usage. Never rejects.
    */
   readonly usage: Promise<ChatUsage | null>;
+  /**
+   * Settles with the usage: true when the AI call failed (no finish, or the turn could
+   * not open), so a paid turn charges nothing (spec 0004, AC-10). Never rejects.
+   */
+  readonly failed: Promise<boolean>;
 };
 
 export type TurnOutput = {
@@ -160,6 +165,8 @@ export type TurnOutput = {
   readonly busy: boolean;
   /** The AI turn's token totals; null for card and busy turns. Never rejects. */
   readonly usage: Promise<ChatUsage | null>;
+  /** Whether the AI call failed; false for card and busy turns. Never rejects. */
+  readonly failed: Promise<boolean>;
   /**
    * Frees the turn lock. The route calls it after saving the reply (spec 0007), so the
    * lock covers the whole turn. Idempotent and never throws; a no op on a busy turn.
@@ -203,6 +210,7 @@ export const once = (run: () => Promise<void>): (() => Promise<void>) => {
 };
 
 const NO_USAGE: Promise<ChatUsage | null> = Promise.resolve(null);
+const NOT_FAILED: Promise<boolean> = Promise.resolve(false);
 
 const BUSY: ServerPart = {
   type: "data-error",
@@ -394,6 +402,7 @@ export const handleTurn = async (
       metered: false,
       busy: true,
       usage: NO_USAGE,
+      failed: NOT_FAILED,
       release: async () => {},
     });
   }
@@ -431,7 +440,7 @@ export const handleTurn = async (
         (await deps.getActive(owner.current, conversationId));
       const metered =
         turn.kind === "text" && active.active?.run.status !== "in_progress";
-      const { stream, usage } = await deps.aiTurn({
+      const { stream, usage, failed } = await deps.aiTurn({
         ownerId: owner.current,
         conversationId,
         message,
@@ -448,7 +457,7 @@ export const handleTurn = async (
         conversationId,
         ms: deps.now() - started,
       });
-      return ok({ stream, metered, busy: false, usage, release });
+      return ok({ stream, metered, busy: false, usage, failed, release });
     }
 
     const [active, recent] = await Promise.all([
@@ -482,6 +491,7 @@ export const handleTurn = async (
       metered: false,
       busy: false,
       usage: NO_USAGE,
+      failed: NOT_FAILED,
       release,
     });
   } catch (e) {

@@ -111,7 +111,7 @@ export const restartRunTool = (env: ToolEnv) =>
       // Every restart starts a new run (a copy or a fresh one), so a guest's restart
       // passes the spend cap and the daily run limits first (spec 0008, AC-4).
       const start = async (): Promise<RestartRunOutput> => {
-        await deps.ensureAccount(env.owner.current);
+        await deps.ensureAccount(env.owner.current, env.isGuest, env.ip);
         const copied = await asOwner(deps, conversationId, env.owner, (id) =>
           deps.startFromWithHold(id, previousRunId, picked.version, price),
         );

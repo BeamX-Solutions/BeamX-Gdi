@@ -52,13 +52,19 @@ function Block({
   );
 }
 
-/** The abuse limit notices the chat can show (spec 0008, "Friendly notices"). */
+/**
+ * The limit notices the chat can show (spec 0008, "Friendly notices"), and the paid
+ * chat ones (spec 0004, AC-9, AC-10).
+ */
 const limitNoticeKinds: readonly ChatErrorKind[] = [
   "slow_down",
   "chat_daily",
   "chats_daily",
   "runs_daily",
   "spend_cap",
+  "chat_credits",
+  "chat_credits_guest",
+  "free_chat_used",
 ];
 
 /** One limit notice; Got it dismisses it, as in the live chat. */
