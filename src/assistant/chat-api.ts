@@ -30,7 +30,7 @@ import type { TurnContext, TurnContextError } from "@/db/queries/conversations";
 import type { NewMessage } from "@/db/queries/messages";
 import type { UsageInput } from "@/db/queries/usage";
 import { costUsd } from "@/lib/ai-cost";
-import type { ChatGuard } from "@/lib/limits";
+import type { ChatGuard, UserBurstWindow } from "@/lib/limits";
 import { ok, type Result } from "@/lib/result";
 import type { SpendCapError } from "@/lib/spend-cap";
 import type { ChatMetadata } from "./part-schemas";
@@ -166,6 +166,25 @@ export const onAbort = (
     },
   });
 };
+
+/** Turn kinds that never call the AI: card taps (spec 0008, AC-12). */
+const CARD_TURNS: ReadonlySet<TurnKind["kind"]> = new Set([
+  "answer",
+  "prefill_response",
+  "retry",
+]);
+
+/**
+ * The per user burst window for a request (spec 0008, AC-7, AC-12): `cards` only for a
+ * well formed card tap; a typed message, an approval, or any body that fails to parse
+ * uses the strict `user` window. Pure.
+ */
+export const burstWindow = (
+  classified: Result<{ readonly turn: TurnKind }, unknown> | null,
+): UserBurstWindow =>
+  classified?.ok && CARD_TURNS.has(classified.value.turn.kind)
+    ? "cards"
+    : "user";
 
 /** The notices sent instead of a turn: shown, never saved. */
 export type NoticeKind =
@@ -425,16 +444,24 @@ export const postChat = async (
     };
   };
 
-  // The burst windows first (spec 0008, AC-7): Redis only, before the body is parsed.
-  // Guests and signed in users alike.
-  if (!(await deps.guards.burst(input.userId, input.ip)))
-    return notice("slow_down", { conversationId: null });
-
-  const body = bodySchema.safeParse(input.body);
-  if (!body.success) return json(400, "invalid_request");
+  // Parsed first (Zod only, no I/O) so the turn kind can pick the burst window.
   // Checked before anything is written, so a bad message never creates a chat.
-  const classified = classifyMessage(body.data.message);
-  if (!classified.ok) return json(400, "invalid_message");
+  const body = bodySchema.safeParse(input.body);
+  const classified = body.success ? classifyMessage(body.data.message) : null;
+
+  // The burst windows (spec 0008, AC-7, AC-12): Redis only, before any DB work.
+  // Guests and signed in users alike. A body that fails to parse uses the strict window.
+  const refused = await deps.guards.burst(
+    input.userId,
+    input.ip,
+    burstWindow(classified),
+  );
+  if (refused !== null)
+    return notice("slow_down", { conversationId: null, window: refused });
+
+  if (!body.success) return json(400, "invalid_request");
+  if (classified === null || !classified.ok)
+    return json(400, "invalid_message");
   const { conversationId, message } = body.data;
   const typed = input.isGuest && classified.value.turn.kind === "text";
 
@@ -447,8 +474,10 @@ export const postChat = async (
     typed ? deps.guestSpendCap() : ok(undefined),
     isText ? deps.billing.freeUsed(input.userId) : null,
   ]);
-  // Same rule as `overLimit`: with a limit of 20, a count of 20 refuses the 21st.
-  const mayCreate = counts === null || counts.chats < deps.limits.chatsPerGuest;
+  // Only a typed message may create a chat (AC-12). Same rule as `overLimit`: with a
+  // limit of 20, a count of 20 refuses the 21st (AC-6).
+  const mayCreate =
+    isText && (counts === null || counts.chats < deps.limits.chatsPerGuest);
 
   const context = await deps.turnContext(
     input.userId,
@@ -456,9 +485,13 @@ export const postChat = async (
     classified.value.message.id,
     mayCreate,
   );
-  // A new chat the guest may not create today (AC-6): nothing was written.
+  // No chat was created (nothing was written): a typed message over the guest's daily
+  // new chat limit gets the notice (AC-6); any other turn to an unknown chat is a 404
+  // (AC-12).
   if (!context.ok && context.error.code === "chat_limit")
-    return notice("chats_daily", { conversationId });
+    return isText
+      ? notice("chats_daily", { conversationId })
+      : json(404, "not_found");
   if (!context.ok) return json(404, "not_found");
   // Counted once the row exists, whatever happens to the turn (AC-6).
   if (input.isGuest && context.value.created)

@@ -369,6 +369,40 @@ describe("withoutMessageOf (spec 0007, AC-8)", () => {
       true,
     );
   });
+
+  it("after a refused card tap, Got it drops the tap and the notice, and the card is live again (spec 0008, AC-12)", () => {
+    const reply: ViewMessage = {
+      id: "r",
+      role: "assistant",
+      parts: [{ type: "text", text: "Next one." }, question()],
+    };
+    const ms: ViewMessage[] = [
+      reply,
+      {
+        id: "u",
+        role: "user",
+        parts: [
+          {
+            type: "data-answer",
+            data: { runId: RUN, questionId: "stage", value: "idea" },
+          },
+        ],
+      },
+      {
+        id: "n",
+        role: "assistant",
+        parts: [
+          { type: "data-error", data: { kind: "slow_down", retry: false } },
+        ],
+      },
+    ];
+    expect(refusedText(ms, "n:0")).toBeNull();
+    const after = withoutMessageOf(ms, "n:0");
+    expect(after.map((m) => m.id)).toEqual(["r"]);
+    expect(threadItems(after, null).some((i) => i.kind === "question")).toBe(
+      true,
+    );
+  });
 });
 
 const notice = (id: string, kind: string): ViewMessage => ({
