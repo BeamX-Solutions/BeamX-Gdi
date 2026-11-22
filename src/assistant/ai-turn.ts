@@ -367,6 +367,19 @@ export const partsAfterStream = async (
   return open === null ? [] : [questionPart(tool, run.id, answers, open)];
 };
 
+/**
+ * The card for a guest's run a limit refused this turn (spec 0008, AC-2, AC-4): the
+ * daily runs or the spend cap. It is saved with the reply, like any card. Pure.
+ */
+export const refusedParts = (
+  events: readonly ToolEvent[],
+): readonly ServerPart[] => {
+  const refused = lastOf(events, "refused");
+  return refused === undefined
+    ? []
+    : [{ type: "data-error", data: { kind: refused.reason, retry: false } }];
+};
+
 // ---------------------------------------------------------------------------
 // The turn
 // ---------------------------------------------------------------------------
@@ -514,6 +527,8 @@ export const createAiTurn =
       deps,
       conversationId: ctx.conversationId,
       owner,
+      isGuest: ctx.isGuest,
+      ip: ctx.ip,
       record: (event: ToolEvent) => {
         events.push(event);
       },
@@ -625,7 +640,7 @@ export const createAiTurn =
                 events,
                 approvalPending: seen.approvalPending,
               }).catch(() => [AI_ERROR]);
-      writeParts(writer, parts, deps.newId);
+      writeParts(writer, [...parts, ...refusedParts(events)], deps.newId);
       deps.log("assistant_turn", {
         path: "ai_done",
         conversationId: ctx.conversationId,

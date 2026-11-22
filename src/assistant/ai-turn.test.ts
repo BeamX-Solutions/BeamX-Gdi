@@ -251,6 +251,11 @@ const fakeDeps = (
     return ok({});
   },
   openChat: async () => ok({ messages: [...world.history], runs: [] }),
+  limits: {
+    guestSpendCap: async () => ok(undefined),
+    takeRun: async () => ok({ keys: [] }),
+    giveBackRun: async () => {},
+  },
   model: () => ({
     id: "mock",
     model,
@@ -287,6 +292,8 @@ const textTurn = (world: World, id: string, text: string): AiTurnContext => {
     conversationId: CONV,
     message: { id, role: "user", parts: [{ type: "text", text }] },
     active: activeOf(world),
+    isGuest: false,
+    ip: null,
     turn: { kind: "text", text },
   };
 };
@@ -308,6 +315,8 @@ const approvalTurn = (
     conversationId: CONV,
     message: { id, role: "user", parts: [part] },
     active: activeOf(world),
+    isGuest: false,
+    ip: null,
     turn: { kind: "approval", responses: [part] },
   };
 };
@@ -671,6 +680,171 @@ describe("startRun approval (AC-3)", () => {
       )(approvalTurn(world, "m2", approvalOf(proposed)[0] ?? "", true)),
     );
     expect(JSON.stringify(second.calls[0]?.prompt)).toContain('"shortfall":3');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Spec 0008: the guest guards at Approve (AC-2, AC-4)
+// ---------------------------------------------------------------------------
+
+/** Run counters and a spend switch, recorded so a test can check what was taken. */
+const fakeLimits = (opts: { max?: number; capped?: boolean } = {}) => {
+  const state = { taken: 0, givenBack: 0, ips: [] as (string | null)[] };
+  const limits: AiTurnDeps["limits"] = {
+    guestSpendCap: async () =>
+      opts.capped ? err({ code: "spend_cap" }) : ok(undefined),
+    takeRun: async (_userId, ip) => {
+      state.ips.push(ip);
+      if (state.taken - state.givenBack >= (opts.max ?? 3))
+        return err({ code: "run_limit" });
+      state.taken += 1;
+      return ok({ keys: ["k"] });
+    },
+    giveBackRun: async () => {
+      state.givenBack += 1;
+    },
+  };
+  return { state, limits };
+};
+
+/** Proposes with a typed turn, then taps Approve as a guest (or not) from an IP. */
+const tapAs = async (
+  world: World,
+  first: readonly Reply[],
+  second: readonly Reply[],
+  over: Partial<AiTurnDeps>,
+  isGuest = true,
+) => {
+  const one = scriptedModel(first);
+  const proposed = await read(
+    await createAiTurn(fakeDeps(world, one.model, over))(
+      textTurn(world, "m1", "please do it"),
+    ),
+  );
+  world.history.push(await asMessage("a1", proposed));
+  const two = scriptedModel(second);
+  const chunks = await read(
+    await createAiTurn(fakeDeps(world, two.model, over))({
+      ...approvalTurn(world, "m2", approvalOf(proposed)[0] ?? "missing", true),
+      isGuest,
+      ip: "1.2.3.4",
+    }),
+  );
+  return { chunks, calls: two.calls };
+};
+
+describe("guest guards at Approve (spec 0008, AC-2, AC-4)", () => {
+  const start = {
+    calls: [{ toolName: "startRun", input: { toolId: "sample" } }],
+  };
+  const restart = {
+    calls: [{ toolName: "restartRun", input: { previousRunId: OLD } }],
+  };
+
+  it("a guest's approved start takes one run with their IP, and keeps it", async () => {
+    const world = makeWorld();
+    const { state, limits } = fakeLimits();
+    await tapAs(world, [start], [{ text: "Started." }], { limits });
+    expect(world.started).toEqual([{ toolId: "sample", price: 5 }]);
+    expect(state).toEqual({ taken: 1, givenBack: 0, ips: ["1.2.3.4"] });
+  });
+
+  it("over the daily runs, nothing is held and the runs card follows a short reply", async () => {
+    const world = makeWorld();
+    const { limits } = fakeLimits({ max: 0 });
+    const { chunks, calls } = await tapAs(
+      world,
+      [start],
+      [{ text: "Sorry about that." }],
+      { limits },
+    );
+    expect(world.started).toEqual([]);
+    expect(seen(calls)).toContain("run_limit");
+    expect(dataOf(chunks)).toEqual([
+      { type: "data-error", data: { kind: "runs_daily", retry: false } },
+    ]);
+  });
+
+  it("with the spend cap tripped, nothing is held or counted and the spend card shows", async () => {
+    const world = makeWorld();
+    const { state, limits } = fakeLimits({ capped: true });
+    const { chunks } = await tapAs(world, [start], [{ text: "Sorry." }], {
+      limits,
+    });
+    expect(world.started).toEqual([]);
+    expect(state.taken).toBe(0);
+    expect(dataOf(chunks)).toEqual([
+      { type: "data-error", data: { kind: "spend_cap", retry: false } },
+    ]);
+  });
+
+  it("a failed hold gives the run back", async () => {
+    const world = makeWorld();
+    const { state, limits } = fakeLimits();
+    await tapAs(world, [start], [{ text: "You need more credits." }], {
+      limits,
+      startRunWithHold: async () =>
+        err({ code: "insufficient_credits", available: 2 }),
+    });
+    expect(state).toMatchObject({ taken: 1, givenBack: 1 });
+  });
+
+  it("a hold that throws gives the run back too", async () => {
+    const world = makeWorld();
+    const { state, limits } = fakeLimits();
+    await tapAs(world, [start], [{ text: "That failed." }], {
+      limits,
+      startRunWithHold: async () => {
+        throw new Error("db down");
+      },
+    });
+    expect(state).toMatchObject({ taken: 1, givenBack: 1 });
+  });
+
+  it("a signed in user is never checked or counted", async () => {
+    const world = makeWorld();
+    const { state, limits } = fakeLimits({ max: 0, capped: true });
+    await tapAs(world, [start], [{ text: "Started." }], { limits }, false);
+    expect(world.started).toEqual([{ toolId: "sample", price: 5 }]);
+    expect(state.ips).toEqual([]);
+  });
+
+  it("a restart counts as a new run, and is refused over the limit", async () => {
+    const counted = makeWorld({
+      quotes: { [OLD]: quote({ status: "completed" }) },
+    });
+    const one = fakeLimits();
+    await tapAs(counted, [restart], [{ text: "Restarted." }], {
+      limits: one.limits,
+    });
+    expect(counted.restarted).toHaveLength(1);
+    expect(one.state.taken).toBe(1);
+
+    const refused = makeWorld({
+      quotes: { [OLD]: quote({ status: "completed" }) },
+    });
+    const none = fakeLimits({ max: 0 });
+    const { chunks } = await tapAs(refused, [restart], [{ text: "Sorry." }], {
+      limits: none.limits,
+    });
+    expect(refused.restarted).toEqual([]);
+    expect(dataOf(chunks)).toContainEqual({
+      type: "data-error",
+      data: { kind: "runs_daily", retry: false },
+    });
+  });
+
+  it("a resume is never limited or counted", async () => {
+    const world = makeWorld({ quotes: { [RUN]: quote({ heldAmount: null }) } });
+    const { state, limits } = fakeLimits({ max: 0, capped: true });
+    await tapAs(
+      world,
+      [{ calls: [{ toolName: "resumeRun", input: { runId: RUN } }] }],
+      [{ text: "Back." }],
+      { limits },
+    );
+    expect(world.resumed).toEqual([{ runId: RUN, price: 5 }]);
+    expect(state.ips).toEqual([]);
   });
 });
 

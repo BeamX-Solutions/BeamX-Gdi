@@ -8,7 +8,7 @@ import * as reports from "@/db/queries/reports";
 import * as runs from "@/db/queries/runs";
 import * as usage from "@/db/queries/usage";
 import { logEvent } from "@/lib/log";
-import { checkSpendCap } from "@/lib/spend-cap";
+import { checkSpendCap, withSpend } from "@/lib/spend-cap";
 import { getReader, getTool } from "@/tools/registry";
 import { resolveModel } from "./model-provider";
 import type { ReportApiDeps } from "./report-api";
@@ -22,7 +22,7 @@ export const reportDeps: RunnerDeps = {
   savePhase: reports.savePhase,
   markReady: reports.markReady,
   markFailed: reports.markFailed,
-  recordUsage: usage.record,
+  recordUsage: withSpend(usage.record),
   checkSpendCap,
   model: resolveModel,
   now: () => Date.now(),

@@ -13,6 +13,7 @@ export const chatRequestBody = (
 
 export type ChatFailure =
   | "sign_in"
+  | "guest_limit"
   | "session_ended"
   | "bot"
   | "not_found"
@@ -52,6 +53,20 @@ export const failureOf = (error: Error): ChatFailure => {
   }
 };
 
+/**
+ * Which card a failed guest sign in shows. The auth client returns `{ error }` with the
+ * status for a server reply, and the sign in route answers `429` when the network has
+ * started too many guests today (spec 0008, AC-8). Anything else, including a request
+ * that never landed, is the sign in card. Pure.
+ */
+export const signInFailure = (error: unknown): ChatFailure =>
+  typeof error === "object" &&
+  error !== null &&
+  "status" in error &&
+  error.status === 429
+    ? "guest_limit"
+    : "sign_in";
+
 export type FailureCopy = {
   readonly kind: ErrorKind;
   readonly title: string;
@@ -64,6 +79,13 @@ export const failureCopy: Readonly<Record<ChatFailure, FailureCopy>> = {
     kind: "network",
     title: "We could not start your chat",
     message: "Check your connection, then send your message again.",
+    actionLabel: "Got it",
+  },
+  guest_limit: {
+    kind: "spend_cap",
+    title: "We couldn't start a new chat",
+    message:
+      "Too many new visitors from your network today. Please try again tomorrow.",
     actionLabel: "Got it",
   },
   session_ended: {

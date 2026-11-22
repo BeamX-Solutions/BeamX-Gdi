@@ -140,3 +140,42 @@ export const withSummary = async <T extends object>(
     return output;
   }
 };
+
+/** A guest's new run refused at Approve (spec 0008): nothing was held. */
+export type RunGuardFailure = {
+  readonly ok: false;
+  readonly error: "spend_cap" | "run_limit";
+};
+
+/**
+ * Starts a new run behind the guest guards (spec 0008, AC-2, AC-4). For a guest, before
+ * any hold: the spend cap, then the atomic run counters. A refusal records the card to
+ * show and returns without calling `start`. If `start` then fails (or throws), the run
+ * count is given back, so only runs that actually start count. Signed in users go
+ * straight to `start`.
+ */
+export const guardedStart = async <T extends { readonly ok: boolean }>(
+  env: ToolEnv,
+  start: () => Promise<T>,
+): Promise<T | RunGuardFailure> => {
+  if (!env.isGuest) return start();
+  const { limits } = env.deps;
+  const cap = await limits.guestSpendCap();
+  if (!cap.ok) {
+    env.record({ kind: "refused", reason: "spend_cap" });
+    return { ok: false, error: "spend_cap" };
+  }
+  const ticket = await limits.takeRun(env.owner.current, env.ip);
+  if (!ticket.ok) {
+    env.record({ kind: "refused", reason: "runs_daily" });
+    return { ok: false, error: "run_limit" };
+  }
+  try {
+    const output = await start();
+    if (!output.ok) await limits.giveBackRun(ticket.value);
+    return output;
+  } catch (e) {
+    await limits.giveBackRun(ticket.value);
+    throw e;
+  }
+};

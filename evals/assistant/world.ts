@@ -161,6 +161,11 @@ export const evalDeps = (
     resumeRunWithHold: async (_o, runId) => ok({ runId }),
     startFromWithHold: async () => ok({ runId: RUN_IDS.active }),
     abandonRun: async () => ok({}),
+    limits: {
+      guestSpendCap: async () => ok(undefined),
+      takeRun: async () => ok({ keys: [] }),
+      giveBackRun: async () => {},
+    },
     openChat: async () =>
       ok({ messages: [...world.history], runs: chatRuns(world) }),
     model: () => models.chat,
@@ -184,6 +189,8 @@ export const textTurn = (
     conversationId: EVAL_CONVERSATION,
     message: { id, role: "user", parts: [{ type: "text", text }] },
     active: activeOf(world),
+    isGuest: false,
+    ip: null,
     turn: { kind: "text", text },
   };
 };

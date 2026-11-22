@@ -8,8 +8,9 @@ import { createUIMessageStreamResponse } from "ai";
 import type { NextRequest } from "next/server";
 import { postChat } from "@/assistant/chat-api";
 import { chatApiDeps } from "@/assistant/chat-deps";
-import { sessionUserId } from "@/auth/session";
+import { sessionUser } from "@/auth/session";
 import { isBot } from "@/lib/bot-check";
+import { requestIp } from "@/lib/client-ip";
 import { resumableEnabled, resumableStreams } from "@/lib/resumable";
 
 // Below the turn lock's 120 second expiry, so no turn outlives its lock (spec 0007, 7a).
@@ -20,10 +21,17 @@ const json = (status: number, body: unknown): Response =>
 
 export async function POST(request: NextRequest) {
   if (await isBot()) return json(403, { code: "bot" });
-  const userId = await sessionUserId(request.headers);
-  if (userId === null) return json(401, { code: "unauthenticated" });
+  const user = await sessionUser(request.headers);
+  if (user === null) return json(401, { code: "unauthenticated" });
+  // Read once: a guest who links an account mid turn stays a guest for this request.
+  const ip = requestIp(request.headers);
   const body: unknown = await request.json().catch(() => null);
-  const result = await postChat(chatApiDeps, { userId, body });
+  const result = await postChat(chatApiDeps, {
+    userId: user.id,
+    isGuest: user.isAnonymous,
+    ip,
+    body,
+  });
   if (result.kind === "json") return json(result.status, result.body);
   const { resumable } = result;
   return createUIMessageStreamResponse({

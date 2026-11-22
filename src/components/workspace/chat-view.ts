@@ -457,6 +457,10 @@ const refusalKinds: ReadonlySet<ErrorData["kind"]> = new Set([
   "busy",
   "limit_text",
   "limit_run",
+  "spend_cap",
+  "slow_down",
+  "chat_daily",
+  "chats_daily",
 ]);
 
 /**
@@ -534,6 +538,36 @@ export const refusedText = (
     .join("");
   return text === "" ? null : text;
 };
+
+/**
+ * Whether an error item is a whole notice (a reply holding only that card, never saved),
+ * rather than a card saved with a reply, like the daily runs card after a refused
+ * Approve (spec 0008). Pure.
+ */
+export const isNoticeItem = (
+  messages: readonly ViewMessage[],
+  itemId: string,
+): boolean => {
+  const message = messages.find((m) => itemId.startsWith(`${m.id}:`));
+  return message !== undefined && message.parts.length === 1;
+};
+
+/**
+ * The messages without the one part an item came from (`<messageId>:<partIndex>`). "Got
+ * it" on a card saved with a reply hides only that card; the reply and the tap before
+ * it stay, since both are saved (spec 0008). Pure.
+ */
+export const withoutPartOf = <
+  M extends { readonly id: string; readonly parts: readonly unknown[] },
+>(
+  messages: readonly M[],
+  itemId: string,
+): M[] =>
+  messages.map((m) => {
+    if (!itemId.startsWith(`${m.id}:`)) return m;
+    const index = Number(itemId.slice(m.id.length + 1));
+    return { ...m, parts: m.parts.filter((_, i) => i !== index) };
+  });
 
 /** True when a reply is the `answered` notice: the thread should be loaded again. Pure. */
 export const isAnsweredNotice = (reply: ViewMessage): boolean =>

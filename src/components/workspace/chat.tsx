@@ -26,17 +26,20 @@ import {
   chatRequestBody,
   failureCopy,
   failureOf,
+  signInFailure,
   type ChatFailure,
 } from "./chat-request";
 import {
   busyRetryPlan,
   isAnsweredNotice,
+  isNoticeItem,
   latestReport,
   latestToolSummary,
   refusedText,
   takenUserMessageId,
   threadItems,
   withoutMessageOf,
+  withoutPartOf,
   type ThreadItem,
   type ViewMessage,
 } from "./chat-view";
@@ -282,7 +285,7 @@ function LiveChat({
           .catch(() => ({ error: true }) as const);
         setSigningIn(false);
         if (signed.error) {
-          setFailure("sign_in");
+          setFailure(signInFailure(signed.error));
           return;
         }
       }
@@ -346,6 +349,12 @@ function LiveChat({
     reload: () => window.location.reload(),
     openReport: setSelectedRun,
     dismiss: (itemId) => {
+      const view = messages as readonly ViewMessage[];
+      // A card saved with a reply (a refused Approve): hide just that card.
+      if (!isNoticeItem(view, itemId)) {
+        setMessages((ms) => withoutPartOf(ms, itemId));
+        return;
+      }
       // The refused text goes back in the composer, so a long message is not lost.
       const text = refusedText(messages as readonly ViewMessage[], itemId);
       setMessages((ms) => withoutMessageOf(ms, itemId));

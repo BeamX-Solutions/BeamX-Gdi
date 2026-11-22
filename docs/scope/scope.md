@@ -21,7 +21,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 6 | Assistant brain | Foundation | done |
 | 7 | Validate an idea in chat (Stellar) | Slice 1 | done |
 | 22 | Credits & billing | Slice 1 | in-progress |
-| 21 | Abuse & AI cost guards | Slice 1 | planned |
+| 21 | Abuse & AI cost guards | Slice 1 | done |
 | 8 | Accounts & sign up to save | Slice 2 | planned |
 | 9 | Shared business profile | Slice 2 | planned |
 | 10 | Beacon health check in chat | Slice 3 | planned |
@@ -143,10 +143,18 @@ spec [0004](../specs/0004-credits-billing/index.md) · code in `src/billing`, `s
 - [ ] Verify it: `/check verify credits & billing`
 - [ ] Test it: `/test credits & billing`
 
-### 21. Abuse & AI cost guards · Beta
+### 21. Abuse & AI cost guards · Beta · done
 Guest chat and starter credits still trigger paid AI calls, so cap abuse and spend before any public link: per guest and per IP rate limits, a bot check on guest start and chat, input and output size limits, and a daily AI spend cap (rules and defaults decided in spec 0001).
 **Done when:** a guest over a limit, or any guest after the daily spend cap trips, gets a friendly message instead of an AI call, and the limits come from config.
-- [ ] Build it: `/develop abuse & ai cost guards`
+spec [0008](../specs/0008-abuse-cost-guards/index.md) · code in `src/lib` (`limits.ts`, `spend-cap.ts`, `client-ip.ts`), `src/assistant`, `src/auth/guest-limit.ts`, `src/app/api`
+- [x] Design it (spec): `/architect abuse & ai cost guards`
+- [x] Build it: `/develop abuse & ai cost guards`
+  - [x] Thin thread: client IP and limits modules, env config, the spend total on every AI call with the tripped marker, and the guest spend cap at chat (AC-1, AC-2, AC-3, AC-9, AC-10, AC-11)
+  - [x] Run approval: guest flag and IP into the tools, guest spend cap and atomic run limits in startRun and restartRun, the cards in the turn (AC-2, AC-4)
+  - [x] Chat route limits: burst windows, daily guest chat, new chat bound in turnContext, the new notices (AC-5, AC-6, AC-7)
+  - [x] Guest sign in IP cap with its client card, the /design showcase and an e2e notice check (AC-8, AC-2, AC-5, AC-7)
+- [ ] Verify it: `/check verify abuse & ai cost guards` (skipped)
+- [ ] Test it: `/test abuse & ai cost guards` (skipped)
 
 ## Slice 2: Accounts and memory
 

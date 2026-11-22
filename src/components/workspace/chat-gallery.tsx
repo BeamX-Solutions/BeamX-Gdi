@@ -8,6 +8,11 @@ import { ConfirmCard } from "@/components/credits/confirm-card";
 import { CreditChip } from "@/components/credits/credit-chip";
 import { ShortBalanceCard } from "@/components/credits/short-balance-card";
 import { StopCard } from "@/components/credits/stop-card";
+import { ErrorCard } from "@/components/feedback/error-card";
+import {
+  chatErrorCopy,
+  type ChatErrorKind,
+} from "@/components/feedback/error-copy";
 import { Button } from "@/components/ui/button";
 import { Suggestion, Suggestions } from "@/components/ai-elements/suggestion";
 import {
@@ -24,6 +29,7 @@ import {
   staffQuestion,
   streamedReply,
 } from "@/components/fixtures/chat";
+import { failureCopy } from "./chat-request";
 import { Composer, type ComposerHandle } from "./composer";
 import { QuestionDemo } from "./question-demo";
 import { RunProgressBar } from "./run-progress-bar";
@@ -42,6 +48,44 @@ function Block({
     <div className="flex min-w-0 flex-col gap-3">
       <h3 className="text-lg font-semibold">{title}</h3>
       {children}
+    </div>
+  );
+}
+
+/** The abuse limit notices the chat can show (spec 0008, "Friendly notices"). */
+const limitNoticeKinds: readonly ChatErrorKind[] = [
+  "slow_down",
+  "chat_daily",
+  "chats_daily",
+  "runs_daily",
+  "spend_cap",
+];
+
+/** One limit notice; Got it dismisses it, as in the live chat. */
+function LimitNotice({
+  id,
+  title,
+  message,
+  actionLabel,
+}: {
+  readonly id: string;
+  readonly title: string;
+  readonly message: string;
+  readonly actionLabel: string;
+}) {
+  const [dismissed, setDismissed] = useState(false);
+  return dismissed ? (
+    <p className="text-sm text-muted-foreground" data-testid={`gone-${id}`}>
+      Dismissed.
+    </p>
+  ) : (
+    <div data-testid={`notice-${id}`}>
+      <ErrorCard
+        kind="spend_cap"
+        title={title}
+        message={message}
+        action={{ label: actionLabel, onAction: () => setDismissed(true) }}
+      />
     </div>
   );
 }
@@ -238,6 +282,15 @@ export function ChatGallery() {
           <div className="flex items-start">
             <CreditChip initial={{ available: 30, held: 0 }} />
           </div>
+        </div>
+      </Block>
+
+      <Block title="Limit notices">
+        <div className="grid gap-4 md:grid-cols-2">
+          {limitNoticeKinds.map((kind) => (
+            <LimitNotice key={kind} id={kind} {...chatErrorCopy[kind]} />
+          ))}
+          <LimitNotice id="guest_limit" {...failureCopy.guest_limit} />
         </div>
       </Block>
 

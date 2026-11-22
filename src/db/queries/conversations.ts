@@ -68,26 +68,41 @@ export type TurnContext = {
   readonly typedInRun: number;
   /** The incoming user message: already saved, and answered by a saved reply. */
   readonly message: { readonly saved: boolean; readonly answered: boolean };
+  /** This request created the chat (spec 0008, AC-6: a guest's new chat is counted). */
+  readonly created: boolean;
 };
+
+export type TurnContextError =
+  | { readonly code: "other_owner" }
+  /** A new chat id, but the guest may not create another chat today (spec 0008). */
+  | { readonly code: "chat_limit" };
 
 /**
  * The chat route's one round trip before a turn (spec 0007, step 4), one `db.batch`:
- * create the chat under the client's id if absent, read its owner, the active and
- * paused runs, the typed message count since the active run started, and whether the
- * incoming message is already saved and answered (a resend). The insert
- * runs first, so the owner read always finds a row: the result is the context, or
- * `other_owner` when the id belongs to someone else (nothing is written then).
+ * create the chat under the client's id if absent and allowed, read its owner, the
+ * active and paused runs, the typed message count since the active run started, and
+ * whether the incoming message is already saved and answered (a resend).
+ *
+ * The insert runs first and only when `mayCreate` (spec 0008, AC-6: a guest under the
+ * daily new chat limit; always true for signed in users); `created` is true only when
+ * this request made the row. An existing chat returns its context whatever `mayCreate`
+ * is. The result is the context, `other_owner` when the id belongs to someone else, or
+ * `chat_limit` when the chat is new and may not be created (nothing is written then).
  */
 export const turnContext = async (
   userId: string,
   conversationId: string,
   messageId: string,
-): Promise<Result<TurnContext, { readonly code: "other_owner" }>> => {
-  const [, owner, live, answers, typed, state] = await db.batch([
-    db
-      .insert(conversation)
-      .values({ id: conversationId, userId })
-      .onConflictDoNothing({ target: conversation.id }),
+  mayCreate = true,
+): Promise<Result<TurnContext, TurnContextError>> => {
+  const [inserted, owner, live, answers, typed, state] = await db.batch([
+    db.execute<{ id: string }>(sql`
+      INSERT INTO conversation (id, user_id)
+      SELECT ${conversationId}::uuid, ${userId}::uuid
+      WHERE ${mayCreate}
+      ON CONFLICT (id) DO NOTHING
+      RETURNING id
+    `),
     db
       .select({ userId: conversation.userId })
       .from(conversation)
@@ -100,7 +115,9 @@ export const turnContext = async (
     ),
     userMessageState(userId, conversationId, messageId),
   ]);
-  if (owner[0]?.userId !== userId) return err({ code: "other_owner" });
+  const ownerId = owner[0]?.userId;
+  if (ownerId === undefined && !mayCreate) return err({ code: "chat_limit" });
+  if (ownerId !== userId) return err({ code: "other_owner" });
   return ok({
     active: toActive(live, answers),
     typedInRun: Number(typed.rows[0]?.n ?? 0),
@@ -108,6 +125,7 @@ export const turnContext = async (
       saved: state.rows[0]?.saved === true,
       answered: state.rows[0]?.answered === true,
     },
+    created: inserted.rows.length > 0,
   });
 };
 

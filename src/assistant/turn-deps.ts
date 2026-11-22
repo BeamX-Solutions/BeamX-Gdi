@@ -12,6 +12,8 @@ import { newId } from "@/db/id";
 import { logEvent } from "@/lib/log";
 import { turnLock } from "@/lib/turn-lock";
 import { ok } from "@/lib/result";
+import { giveBackRun, takeRun } from "@/lib/limits";
+import { guestSpendCap, withSpend } from "@/lib/spend-cap";
 import { getTool, tools } from "@/tools/registry";
 import { createAiTurn, type AiTurnDeps } from "./ai-turn";
 import { resolveModel } from "./model-provider";
@@ -110,8 +112,9 @@ const aiTurnDeps: AiTurnDeps = {
     return started.ok ? ok({ runId: started.value.run.id }) : started;
   },
   abandonRun: runs.abandon,
+  limits: { guestSpendCap, takeRun, giveBackRun },
   helperModel: () => resolveModel("helper"),
-  recordUsage: usage.record,
+  recordUsage: withSpend(usage.record),
   oldAnswers: async (ownerId, runId) => {
     const read = await runs.get(ownerId, runId);
     return read.ok

@@ -13,10 +13,12 @@ import { asOwner } from "../card-steps";
 import type { ToolEnv } from "./env";
 import {
   cardBalance,
+  guardedStart,
   holdFailure,
   serverField,
   withSummary,
   type HoldFailure,
+  type RunGuardFailure,
   type WithSummary,
 } from "./money";
 
@@ -64,6 +66,7 @@ export type StartRunOutput = WithSummary<
   | { readonly ok: true; readonly runId: string; readonly toolName: string }
   | { readonly ok: false; readonly error: "unknown_tool" | "price_changed" }
   | HoldFailure
+  | RunGuardFailure
 >;
 
 export const startRunTool = (env: ToolEnv) =>
@@ -87,37 +90,40 @@ export const startRunTool = (env: ToolEnv) =>
       if (shownPrice === undefined || !priceStillValid(shownPrice, price))
         return done({ ok: false, error: "price_changed" });
 
-      await deps.ensureAccount(env.owner.current);
-      const { owner, result } = await asOwner(
-        deps,
-        conversationId,
-        env.owner,
-        (id) =>
-          deps.startRunWithHold(
-            id,
+      // A guest's run passes the spend cap and the daily run limits first (spec 0008).
+      return done(
+        await guardedStart(env, async (): Promise<StartRunOutput> => {
+          await deps.ensureAccount(env.owner.current);
+          const { owner, result } = await asOwner(
+            deps,
             conversationId,
-            toolId,
-            picked.version,
-            price,
-          ),
+            env.owner,
+            (id) =>
+              deps.startRunWithHold(
+                id,
+                conversationId,
+                toolId,
+                picked.version,
+                price,
+              ),
+          );
+          env.owner.current = owner.current;
+          if (result.ok) {
+            env.record({
+              kind: "started",
+              runId: result.value.runId,
+              toolId,
+              from: { kind: "new" },
+            });
+            return withSummary(env, {
+              ok: true,
+              runId: result.value.runId,
+              toolName: picked.name,
+            });
+          }
+          return withSummary(env, holdFailure(result.error, price));
+        }),
       );
-      env.owner.current = owner.current;
-      if (result.ok) {
-        env.record({
-          kind: "started",
-          runId: result.value.runId,
-          toolId,
-          from: { kind: "new" },
-        });
-        return done(
-          await withSummary(env, {
-            ok: true,
-            runId: result.value.runId,
-            toolName: picked.name,
-          }),
-        );
-      }
-      return done(await withSummary(env, holdFailure(result.error, price)));
     },
   });
 

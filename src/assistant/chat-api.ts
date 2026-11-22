@@ -6,17 +6,19 @@
  * One writer per turn: the reply is saved once, in the outer stream's `onEnd`, and only
  * then is the turn lock released, so a tap sent again before the save gets `busy`.
  *
- * Limits (AC-8) are checked before the turn: a notice stream, never saved, with no lock
- * and no AI call. A turn's stream is resumable (AC-6): the route buffers a copy under the
+ * Limits (AC-8, and spec 0008's abuse limits) are checked before the turn: a notice
+ * stream, never saved, with no lock and no AI call. A turn's stream is resumable (AC-6): the route buffers a copy under the
  * assistant message id, and `onEnd` forgets it once the reply is saved.
  */
 import { createUIMessageStream, type UIMessageChunk } from "ai";
 import { z } from "zod";
-import type { TurnContext } from "@/db/queries/conversations";
+import type { TurnContext, TurnContextError } from "@/db/queries/conversations";
 import type { NewMessage } from "@/db/queries/messages";
 import type { UsageInput } from "@/db/queries/usage";
 import { costUsd } from "@/lib/ai-cost";
-import type { Result } from "@/lib/result";
+import type { ChatGuard } from "@/lib/limits";
+import { ok, type Result } from "@/lib/result";
+import type { SpendCapError } from "@/lib/spend-cap";
 import { classifyMessage, type TurnKind } from "./parts";
 import type { ChatUsage, TurnError, TurnInput, TurnOutput } from "./turn";
 
@@ -25,7 +27,9 @@ export type ChatApiDeps = {
     userId: string,
     conversationId: string,
     messageId: string,
-  ) => Promise<Result<TurnContext, { readonly code: "other_owner" }>>;
+    /** False for a guest at the daily new chat limit (spec 0008, AC-6). */
+    mayCreate: boolean,
+  ) => Promise<Result<TurnContext, TurnContextError>>;
   readonly handleTurn: (
     input: TurnInput,
   ) => Promise<Result<TurnOutput, TurnError>>;
@@ -39,13 +43,25 @@ export type ChatApiDeps = {
     message: NewMessage,
   ) => Promise<Result<number, { readonly code: "not_found" }>>;
   readonly recordUsage: (input: UsageInput) => Promise<unknown>;
+  /** The daily AI spend cap for guests (spec 0008, AC-2). Allows on a Redis error. */
+  readonly guestSpendCap: () => Promise<Result<void, SpendCapError>>;
   /** Forgets the chat's resumable stream once its reply is saved. Never throws. */
   readonly finishStream: (
     conversationId: string,
     streamId: string,
   ) => Promise<void>;
-  /** `MAX_MESSAGE_CHARS` and `RATE_LIMIT_MESSAGES_PER_RUN` (spec 0007, AC-8). */
-  readonly limits: { readonly maxChars: number; readonly perRun: number };
+  /** The burst windows and a guest's daily chat counts (spec 0008). Never throw. */
+  readonly guards: ChatGuard;
+  /**
+   * `MAX_MESSAGE_CHARS` and `RATE_LIMIT_MESSAGES_PER_RUN` (spec 0007, AC-8), plus
+   * `LIMIT_CHAT_PER_GUEST` and `LIMIT_CHATS_PER_GUEST` (spec 0008).
+   */
+  readonly limits: {
+    readonly maxChars: number;
+    readonly perRun: number;
+    readonly chatPerGuest: number;
+    readonly chatsPerGuest: number;
+  };
   /** Keeps work alive after the response ends (Next's `after`). */
   readonly waitUntil: (task: Promise<unknown>) => void;
   readonly newId: () => string;
@@ -105,13 +121,23 @@ export const onAbort = (
   });
 };
 
+/** The notices sent instead of a turn: shown, never saved. */
+export type NoticeKind =
+  | "limit_text"
+  | "limit_run"
+  | "answered"
+  | "spend_cap"
+  | "slow_down"
+  | "chat_daily"
+  | "chats_daily";
+
 /**
  * A limit notice (step 5): one assistant message holding a `data-error` part. It is not
  * saved, takes no lock and makes no AI call.
  */
 export const noticeStream = (
   id: string,
-  kind: "limit_text" | "limit_run" | "answered",
+  kind: NoticeKind,
 ): ReadableStream<UIMessageChunk> =>
   createUIMessageStream({
     generateId: () => id,
@@ -130,7 +156,7 @@ export const noticeStream = (
 export const limitHit = (
   turn: TurnKind,
   typedInRun: number,
-  limits: ChatApiDeps["limits"],
+  limits: Pick<ChatApiDeps["limits"], "maxChars" | "perRun">,
 ): "limit_text" | "limit_run" | null => {
   if (turn.kind !== "text") return null;
   if (turn.text.length > limits.maxChars) return "limit_text";
@@ -222,21 +248,62 @@ const saveReply = async (
  */
 export const postChat = async (
   deps: ChatApiDeps,
-  input: { readonly userId: string; readonly body: unknown },
+  input: {
+    readonly userId: string;
+    /** A guest (anonymous session), read once by the route (spec 0008). */
+    readonly isGuest: boolean;
+    /** The client IP for the IP limits, or null when unknown (spec 0008). */
+    readonly ip: string | null;
+    readonly body: unknown;
+  },
 ): Promise<ChatResponse> => {
+  const notice = (
+    kind: NoticeKind,
+    fields: Readonly<Record<string, string | null>>,
+  ): ChatResponse => {
+    deps.log("chat_limit", { ...fields, limit: kind });
+    return {
+      kind: "stream",
+      stream: noticeStream(deps.newId(), kind),
+      resumable: null,
+    };
+  };
+
+  // The burst windows first (spec 0008, AC-7): Redis only, before the body is parsed.
+  // Guests and signed in users alike.
+  if (!(await deps.guards.burst(input.userId, input.ip)))
+    return notice("slow_down", { conversationId: null });
+
   const body = bodySchema.safeParse(input.body);
   if (!body.success) return json(400, "invalid_request");
   // Checked before anything is written, so a bad message never creates a chat.
   const classified = classifyMessage(body.data.message);
   if (!classified.ok) return json(400, "invalid_message");
   const { conversationId, message } = body.data;
+  const typed = input.isGuest && classified.value.turn.kind === "text";
+
+  // A guest's daily counts, and for a typed message the spend cap, read in parallel
+  // before the DB round trip (spec 0008). Signed in users skip both.
+  const [counts, cap] = await Promise.all([
+    input.isGuest ? deps.guards.dailyCounts(input.userId) : null,
+    typed ? deps.guestSpendCap() : ok(undefined),
+  ]);
+  // Same rule as `overLimit`: with a limit of 20, a count of 20 refuses the 21st.
+  const mayCreate = counts === null || counts.chats < deps.limits.chatsPerGuest;
 
   const context = await deps.turnContext(
     input.userId,
     conversationId,
     classified.value.message.id,
+    mayCreate,
   );
+  // A new chat the guest may not create today (AC-6): nothing was written.
+  if (!context.ok && context.error.code === "chat_limit")
+    return notice("chats_daily", { conversationId });
   if (!context.ok) return json(404, "not_found");
+  // Counted once the row exists, whatever happens to the turn (AC-6).
+  if (input.isGuest && context.value.created)
+    deps.waitUntil(deps.guards.countChats(input.userId));
 
   // Made once, up front: a retried `onEnd` keeps the same id and `callKey`.
   const assistantId = deps.newId();
@@ -251,6 +318,22 @@ export const postChat = async (
       resumable: null,
     };
   }
+
+  const runInProgress =
+    context.value.active.active?.run.status === "in_progress";
+  // Only a guest's new typed message (a resend passed these when it came in).
+  const guestTyped = typed && !context.value.message.saved;
+  // The spend cap (spec 0008, AC-2). Taps, card answers and resends go through;
+  // signed in users are never paused.
+  if (guestTyped && !cap.ok) return notice("spend_cap", { conversationId });
+  // The daily chat limit (AC-5): typed messages with no run in progress.
+  if (
+    guestTyped &&
+    !runInProgress &&
+    counts !== null &&
+    counts.chat >= deps.limits.chatPerGuest
+  )
+    return notice("chat_daily", { conversationId });
 
   // Step 5: limits before the turn. Shown, never saved, no lock, no AI call. A resend
   // of a saved message passed the limit when it came in, so it is not counted again.
@@ -270,7 +353,12 @@ export const postChat = async (
     userId: input.userId,
     conversationId,
     message,
-    context: { ownerId: input.userId, active: context.value.active },
+    context: {
+      ownerId: input.userId,
+      active: context.value.active,
+      isGuest: input.isGuest,
+      ip: input.ip,
+    },
   });
   if (!turn.ok)
     return turn.error.code === "not_found"
@@ -281,6 +369,9 @@ export const postChat = async (
   try {
     if (metered)
       deps.log("chat_metered", { conversationId, messageId: assistantId });
+    // The turn ran on a new typed message with no run in progress: count it (AC-5).
+    if (guestTyped && metered && !busy)
+      deps.waitUntil(deps.guards.countChat(input.userId));
     const stream = createUIMessageStream({
       generateId: () => assistantId,
       execute: ({ writer }) => {
