@@ -52,6 +52,18 @@ export default defineConfig({
     reuseExistingServer: !process.env.CI,
     // Every AI call uses the scripted fake models (spec 0007), so the full flow test
     // costs nothing. `env.ts` ignores it on a production deploy.
-    env: { E2E_FAKE_AI: "true" },
+    // Local runs may use the real Upstash from `.env`, where the abuse limits are live
+    // (spec 0008); the flow taps cards faster than a person, so they are lifted here.
+    // The limit notices have their own stubbed checks (e2e/limits.spec.ts).
+    env: {
+      E2E_FAKE_AI: "true",
+      LIMIT_BURST_PER_USER: "10000",
+      LIMIT_BURST_PER_IP: "10000",
+      LIMIT_CHAT_PER_GUEST: "10000",
+      LIMIT_CHATS_PER_GUEST: "10000",
+      LIMIT_RUNS_PER_GUEST: "10000",
+      LIMIT_RUNS_PER_IP: "10000",
+      LIMIT_GUESTS_PER_IP: "10000",
+    },
   },
 });

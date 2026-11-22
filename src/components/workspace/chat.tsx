@@ -26,6 +26,7 @@ import {
   chatRequestBody,
   failureCopy,
   failureOf,
+  signInFailure,
   type ChatFailure,
 } from "./chat-request";
 import {
@@ -284,7 +285,7 @@ function LiveChat({
           .catch(() => ({ error: true }) as const);
         setSigningIn(false);
         if (signed.error) {
-          setFailure("sign_in");
+          setFailure(signInFailure(signed.error));
           return;
         }
       }

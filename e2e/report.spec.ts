@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { errorKinds, reportFixtures } from "../src/components/fixtures/report";
 import {
   errorCopy,
@@ -85,9 +85,15 @@ test.describe("report parts (AC-11)", () => {
 });
 
 test.describe("error cards (AC-12)", () => {
+  // The chat section above also shows limit notices with the spend cap look.
+  const reportSection = (page: Page) =>
+    page.getByRole("region", { name: "Report parts and error cards" });
+
   test("each kind shows a message and exactly one action", async ({ page }) => {
     for (const kind of errorKinds) {
-      const card = page.locator(`[data-error-kind="${kind}"]`).first();
+      const card = reportSection(page)
+        .locator(`[data-error-kind="${kind}"]`)
+        .first();
       await expect(card).toBeVisible();
       await expect(card.getByText(errorCopy[kind].message)).toBeVisible();
       const actions = card.getByRole("button").or(card.getByRole("link"));
@@ -107,7 +113,7 @@ test.describe("error cards (AC-12)", () => {
   test("Got it dismisses the spend cap card and leaves a note, not a blank", async ({
     page,
   }) => {
-    await page
+    await reportSection(page)
       .locator('[data-error-kind="spend_cap"]')
       .first()
       .getByRole("button", { name: "Got it" })

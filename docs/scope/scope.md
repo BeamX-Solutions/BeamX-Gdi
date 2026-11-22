@@ -146,13 +146,13 @@ spec [0004](../specs/0004-credits-billing/index.md) · code in `src/billing`, `s
 ### 21. Abuse & AI cost guards · Beta · in-progress
 Guest chat and starter credits still trigger paid AI calls, so cap abuse and spend before any public link: per guest and per IP rate limits, a bot check on guest start and chat, input and output size limits, and a daily AI spend cap (rules and defaults decided in spec 0001).
 **Done when:** a guest over a limit, or any guest after the daily spend cap trips, gets a friendly message instead of an AI call, and the limits come from config.
-spec [0008](../specs/0008-abuse-cost-guards/index.md) · code in `src/lib` (`limits.ts`, `spend-cap.ts`, `client-ip.ts`), `src/assistant`, `src/app/api`
+spec [0008](../specs/0008-abuse-cost-guards/index.md) · code in `src/lib` (`limits.ts`, `spend-cap.ts`, `client-ip.ts`), `src/assistant`, `src/auth/guest-limit.ts`, `src/app/api`
 - [x] Design it (spec): `/architect abuse & ai cost guards`
-- [ ] Build it: `/develop abuse & ai cost guards`
+- [x] Build it: `/develop abuse & ai cost guards`
   - [x] Thin thread: client IP and limits modules, env config, the spend total on every AI call with the tripped marker, and the guest spend cap at chat (AC-1, AC-2, AC-3, AC-9, AC-10, AC-11)
   - [x] Run approval: guest flag and IP into the tools, guest spend cap and atomic run limits in startRun and restartRun, the cards in the turn (AC-2, AC-4)
   - [x] Chat route limits: burst windows, daily guest chat, new chat bound in turnContext, the new notices (AC-5, AC-6, AC-7)
-  - [ ] Guest sign in IP cap with its client card, the /design showcase and an e2e notice check (AC-8, AC-2, AC-5, AC-7)
+  - [x] Guest sign in IP cap with its client card, the /design showcase and an e2e notice check (AC-8, AC-2, AC-5, AC-7)
 - [ ] Verify it: `/check verify abuse & ai cost guards`
 - [ ] Test it: `/test abuse & ai cost guards`
 

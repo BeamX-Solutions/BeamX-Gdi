@@ -286,6 +286,25 @@ export const chatGuard = (deps: {
 
 export type ChatGuard = ReturnType<typeof chatGuard>;
 
+/** Guest sign ins per IP today (AC-8): check, then count on a `200`. */
+export const guestGuard = (deps: {
+  readonly store: LimitStore;
+  readonly now: () => Date;
+}) => ({
+  read: (ip: string): Promise<number> =>
+    deps.store.read(
+      "guests_daily",
+      limitKeys.guests(ip, lagosDate(deps.now())),
+    ),
+  count: (ip: string): Promise<void> =>
+    deps.store.count(
+      "guests_daily",
+      limitKeys.guests(ip, lagosDate(deps.now())),
+    ),
+});
+
+export type GuestGuard = ReturnType<typeof guestGuard>;
+
 const slidingWindow = (redis: Redis, prefix: string, max: number) => {
   const limiter = new Ratelimit({
     redis,
@@ -319,6 +338,10 @@ const liveRuns = runGuard({
   now: () => new Date(),
 });
 export const takeRun = liveRuns.takeRun;
+export const guestGuards: GuestGuard = guestGuard({
+  store: limitStore,
+  now: () => new Date(),
+});
 export const chatGuards: ChatGuard = chatGuard({
   store: limitStore,
   now: () => new Date(),

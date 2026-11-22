@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chatRequestBody, failureOf } from "./chat-request";
+import { chatRequestBody, failureOf, signInFailure } from "./chat-request";
 
 // Spec 0007, AC-2, AC-11: the client sends only the new message, and every failed
 // request maps to a friendly card.
@@ -33,5 +33,19 @@ describe("failureOf", () => {
 
   it("treats a non JSON error as unknown", () => {
     expect(failureOf(new Error("<html>500</html>"))).toBe("unknown");
+  });
+});
+
+describe("signInFailure (spec 0008, AC-8)", () => {
+  it("shows the guest limit card for a 429 from the sign in route", () => {
+    expect(signInFailure({ status: 429, message: "guest_limit" })).toBe(
+      "guest_limit",
+    );
+  });
+
+  it("shows the sign in card for anything else", () => {
+    expect(signInFailure({ status: 500 })).toBe("sign_in");
+    expect(signInFailure(true)).toBe("sign_in");
+    expect(signInFailure(null)).toBe("sign_in");
   });
 });
