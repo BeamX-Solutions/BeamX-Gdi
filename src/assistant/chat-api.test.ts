@@ -1308,7 +1308,7 @@ describe("postChat: paid chat (spec 0004, AC-9, AC-10, AC-11)", () => {
     expect(b.calls.settle).toHaveBeenCalledWith(HOLD, 0);
   });
 
-  /** An inner stream the test ends by hand, after the client has pressed Stop. */
+  /** An inner stream the test ends by hand, after the client disconnected. */
   const heldOpen = () => {
     const ctl: { c: ReadableStreamDefaultController<UIMessageChunk> | null } = {
       c: null,
@@ -1321,7 +1321,41 @@ describe("postChat: paid chat (spec 0004, AC-9, AC-10, AC-11)", () => {
     return { stream, ctl };
   };
 
-  it("charges nothing on a Stop before any output", async () => {
+  it("with resumable streams on, a disconnect lets the reply finish: saved whole and settled once (spec 0004, AC-10)", async () => {
+    // Emulates the route's tee: one copy goes to the client, the other to the Redis
+    // buffer, which keeps reading after the client is gone. This checks the billing and
+    // saving behaviour; the route wiring is covered by the manual verify step.
+    const b = billing({ used: ACCOUNT_FREE });
+    const inner = heldOpen();
+    const { deps, saved, pending } = fakeDeps({
+      billing: b.value,
+      handleTurn: async () => ok(turnOutput({ stream: inner.stream })),
+    });
+    const response = await send(deps, typed("hi"));
+    if (response.kind !== "stream") throw new Error("expected a stream");
+    const [client, buffer] = response.stream.tee();
+    const buffered = readAll({ ...response, stream: buffer });
+    const reader = client.getReader();
+    await reader.read(); // the start chunk
+    inner.ctl.c?.enqueue({ type: "text-start", id: "t" });
+    inner.ctl.c?.enqueue({ type: "text-delta", id: "t", delta: "Half, " });
+    // The client disconnects mid reply. Cancelling one tee branch settles only once both
+    // are cancelled, so it is not awaited: the buffer copy is still reading.
+    void reader.cancel();
+    inner.ctl.c?.enqueue({
+      type: "text-delta",
+      id: "t",
+      delta: "then the rest.",
+    });
+    inner.ctl.c?.enqueue({ type: "text-end", id: "t" });
+    inner.ctl.c?.close();
+    await buffered;
+    await Promise.all(pending);
+    expect(b.calls.settle).toHaveBeenCalledOnce();
+    expect(JSON.stringify(saved.at(-1)?.message)).toContain("then the rest.");
+  });
+
+  it("with resumable streams off, charges nothing on a disconnect before any output", async () => {
     const b = billing({ used: ACCOUNT_FREE });
     const inner = heldOpen();
     const { deps } = fakeDeps({
@@ -1333,13 +1367,13 @@ describe("postChat: paid chat (spec 0004, AC-9, AC-10, AC-11)", () => {
     const reader = response.stream.getReader();
     await reader.read(); // the start chunk
     await reader.cancel();
-    inner.ctl.c?.close(); // the turn ends on the server after the Stop
+    inner.ctl.c?.close(); // the turn ends on the server after the disconnect
     await vi.waitFor(() =>
       expect(b.calls.settle).toHaveBeenCalledWith(HOLD, 0),
     );
   });
 
-  it("charges the cost so far on a Stop after output started", async () => {
+  it("with resumable streams off, charges the cost so far on a disconnect after output started", async () => {
     const b = billing({ used: ACCOUNT_FREE });
     const inner = heldOpen();
     const { deps } = fakeDeps({

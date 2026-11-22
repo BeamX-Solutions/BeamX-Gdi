@@ -12,6 +12,7 @@ vi.mock("next/server", () => ({ after: () => {} }));
 
 const {
   ACTIVE_STREAM_TTL_S,
+  drainToEnd,
   redisResumableStreams,
   upstashPublisher,
   upstashSubscriber,
@@ -200,6 +201,60 @@ describe("redisResumableStreams (the chat:active pointer)", () => {
     expect(logEvent).toHaveBeenCalledWith("resumable_start_failed", {
       conversationId: "c1",
       streamId: "s1",
+      draining: true,
     });
+  });
+
+  it("when Redis fails at start, reads the copy to its end instead of cancelling it (spec 0004, AC-10)", async () => {
+    const broken = {
+      set: async () => {
+        throw new Error("down");
+      },
+    } as unknown as Redis;
+    const pulled: string[] = [];
+    let cancelled = false;
+    const copy = new ReadableStream<string>({
+      pull: (c) => {
+        const next = PARTS[pulled.length];
+        if (next === undefined) return c.close();
+        pulled.push(next);
+        c.enqueue(next);
+      },
+      cancel: () => {
+        cancelled = true;
+      },
+    });
+    await redisResumableStreams(broken).start("c1", "s1", copy);
+    expect(pulled).toEqual(PARTS);
+    expect(cancelled).toBe(false);
+  });
+});
+
+describe("drainToEnd", () => {
+  it("reads every chunk and reports true", async () => {
+    let reads = 0;
+    const stream = new ReadableStream<string>({
+      pull: (c) => {
+        reads += 1;
+        if (reads > 3) c.close();
+        else c.enqueue("x");
+      },
+    });
+    expect(await drainToEnd(stream)).toBe(true);
+    expect(reads).toBe(4);
+  });
+
+  it("leaves a locked stream alone and reports false", async () => {
+    const stream = slowStream(PARTS, 1);
+    const reader = stream.getReader();
+    expect(await drainToEnd(stream)).toBe(false);
+    reader.releaseLock();
+  });
+
+  it("reports false when reading fails, and never throws", async () => {
+    const stream = new ReadableStream<string>({
+      pull: (c) => c.error(new Error("broken")),
+    });
+    await expect(drainToEnd(stream)).resolves.toBe(false);
   });
 });

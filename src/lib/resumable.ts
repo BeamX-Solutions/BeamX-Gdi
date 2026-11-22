@@ -116,6 +116,26 @@ export const upstashSubscriber = (redis: Redis): Subscriber => {
   };
 };
 
+/**
+ * Reads `sse` to its end and throws the text away. Used when the Redis buffer fails to
+ * start: the copy must keep being read, or a client disconnect would cancel the tee and
+ * cut the reply off mid turn (spec 0004, AC-10). False when the stream is already locked
+ * (the library took its reader before failing) or reading failed. Never throws.
+ */
+export const drainToEnd = async (
+  sse: ReadableStream<string>,
+): Promise<boolean> => {
+  if (sse.locked) return false;
+  try {
+    const reader = sse.getReader();
+    for (;;) {
+      if ((await reader.read()).done) return true;
+    }
+  } catch {
+    return false;
+  }
+};
+
 export const redisResumableStreams = (redis: Redis): ResumableStreams => {
   const context = createResumableStreamContext({
     keyPrefix: "resumable-stream",
@@ -131,9 +151,18 @@ export const redisResumableStreams = (redis: Redis): ResumableStreams => {
         });
         await context.createNewResumableStream(streamId, () => sse);
       } catch {
-        logEvent("resumable_start_failed", { conversationId, streamId });
-        // The copy must still be drained, or the tee holds the reply in memory.
-        await sse.cancel().catch(() => {});
+        // Read the copy to its end instead of cancelling it, so a disconnect still lets
+        // the reply finish and settle like any other (spec 0004, AC-10). `after` keeps the
+        // function alive for it, as the library does for its own buffer.
+        const draining = !sse.locked;
+        const drained = drainToEnd(sse);
+        after(() => drained);
+        logEvent("resumable_start_failed", {
+          conversationId,
+          streamId,
+          draining,
+        });
+        await drained;
       }
     },
     finish: async (conversationId, streamId) => {
@@ -158,6 +187,8 @@ export const redisResumableStreams = (redis: Redis): ResumableStreams => {
 };
 
 const disabledResumableStreams: ResumableStreams = {
+  // Resuming is off (dev, CI): the copy is cancelled, so a client disconnect cuts the
+  // reply off and settles it as a disconnect (spec 0004, AC-10).
   start: async (_conversationId, _streamId, sse) => {
     await sse.cancel().catch(() => {});
   },
