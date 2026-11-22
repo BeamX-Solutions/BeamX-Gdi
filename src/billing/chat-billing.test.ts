@@ -93,7 +93,7 @@ describe("chatSettleAmount (AC-10)", () => {
     expect(chatSettleAmount({ kind: "failed" }, 0.05, billingConfig)).toBe(0);
   });
 
-  it("charges nothing on a Stop before any output", () => {
+  it("charges nothing on a disconnect before any output (resumable streams off)", () => {
     expect(
       chatSettleAmount(
         { kind: "stopped", receivedOutput: false },
@@ -103,7 +103,7 @@ describe("chatSettleAmount (AC-10)", () => {
     ).toBe(0);
   });
 
-  it("charges the cost so far on a Stop after output, 1 when unknown", () => {
+  it("charges the cost so far on a disconnect after output, 1 when unknown", () => {
     // $0.05 × 1700 × 3 ÷ 100 = 2.55 → 3.
     expect(
       chatSettleAmount(

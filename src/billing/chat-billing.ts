@@ -47,8 +47,9 @@ export type ChatEnd =
 
 /**
  * Credits to charge for a paid turn (AC-10): the real cost on a finished reply, nothing
- * on an AI error, and on Stop nothing before the first output, else the cost so far (at
- * least 1). A finished reply with no reported usage is charged the minimum, 1. Pure.
+ * on an AI error, and on a disconnect with resumable streams off nothing before the
+ * first output, else the cost so far (at least 1). There is no chat Stop button; the
+ * `stopped` end is that disconnect. A finished reply with no reported usage is charged the minimum, 1. Pure.
  */
 export const chatSettleAmount = (
   end: ChatEnd,

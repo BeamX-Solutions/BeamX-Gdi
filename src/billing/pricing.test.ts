@@ -72,7 +72,7 @@ describe("chatCharge (AC-10)", () => {
     expect(chatCharge(1, cfg)).toBe(cfg.chat.ceilingCredits);
   });
 
-  it("stop before any output charges 0; unknown usage charges 1", () => {
+  it("a disconnect before any output charges 0; unknown usage charges 1", () => {
     expect(chatChargeOnStop(0.03, false, cfg)).toBe(0);
     expect(chatChargeOnStop(null, true, cfg)).toBe(1);
     expect(chatChargeOnStop(0.03, true, cfg)).toBe(2);
