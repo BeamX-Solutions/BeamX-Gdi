@@ -8,6 +8,7 @@ import {
   MessageResponse,
 } from "@/components/ai-elements/message";
 import { nextAnnouncement } from "./announce";
+import { useNotice } from "./notice-context";
 import { StatusLine } from "./status-line";
 import type { MessageView, ThreadEntry } from "./types";
 
@@ -29,7 +30,8 @@ type ThreadProps = {
  * The conversation. It sticks to the bottom while text streams (a "Jump to latest" button
  * shows if the reader scrolled up) and owns the one `aria-live="polite"` region: a reply
  * is announced once, in full, when it stops streaming, and each new status text is
- * announced too (AC-6).
+ * announced too (AC-6). A workspace notice (the toast, spec 0009) is announced the same
+ * way, without showing in the status line.
  */
 export function Thread({
   messages,
@@ -38,16 +40,19 @@ export function Thread({
   children,
   label,
 }: ThreadProps) {
+  // The status line shows `status`; the live region also speaks a workspace notice.
+  const notice = useNotice();
+  const spoken = status ?? notice;
   const [tracked, setTracked] = useState({
     messages,
-    status,
+    status: spoken,
     announcement: "",
   });
-  if (tracked.messages !== messages || tracked.status !== status) {
+  if (tracked.messages !== messages || tracked.status !== spoken) {
     setTracked({
       messages,
-      status,
-      announcement: nextAnnouncement(tracked, messages, status),
+      status: spoken,
+      announcement: nextAnnouncement(tracked, messages, spoken),
     });
   }
 

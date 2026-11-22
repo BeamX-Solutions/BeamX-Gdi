@@ -1,7 +1,8 @@
 /**
  * Better Auth's handler (spec 0007). The anonymous sign in is BotID checked first, so a
- * bot can't mint guests, then held to the guest per IP cap (spec 0008, AC-8);
- * everything else goes straight to Better Auth.
+ * bot can't mint guests, then held to the guest per IP cap (spec 0008, AC-8).
+ * `/sign-up/email` is blocked: accounts are only created by the email code sign in, so no
+ * unverified account can exist (spec 0009). Everything else goes to Better Auth.
  */
 import { toNextJsHandler } from "better-auth/next-js";
 import { after, type NextRequest } from "next/server";
@@ -17,8 +18,10 @@ const handler = toNextJsHandler(auth);
 export const GET = handler.GET;
 
 export async function POST(request: NextRequest) {
-  if (!new URL(request.url).pathname.endsWith("/sign-in/anonymous"))
-    return handler.POST(request);
+  const path = new URL(request.url).pathname;
+  if (path.endsWith("/sign-up/email"))
+    return Response.json({ code: "not_found" }, { status: 404 });
+  if (!path.endsWith("/sign-in/anonymous")) return handler.POST(request);
   if (await isBot()) return Response.json({ code: "bot" }, { status: 403 });
   return limitGuestSignIn(
     {

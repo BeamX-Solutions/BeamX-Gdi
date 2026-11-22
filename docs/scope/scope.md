@@ -166,7 +166,7 @@ Sign up or sign in, and carry the guest's run into the new account so nothing is
 spec [0009](../specs/0009-accounts-sign-up/index.md) · code in `src/auth`, `src/email`, `src/app/api/auth`, `src/app/api/account`, `src/components`, `src/db/queries/users.ts`
 - [x] Design it (spec): `/architect accounts & sign up to save`
 - [ ] Build it: `/develop accounts & sign up to save`
-  - [ ] Thin thread: code emails, email sign up through the code with the guest linked and the password set, the header account menu and sign out (AC-1, AC-2, AC-3, AC-6, AC-8, AC-11, AC-12, AC-17)
+  - [x] Thin thread: code emails, email sign up through the code with the guest linked and the password set, the header account menu and sign out (AC-1, AC-2, AC-3, AC-6, AC-8, AC-11, AC-12, AC-17)
   - [ ] Sign in and forgot password (AC-5, AC-7, AC-10)
   - [ ] Abuse guards, the verified account hook, and the sign up prompts on reports and notices (AC-1, AC-15, AC-16)
   - [ ] Delete account and the daily guest purge (AC-13, AC-14, AC-18)

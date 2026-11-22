@@ -3,6 +3,7 @@
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import {
+  useCallback,
   useMemo,
   useRef,
   useState,
@@ -13,6 +14,7 @@ import { v7 as newId } from "uuid";
 import type { ChatUIMessage } from "@/assistant/chat-page";
 import type { AnswerData, PrefillResponseData } from "@/assistant/part-schemas";
 import { authClient } from "@/auth/client";
+import { AccountControl } from "@/components/auth/account-control";
 import type { CreditSummary } from "@/billing/summary";
 import { Suggestion, Suggestions } from "@/components/ai-elements/suggestion";
 import { LiveCreditSummary } from "@/components/credits/credit-chip";
@@ -21,6 +23,8 @@ import { panelView } from "@/components/report/report-panel-state";
 import { ReportStatusView } from "@/components/report/report-status-view";
 import { useReportStatus } from "@/components/report/use-report-status";
 import { reportTitle } from "./chat-copy";
+import { NoticeContext } from "./notice-context";
+import { Toast } from "./toast";
 import { ChatItem, OpenReportOnArrival, type ChatActions } from "./chat-items";
 import {
   chatRequestBody,
@@ -81,16 +85,27 @@ function ChatFrame({
   readonly report?: ReactNode | null;
   readonly reportName?: string;
 }) {
+  // The after sign in toast (spec 0009, AC-6), announced by the Thread.
+  const [notice, setNotice] = useState<string | null>(null);
+  const clearNotice = useCallback(() => setNotice(null), []);
   return (
-    <WorkspaceShell
-      header={<Header>{chip}</Header>}
-      rail={<HistoryRail items={[]} />}
-      report={report}
-      reportTitle={reportName}
-    >
-      {thread}
-      {composer}
-    </WorkspaceShell>
+    <NoticeContext.Provider value={notice}>
+      <WorkspaceShell
+        header={
+          <Header>
+            {chip}
+            <AccountControl onNotice={setNotice} />
+          </Header>
+        }
+        rail={<HistoryRail items={[]} />}
+        report={report}
+        reportTitle={reportName}
+      >
+        {thread}
+        {composer}
+      </WorkspaceShell>
+      <Toast message={notice} onDone={clearNotice} />
+    </NoticeContext.Provider>
   );
 }
 

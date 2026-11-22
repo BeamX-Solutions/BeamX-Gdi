@@ -67,6 +67,17 @@ const schema = z.object({
     (v) => (v === "" ? undefined : v),
     z.string().min(16).optional(),
   ),
+  // Resend (spec 0009): the 6 digit code emails for sign up and password reset. Both are
+  // required in production; in dev without a key the code is logged to the console.
+  RESEND_API_KEY: z.preprocess(
+    (v) => (v === "" ? undefined : v),
+    z.string().min(1).optional(),
+  ),
+  // The sender, e.g. `BeamX <no-reply@beamxsolutions.com>`.
+  EMAIL_FROM: z.preprocess(
+    (v) => (v === "" ? undefined : v),
+    z.string().min(3).optional(),
+  ),
   // "true" swaps every AI call for the scripted fake models in `src/lib/fake-model.ts`
   // (spec 0007), for `pnpm e2e`. Ignored on a production deploy, which refuses to boot
   // with it set (`envSchema`).
@@ -112,6 +123,13 @@ export const envSchema = (production: boolean) =>
         message:
           "CRON_SECRET is required in production (the daily billing job)",
       });
+    for (const name of ["RESEND_API_KEY", "EMAIL_FROM"] as const)
+      if (value[name] === undefined)
+        ctx.addIssue({
+          code: "custom",
+          path: [name],
+          message: `${name} is required in production (the sign up code emails)`,
+        });
     if (value.E2E_FAKE_AI)
       ctx.addIssue({
         code: "custom",
@@ -162,6 +180,8 @@ export const env: Env = skip
       LIMIT_RUNS_PER_IP: rawLimit(process.env.LIMIT_RUNS_PER_IP, 20),
       LIMIT_GUESTS_PER_IP: rawLimit(process.env.LIMIT_GUESTS_PER_IP, 30),
       CRON_SECRET: process.env.CRON_SECRET || undefined,
+      RESEND_API_KEY: process.env.RESEND_API_KEY || undefined,
+      EMAIL_FROM: process.env.EMAIL_FROM || undefined,
       E2E_FAKE_AI: process.env.E2E_FAKE_AI === "true",
       VERCEL_ENV:
         process.env.VERCEL_ENV === "production" ||

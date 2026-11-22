@@ -1,7 +1,7 @@
 # 0009. Accounts and sign up to save
 
 **Date**: 2026-11-22
-**Status**: Proposed
+**Status**: In Progress
 
 ## Summary
 
@@ -184,8 +184,8 @@ The daily purge joins the existing cron route through `runDailyJobs`: it checks 
 
 Tracer Bullet: one real sign up path end to end first (email check, code, account, link, password, toast), then sign in and recovery, then the rest of the account surface, then cleanup. Google comes last, as its own milestone.
 
-1. [ ] Email foundation: `src/email/` with a Resend client (`RESEND_API_KEY`, `EMAIL_FROM` in `env.ts` and `.env.example`, dev console fallback), a React Email `CodeEmail` template with plain text, and `sendCodeEmail(to, code, purpose)` returning a `Result`; unit test the template text, satisfies **AC-17**
-2. [ ] Thin thread, email sign up: Better Auth config (`emailOTP` with sign up through the code sign in, `requireEmailVerification`, session lengths, `haveIBeenPwned` paths); `/sign-up/email` blocked; `/api/account/email-check` and `/api/account/set-password`; the auth dialog with sign up, code and password screens (shadcn `Dialog`, bottom `Sheet` on narrow screens, design tokens), opened from the header Sign in button; the signed in header account menu (name, email, Sign out); the toast; integration tests that a guest's data moves on the code sign in and that a failed link keeps the guest, satisfies **AC-1** (header), **AC-2**, **AC-3**, **AC-6**, **AC-8**, **AC-11**, **AC-12**
+1. [x] Email foundation: `src/email/` with a Resend client (`RESEND_API_KEY`, `EMAIL_FROM` in `env.ts` and `.env.example`, dev console fallback), a React Email `CodeEmail` template with plain text, and `sendCodeEmail(to, code, purpose)` returning a `Result`; unit test the template text, satisfies **AC-17**
+2. [x] Thin thread, email sign up: Better Auth config (`emailOTP` with sign up through the code sign in, `requireEmailVerification`, session lengths, `haveIBeenPwned` paths); `/sign-up/email` blocked; `/api/account/email-check` and `/api/account/set-password`; the auth dialog with sign up, code and password screens (shadcn `Dialog`, bottom `Sheet` on narrow screens, design tokens), opened from the header Sign in button; the signed in header account menu (name, email, Sign out); the toast; integration tests that a guest's data moves on the code sign in and that a failed link keeps the guest, satisfies **AC-1** (header), **AC-2**, **AC-3**, **AC-6**, **AC-8**, **AC-11**, **AC-12**
 3. [ ] Sign in and recovery: sign in form with the forfeit note, forgot password by code with sessions revoked then a sign in; tests, satisfies **AC-5**, **AC-7**, **AC-10**
 4. [ ] Abuse guards and hook: BotID on every auth POST in the route and in `src/instrumentation-client.ts`; Better Auth `rateLimit` with the Upstash `consume` storage and `customRules` (anonymous sign in off); the per email limit on the email check; `onAccountVerified` from the user create and update hooks; tests, satisfies **AC-15**, **AC-16**
 5. [ ] More prompts: the save prompt card after a guest's ready report, and a Sign up action on `runs_daily`, `chat_daily`, `chats_daily` notices and the guest short balance card; `/design` showcase entries; e2e of sign up from the save prompt with axe clean, satisfies **AC-1**

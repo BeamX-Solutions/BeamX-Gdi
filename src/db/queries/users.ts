@@ -1,6 +1,6 @@
-import { eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "../client";
-import { aiUsage, conversation, toolRun, user } from "../schema";
+import { account, aiUsage, conversation, toolRun, user } from "../schema";
 import { linkGuestCreditStatements } from "./credits";
 import { logEvent } from "@/lib/log";
 
@@ -86,4 +86,32 @@ export const deleteAccount = async (userId: string): Promise<boolean> => {
     .returning({ id: user.id });
   logEvent("user_deleted", { userId, deleted: deleted.length > 0 });
   return deleted.length > 0;
+};
+
+/** Whether an email already belongs to an account (spec 0009, AC-8). */
+export type EmailStatus = "none" | "exists" | "google_only";
+
+/**
+ * The account behind a lowercased email, for the sign up form's email check: `none`
+ * (free to sign up), `exists` (has a password; sign in instead), or `google_only` (made
+ * with Google; use Google or Forgot password to add one). Guests never count. One round
+ * trip.
+ */
+export const emailStatus = async (email: string): Promise<EmailStatus> => {
+  const [row] = await db
+    .select({
+      hasPassword: sql<boolean>`bool_or(${account.providerId} = 'credential')`,
+    })
+    .from(user)
+    .leftJoin(account, eq(account.userId, user.id))
+    .where(
+      and(
+        eq(user.email, email.trim().toLowerCase()),
+        // `is_anonymous` may be null for an account: `IS NOT TRUE` keeps those.
+        sql`${user.isAnonymous} IS NOT TRUE`,
+      ),
+    )
+    .groupBy(user.id);
+  if (row === undefined) return "none";
+  return row.hasPassword ? "exists" : "google_only";
 };
