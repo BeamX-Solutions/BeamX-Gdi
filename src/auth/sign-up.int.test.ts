@@ -5,9 +5,16 @@ import { eq } from "drizzle-orm";
 // that holds the guest cookie, and the guest's work moves to it. Runs Better Auth's real
 // endpoints against the Neon test branch; the emailed code is captured instead of sent.
 
-const { codes, linkControl } = vi.hoisted(() => ({
+const { codes, linkControl, events } = vi.hoisted(() => ({
   codes: new Map<string, string>(),
   linkControl: { fail: false },
+  events: [] as { event: string; userId?: unknown }[],
+}));
+
+vi.mock("@/lib/log", () => ({
+  logEvent: (event: string, fields: Record<string, unknown>) => {
+    events.push({ event, userId: fields.userId });
+  },
 }));
 
 vi.mock("@/email/send", () => ({
@@ -99,6 +106,10 @@ describe("sign up by code (spec 0009, AC-2, AC-6)", () => {
     // Better Auth deletes the guest once the link succeeded.
     const [guest] = await db.select().from(user).where(eq(user.id, guestId));
     expect(guest).toBeUndefined();
+    // The verified account hook ran for the new user, never for the guest (AC-16).
+    const verified = events.filter((e) => e.event === "account_verified");
+    expect(verified.some((e) => e.userId === account.id)).toBe(true);
+    expect(verified.some((e) => e.userId === guestId)).toBe(false);
 
     // The password is then set inside that session (the set-password route's call).
     const session = cookieFrom(result.headers);

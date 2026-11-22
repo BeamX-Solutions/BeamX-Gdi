@@ -7,9 +7,13 @@ import * as schema from "@/db/schema";
 import type { CodePurpose } from "@/email/copy";
 import { sendCodeEmail } from "@/email/send";
 import { env } from "@/lib/env";
+import { afterUserWrite } from "./account-verified";
 import { linkGuestAccount } from "./link";
+import { AUTH_RATE_RULES, authRateLimiter } from "./rate-limit";
 
 const DAY_S = 60 * 60 * 24;
+
+const verifiedHook = afterUserWrite();
 
 /** Better Auth's code types mapped to the email we send (spec 0009). */
 const PURPOSE: Readonly<
@@ -47,6 +51,21 @@ export const auth = betterAuth({
   // 30 days, extended at most once a day while used (AC-11); a session counts as fresh
   // for deleting the account for one day after it was created (AC-13).
   session: { expiresIn: 30 * DAY_S, updateAge: DAY_S, freshAge: DAY_S },
+  // Per IP limits on the auth POSTs, kept in Upstash so every function instance shares
+  // them (AC-15). The storage fails open; the guest sign in has spec 0008's cap instead.
+  rateLimit: {
+    enabled: true,
+    customStorage: authRateLimiter.storage,
+    customRules: AUTH_RATE_RULES,
+  },
+  // A verified, non guest user was created or changed: the hook point for spec 0004's
+  // grants (AC-16). `afterUserWrite` never throws.
+  databaseHooks: {
+    user: {
+      create: { after: verifiedHook },
+      update: { after: verifiedHook },
+    },
+  },
   plugins: [
     anonymous({ onLinkAccount: linkGuestAccount }),
     emailOTP({

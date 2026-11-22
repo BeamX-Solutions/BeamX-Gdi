@@ -12,6 +12,13 @@ import { isPasswordCompromised } from "better-auth/plugins";
 import { z } from "zod";
 import { authFailure } from "@/auth/api-error";
 import { auth } from "@/auth/auth";
+import {
+  allowSetPassword,
+  authRateLimiter,
+  RATE_LIMITED_BODY,
+} from "@/auth/rate-limit";
+import { isBot } from "@/lib/bot-check";
+import { requestIp } from "@/lib/client-ip";
 
 const bodySchema = z.object({ password: z.string().min(8).max(128) });
 
@@ -19,6 +26,11 @@ const json = (status: number, body: unknown): Response =>
   Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
 
 export async function POST(request: Request) {
+  // BotID and the per IP limit first (AC-15): Better Auth's own limit never sees this
+  // route, because it calls the server API directly.
+  if (await isBot()) return json(403, { code: "bot" });
+  if (!(await allowSetPassword(authRateLimiter, requestIp(request.headers))))
+    return json(429, RATE_LIMITED_BODY);
   const session = await auth.api.getSession({ headers: request.headers });
   if (session === null || session.user.isAnonymous === true)
     return json(401, { code: "unauthenticated" });
