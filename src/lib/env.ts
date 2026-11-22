@@ -1,5 +1,18 @@
 import { z } from "zod";
 
+/** A positive whole number from env with a default; an empty line counts as unset. */
+const limit = (fallback: number) =>
+  z.preprocess(
+    (v) => (v === "" ? undefined : v),
+    z.coerce.number().int().positive().default(fallback),
+  );
+
+/** `limit` read by hand for the `SKIP_ENV_VALIDATION` path. */
+const rawLimit = (v: string | undefined, fallback: number): number => {
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+};
+
 const schema = z.object({
   DATABASE_URL: z.url(),
   DATABASE_URL_UNPOOLED: z.url(),
@@ -14,8 +27,8 @@ const schema = z.object({
     (v) => (v === "" ? undefined : v),
     z.string().min(1).optional(),
   ),
-  // Upstash Redis (spec 0001): the chat turn lock and resumable streams now, rate limits
-  // later. Optional at boot: without them the turn lock is off (logged), so dev and CI
+  // Upstash Redis (spec 0001): the chat turn lock, resumable streams and the abuse limits
+  // (spec 0008). Optional at boot: without them the turn lock is off (logged), so dev and CI
   // run without Redis. A production deploy fails without both (`envSchema`).
   UPSTASH_REDIS_REST_URL: z.preprocess(
     (v) => (v === "" ? undefined : v),
@@ -29,6 +42,23 @@ const schema = z.object({
   // before any AI call, and so is the typed message after this many in one run.
   MAX_MESSAGE_CHARS: z.coerce.number().int().positive().default(4000),
   RATE_LIMIT_MESSAGES_PER_RUN: z.coerce.number().int().positive().default(40),
+  // Abuse and AI cost guards (spec 0008, AC-10). Daily counts reset at Lagos midnight.
+  // The cap is dollars of AI spend a Lagos day; once reached, guests pause (AC-2).
+  AI_DAILY_SPEND_CAP_USD: z.preprocess(
+    (v) => (v === "" ? undefined : v),
+    z.coerce.number().positive().default(20),
+  ),
+  // Chat requests a minute, per user and per IP (AC-7).
+  LIMIT_BURST_PER_USER: limit(10),
+  LIMIT_BURST_PER_IP: limit(60),
+  // A guest's typed messages with no run in progress, and new chats, a day (AC-5, AC-6).
+  LIMIT_CHAT_PER_GUEST: limit(30),
+  LIMIT_CHATS_PER_GUEST: limit(20),
+  // Guest tool runs started a day, per guest and per IP (AC-4).
+  LIMIT_RUNS_PER_GUEST: limit(3),
+  LIMIT_RUNS_PER_IP: limit(20),
+  // New guests a day from one IP (AC-8).
+  LIMIT_GUESTS_PER_IP: limit(30),
   // "true" swaps every AI call for the scripted fake models in `src/lib/fake-model.ts`
   // (spec 0007), for `pnpm e2e`. Ignored on a production deploy, which refuses to boot
   // with it set (`envSchema`).
@@ -104,6 +134,14 @@ export const env: Env = skip
       MAX_MESSAGE_CHARS: Number(process.env.MAX_MESSAGE_CHARS) || 4000,
       RATE_LIMIT_MESSAGES_PER_RUN:
         Number(process.env.RATE_LIMIT_MESSAGES_PER_RUN) || 40,
+      AI_DAILY_SPEND_CAP_USD: rawLimit(process.env.AI_DAILY_SPEND_CAP_USD, 20),
+      LIMIT_BURST_PER_USER: rawLimit(process.env.LIMIT_BURST_PER_USER, 10),
+      LIMIT_BURST_PER_IP: rawLimit(process.env.LIMIT_BURST_PER_IP, 60),
+      LIMIT_CHAT_PER_GUEST: rawLimit(process.env.LIMIT_CHAT_PER_GUEST, 30),
+      LIMIT_CHATS_PER_GUEST: rawLimit(process.env.LIMIT_CHATS_PER_GUEST, 20),
+      LIMIT_RUNS_PER_GUEST: rawLimit(process.env.LIMIT_RUNS_PER_GUEST, 3),
+      LIMIT_RUNS_PER_IP: rawLimit(process.env.LIMIT_RUNS_PER_IP, 20),
+      LIMIT_GUESTS_PER_IP: rawLimit(process.env.LIMIT_GUESTS_PER_IP, 30),
       E2E_FAKE_AI: process.env.E2E_FAKE_AI === "true",
       VERCEL_ENV:
         process.env.VERCEL_ENV === "production" ||

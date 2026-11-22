@@ -24,6 +24,7 @@
     "@ai-sdk/anthropic": "^4.0.106",
     "@ai-sdk/react": "4.0.181",
     "@neondatabase/serverless": "^1.2.1",
+    "@upstash/ratelimit": "^2.2.1",
     "@upstash/redis": "^1.41.0",
     "ai": "^7.0.177",
     "better-auth": "^1.7.25",

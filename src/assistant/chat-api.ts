@@ -17,6 +17,7 @@ import type { NewMessage } from "@/db/queries/messages";
 import type { UsageInput } from "@/db/queries/usage";
 import { costUsd } from "@/lib/ai-cost";
 import type { Result } from "@/lib/result";
+import type { SpendCapError } from "@/lib/spend-cap";
 import { classifyMessage, type TurnKind } from "./parts";
 import type { ChatUsage, TurnError, TurnInput, TurnOutput } from "./turn";
 
@@ -39,6 +40,8 @@ export type ChatApiDeps = {
     message: NewMessage,
   ) => Promise<Result<number, { readonly code: "not_found" }>>;
   readonly recordUsage: (input: UsageInput) => Promise<unknown>;
+  /** The daily AI spend cap for guests (spec 0008, AC-2). Allows on a Redis error. */
+  readonly guestSpendCap: () => Promise<Result<void, SpendCapError>>;
   /** Forgets the chat's resumable stream once its reply is saved. Never throws. */
   readonly finishStream: (
     conversationId: string,
@@ -105,13 +108,16 @@ export const onAbort = (
   });
 };
 
+/** The notices sent instead of a turn: shown, never saved. */
+export type NoticeKind = "limit_text" | "limit_run" | "answered" | "spend_cap";
+
 /**
  * A limit notice (step 5): one assistant message holding a `data-error` part. It is not
  * saved, takes no lock and makes no AI call.
  */
 export const noticeStream = (
   id: string,
-  kind: "limit_text" | "limit_run" | "answered",
+  kind: NoticeKind,
 ): ReadableStream<UIMessageChunk> =>
   createUIMessageStream({
     generateId: () => id,
@@ -222,7 +228,14 @@ const saveReply = async (
  */
 export const postChat = async (
   deps: ChatApiDeps,
-  input: { readonly userId: string; readonly body: unknown },
+  input: {
+    readonly userId: string;
+    /** A guest (anonymous session), read once by the route (spec 0008). */
+    readonly isGuest: boolean;
+    /** The client IP for the IP limits, or null when unknown (spec 0008). */
+    readonly ip: string | null;
+    readonly body: unknown;
+  },
 ): Promise<ChatResponse> => {
   const body = bodySchema.safeParse(input.body);
   if (!body.success) return json(400, "invalid_request");
@@ -250,6 +263,24 @@ export const postChat = async (
       stream: noticeStream(assistantId, "answered"),
       resumable: null,
     };
+  }
+
+  // The spend cap (spec 0008, AC-2): only a guest's new typed message. Taps, card
+  // answers and resends go through; signed in users are never paused.
+  if (
+    input.isGuest &&
+    classified.value.turn.kind === "text" &&
+    !context.value.message.saved
+  ) {
+    const cap = await deps.guestSpendCap();
+    if (!cap.ok) {
+      deps.log("chat_limit", { conversationId, limit: "spend_cap" });
+      return {
+        kind: "stream",
+        stream: noticeStream(assistantId, "spend_cap"),
+        resumable: null,
+      };
+    }
   }
 
   // Step 5: limits before the turn. Shown, never saved, no lock, no AI call. A resend

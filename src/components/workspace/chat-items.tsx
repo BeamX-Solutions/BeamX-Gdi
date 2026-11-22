@@ -144,13 +144,15 @@ export function ChatItem({
       const runId = data.runId;
       return (
         <ErrorCard
-          kind="ai_error"
+          kind={data.kind === "spend_cap" ? "spend_cap" : "ai_error"}
           title={copy.title}
           message={copy.message}
           action={{
             label: copy.actionLabel,
             onAction:
-              data.kind === "limit_text" || data.kind === "limit_run"
+              data.kind === "limit_text" ||
+              data.kind === "limit_run" ||
+              data.kind === "spend_cap"
                 ? () => actions.dismiss(item.id)
                 : data.kind === "complete_retry" && runId !== undefined
                   ? () => actions.retryComplete(runId)

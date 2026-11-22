@@ -10,3 +10,21 @@ export const sessionUserId = async (
   const session = await auth.api.getSession({ headers });
   return session?.user.id ?? null;
 };
+
+export type SessionUser = {
+  readonly id: string;
+  readonly isAnonymous: boolean;
+};
+
+/**
+ * The session user with whether they are a guest (Better Auth's anonymous plugin), or
+ * null. Only `isAnonymous === true` is a guest; an account never meets guest limits.
+ */
+export const sessionUser = async (
+  headers: Headers,
+): Promise<SessionUser | null> => {
+  const session = await auth.api.getSession({ headers });
+  return session
+    ? { id: session.user.id, isAnonymous: session.user.isAnonymous === true }
+    : null;
+};

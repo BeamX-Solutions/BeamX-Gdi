@@ -86,6 +86,7 @@ export type ChatErrorKind =
   | "busy"
   | "limit_text"
   | "limit_run"
+  | "spend_cap"
   | "answered";
 
 /**
@@ -120,6 +121,7 @@ export const chatErrorCopy: Readonly<Record<ChatErrorKind, ErrorCopy>> = {
     message: "You can still tap the cards to answer, or start a new chat.",
     actionLabel: "Got it",
   },
+  spend_cap: errorCopy.spend_cap,
   answered: {
     title: "Already answered",
     message: "Loading the reply to that message.",

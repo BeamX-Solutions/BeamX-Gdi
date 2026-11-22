@@ -457,6 +457,7 @@ const refusalKinds: ReadonlySet<ErrorData["kind"]> = new Set([
   "busy",
   "limit_text",
   "limit_run",
+  "spend_cap",
 ]);
 
 /**

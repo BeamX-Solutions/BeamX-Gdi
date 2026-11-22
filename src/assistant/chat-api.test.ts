@@ -83,6 +83,7 @@ const fakeDeps = (over: Partial<ChatApiDeps> = {}) => {
     recordUsage: async (input) => {
       usage.push(input);
     },
+    guestSpendCap: async () => ok(undefined),
     finishStream: async (_c, streamId) => {
       finished.push(streamId);
     },
@@ -116,6 +117,8 @@ describe("postChat: input and ownership (AC-2, AC-7)", () => {
     const { deps } = fakeDeps({ turnContext });
     const result = await postChat(deps, {
       userId: USER,
+      isGuest: false,
+      ip: null,
       body: { conversationId: "nope", message: typed("hi") },
     });
     expect(result).toEqual({
@@ -131,6 +134,8 @@ describe("postChat: input and ownership (AC-2, AC-7)", () => {
     const { deps } = fakeDeps({ turnContext });
     const result = await postChat(deps, {
       userId: USER,
+      isGuest: false,
+      ip: null,
       body: { conversationId: CONV, message: { id: MSG, role: "assistant" } },
     });
     expect(result).toMatchObject({ status: 400 });
@@ -145,6 +150,8 @@ describe("postChat: input and ownership (AC-2, AC-7)", () => {
     });
     const result = await postChat(deps, {
       userId: OTHER,
+      isGuest: false,
+      ip: null,
       body: { conversationId: CONV, message: typed("hi") },
     });
     expect(result).toMatchObject({ status: 404, body: { code: "not_found" } });
@@ -166,6 +173,8 @@ describe("postChat: input and ownership (AC-2, AC-7)", () => {
     await readAll(
       await postChat(deps, {
         userId: USER,
+        isGuest: false,
+        ip: null,
         body: { conversationId: CONV, message: typed("hi") },
       }),
     );
@@ -181,6 +190,8 @@ describe("postChat: one writer per turn (AC-2)", () => {
     const chunks = await readAll(
       await postChat(deps, {
         userId: USER,
+        isGuest: false,
+        ip: null,
         body: { conversationId: CONV, message: typed("hi") },
       }),
     );
@@ -203,6 +214,8 @@ describe("postChat: one writer per turn (AC-2)", () => {
     await readAll(
       await postChat(deps, {
         userId: USER,
+        isGuest: false,
+        ip: null,
         body: { conversationId: CONV, message: typed("hi") },
       }),
     );
@@ -231,6 +244,8 @@ describe("postChat: one writer per turn (AC-2)", () => {
     await readAll(
       await postChat(deps, {
         userId: USER,
+        isGuest: false,
+        ip: null,
         body: { conversationId: CONV, message: typed("hi") },
       }),
     );
@@ -253,6 +268,8 @@ describe("postChat: one writer per turn (AC-2)", () => {
     await readAll(
       await postChat(deps, {
         userId: USER,
+        isGuest: false,
+        ip: null,
         body: { conversationId: CONV, message: typed("hi") },
       }),
     );
@@ -271,6 +288,8 @@ describe("postChat: one writer per turn (AC-2)", () => {
     await readAll(
       await postChat(deps, {
         userId: USER,
+        isGuest: false,
+        ip: null,
         body: { conversationId: CONV, message: typed("hi") },
       }),
     );
@@ -285,6 +304,8 @@ describe("postChat: usage (spec 0007, step 7.3)", () => {
     await readAll(
       await postChat(deps, {
         userId: USER,
+        isGuest: false,
+        ip: null,
         body: { conversationId: CONV, message: typed("hi") },
       }),
     );
@@ -317,6 +338,8 @@ describe("postChat: usage (spec 0007, step 7.3)", () => {
     await readAll(
       await postChat(deps, {
         userId: USER,
+        isGuest: false,
+        ip: null,
         body: { conversationId: CONV, message: typed("hi") },
       }),
     );
@@ -333,6 +356,8 @@ describe("postChat: usage (spec 0007, step 7.3)", () => {
     await readAll(
       await postChat(deps, {
         userId: USER,
+        isGuest: false,
+        ip: null,
         body: { conversationId: CONV, message: typed("hi") },
       }),
     );
@@ -411,6 +436,8 @@ describe("postChat over handleTurn: the lock covers the save (AC-2)", () => {
     const first = readAll(
       await postChat(deps, {
         userId: USER,
+        isGuest: false,
+        ip: null,
         body: { conversationId: CONV, message: typed("hi") },
       }),
     );
@@ -423,6 +450,8 @@ describe("postChat over handleTurn: the lock covers the save (AC-2)", () => {
         { ...deps, newId: () => "0190a000-0000-7000-8000-000000000e02" },
         {
           userId: USER,
+          isGuest: false,
+          ip: null,
           body: { conversationId: CONV, message: typed("again", MSG2) },
         },
       ),
@@ -456,6 +485,8 @@ describe("postChat over handleTurn: the lock covers the save (AC-2)", () => {
     });
     const response = await postChat(deps, {
       userId: USER,
+      isGuest: false,
+      ip: null,
       body: { conversationId: CONV, message: typed("hi") },
     });
     if (response.kind !== "stream") throw new Error("expected a stream");
@@ -498,6 +529,8 @@ describe("postChat: limits (spec 0007, AC-8)", () => {
     const { deps, saved } = fakeDeps({ handleTurn: handle });
     const result = await postChat(deps, {
       userId: USER,
+      isGuest: false,
+      ip: null,
       body: { conversationId: CONV, message: typed("a".repeat(4001)) },
     });
     expect(result).toMatchObject({ kind: "stream", resumable: null });
@@ -516,6 +549,8 @@ describe("postChat: limits (spec 0007, AC-8)", () => {
     await readAll(
       await postChat(deps, {
         userId: USER,
+        isGuest: false,
+        ip: null,
         body: { conversationId: CONV, message: typed("a".repeat(4000)) },
       }),
     );
@@ -527,6 +562,8 @@ describe("postChat: limits (spec 0007, AC-8)", () => {
     const { deps } = fakeDeps({ handleTurn: handle, turnContext: inRun(40) });
     const result = await postChat(deps, {
       userId: USER,
+      isGuest: false,
+      ip: null,
       body: { conversationId: CONV, message: typed("one more") },
     });
     expect(await readAll(result)).toContainEqual({
@@ -546,6 +583,8 @@ describe("postChat: limits (spec 0007, AC-8)", () => {
     await readAll(
       await postChat(deps, {
         userId: USER,
+        isGuest: false,
+        ip: null,
         body: { conversationId: CONV, message: typed("fortieth") },
       }),
     );
@@ -558,6 +597,8 @@ describe("postChat: limits (spec 0007, AC-8)", () => {
     await readAll(
       await postChat(deps, {
         userId: USER,
+        isGuest: false,
+        ip: null,
         body: { conversationId: CONV, message: typed("fortieth") },
       }),
     );
@@ -570,6 +611,8 @@ describe("postChat: limits (spec 0007, AC-8)", () => {
     await readAll(
       await postChat(deps, {
         userId: USER,
+        isGuest: false,
+        ip: null,
         body: { conversationId: CONV, message: approvalTap() },
       }),
     );
@@ -591,6 +634,8 @@ describe("postChat: resumable streams (spec 0007, AC-6)", () => {
     const { deps } = fakeDeps();
     const result = await postChat(deps, {
       userId: USER,
+      isGuest: false,
+      ip: null,
       body: { conversationId: CONV, message: typed("hi") },
     });
     expect(result).toMatchObject({
@@ -613,6 +658,8 @@ describe("postChat: resumable streams (spec 0007, AC-6)", () => {
     await readAll(
       await postChat(deps, {
         userId: USER,
+        isGuest: false,
+        ip: null,
         body: { conversationId: CONV, message: typed("hi") },
       }),
     );
@@ -625,6 +672,8 @@ describe("postChat: resumable streams (spec 0007, AC-6)", () => {
     });
     const result = await postChat(deps, {
       userId: USER,
+      isGuest: false,
+      ip: null,
       body: { conversationId: CONV, message: typed("hi") },
     });
     expect(result).toMatchObject({ resumable: null });
@@ -641,6 +690,8 @@ describe("postChat: a resent message that already has a reply", () => {
     const message = typed("what can you do?");
     const result = await postChat(deps, {
       userId: USER,
+      isGuest: false,
+      ip: null,
       body: { conversationId: CONV, message },
     });
     expect(result.kind === "stream" && result.resumable).toBe(null);
@@ -652,5 +703,71 @@ describe("postChat: a resent message that already has a reply", () => {
     expect(saved).toEqual([]);
     // The route asks about this exact message id.
     expect(turnContext).toHaveBeenCalledWith(USER, CONV, message.id);
+  });
+});
+
+describe("postChat: the guest spend cap (spec 0008, AC-2)", () => {
+  const capped = async () => err({ code: "spend_cap" as const });
+
+  const send = (deps: ChatApiDeps, message: unknown, isGuest = true) =>
+    postChat(deps, {
+      userId: USER,
+      isGuest,
+      ip: "102.89.1.2",
+      body: { conversationId: CONV, message },
+    });
+
+  it("gives a guest's typed message the spend_cap notice, with no turn and nothing saved", async () => {
+    const handle = vi.fn();
+    const { deps, saved, logs } = fakeDeps({
+      handleTurn: handle,
+      guestSpendCap: capped,
+    });
+    const chunks = await readAll(await send(deps, typed("hello")));
+    expect(chunks).toContainEqual({
+      type: "data-error",
+      data: { kind: "spend_cap", retry: false },
+    });
+    expect(handle).not.toHaveBeenCalled();
+    expect(saved).toEqual([]);
+    expect(logs).toContain("chat_limit");
+  });
+
+  it("lets a guest's tap through: a run already started keeps going", async () => {
+    const handle = vi.fn(async () => ok(turnOutput()));
+    const cap = vi.fn(capped);
+    const { deps } = fakeDeps({ handleTurn: handle, guestSpendCap: cap });
+    await readAll(await send(deps, approvalTap()));
+    expect(handle).toHaveBeenCalledOnce();
+    expect(cap).not.toHaveBeenCalled();
+  });
+
+  it("never pauses a signed in user", async () => {
+    const handle = vi.fn(async () => ok(turnOutput()));
+    const cap = vi.fn(capped);
+    const { deps } = fakeDeps({ handleTurn: handle, guestSpendCap: cap });
+    await readAll(await send(deps, typed("hello"), false));
+    expect(handle).toHaveBeenCalledOnce();
+    expect(cap).not.toHaveBeenCalled();
+  });
+
+  it("lets a resend of a saved message through: it passed when it came in", async () => {
+    const handle = vi.fn(async () => ok(turnOutput()));
+    const cap = vi.fn(capped);
+    const { deps } = fakeDeps({
+      handleTurn: handle,
+      guestSpendCap: cap,
+      turnContext: inRun(0, { saved: true, answered: false }),
+    });
+    await readAll(await send(deps, typed("hello")));
+    expect(handle).toHaveBeenCalledOnce();
+    expect(cap).not.toHaveBeenCalled();
+  });
+
+  it("lets a guest's typed message through below the cap", async () => {
+    const handle = vi.fn(async () => ok(turnOutput()));
+    const { deps } = fakeDeps({ handleTurn: handle });
+    await readAll(await send(deps, typed("hello")));
+    expect(handle).toHaveBeenCalledOnce();
   });
 });

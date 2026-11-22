@@ -12,6 +12,7 @@ import { newId } from "@/db/id";
 import { logEvent } from "@/lib/log";
 import { turnLock } from "@/lib/turn-lock";
 import { ok } from "@/lib/result";
+import { withSpend } from "@/lib/spend-cap";
 import { getTool, tools } from "@/tools/registry";
 import { createAiTurn, type AiTurnDeps } from "./ai-turn";
 import { resolveModel } from "./model-provider";
@@ -111,7 +112,7 @@ const aiTurnDeps: AiTurnDeps = {
   },
   abandonRun: runs.abandon,
   helperModel: () => resolveModel("helper"),
-  recordUsage: usage.record,
+  recordUsage: withSpend(usage.record),
   oldAnswers: async (ownerId, runId) => {
     const read = await runs.get(ownerId, runId);
     return read.ok
