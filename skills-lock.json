@@ -85,6 +85,13 @@
       "skillPath": "better-auth/emailAndPassword/SKILL.md",
       "computedHash": "407c1244202876daa748818ed41dc55afde1b3f7aec48ae3a1f1c8a7ee40465e"
     },
+    "email-best-practices": {
+      "source": "resend/email-best-practices",
+      "commit": "cf5438cf10970d715dd204de721ffc89869d8f6d",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "865ee2b31418846f0076244970d8517c87a605e3b8affa5fd1894a8a7975237c"
+    },
     "migrate-ai-sdk-v6-to-v7": {
       "source": "vercel/ai",
       "commit": "bd0f9e4ebda0d23a849e37860e2a1aebac9a9eef",
@@ -147,6 +154,13 @@
       "sourceType": "github",
       "skillPath": "skills/playwright-cli/SKILL.md",
       "computedHash": "d3c50339092b670cdda1ba2bed0bdee1c34247cdf70df475e8b7d83983a39e79"
+    },
+    "resend": {
+      "source": "resend/resend-skills",
+      "commit": "063246e39987faebc2608f968ca13a02d994a0d4",
+      "sourceType": "github",
+      "skillPath": "skills/resend/SKILL.md",
+      "computedHash": "5d09dbdf01bc6d640f2340f24069307c53a7b58c6c94c1276932c22c3abc8cb1"
     },
     "scope": {
       "source": "JavaScript-Mastery-Pro/skills",

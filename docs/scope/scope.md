@@ -21,8 +21,8 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 6 | Assistant brain | Foundation | done |
 | 7 | Validate an idea in chat (Stellar) | Slice 1 | done |
 | 22 | Credits & billing | Slice 1 | in-progress |
-| 21 | Abuse & AI cost guards | Slice 1 | done |
-| 8 | Accounts & sign up to save | Slice 2 | planned |
+| 21 | Abuse & AI cost guards | Slice 1 | in-progress |
+| 8 | Accounts & sign up to save | Slice 2 | in-progress |
 | 9 | Shared business profile | Slice 2 | planned |
 | 10 | Beacon health check in chat | Slice 3 | planned |
 | 11 | Beacon Pro in chat | Slice 3 | planned |
@@ -138,30 +138,41 @@ spec [0004](../specs/0004-credits-billing/index.md) · code in `src/billing`, `s
 - [ ] Build it: `/develop credits & billing`
   - [x] Thin thread: a guest pays for a Stellar run with starter credits (config, ledger and holds migration, hold on approve, charge on report ready, release on failure, confirm card, header chip) (AC-1, AC-2, AC-3, AC-4, AC-5, AC-8, AC-11, AC-14, AC-18, AC-20, AC-21)
   - [x] Hold lifecycle and paid chat: resume and reconfirm, daily cron with idle and chat hold sweeps, free allowance and metered chat, guest grant IP cap, charge once across phases (AC-2, AC-6, AC-7, AC-9, AC-10, AC-11, AC-21)
+  - [ ] Disconnect is never a stop: drain the stream copy when the Redis buffer fails, reword the Stop comments, tee billing test (AC-10)
   - [ ] Buying credits, after #8 sign up: payment table, Paystack client, checkout, callback, webhook, pending sweep, buy from the card, `/credits` page (AC-8, AC-13, AC-14, AC-21)
   - [ ] Accounts and money operations, after #8: sign up grant, Luna import and claim, guest link merge, deletion, adjust script, expiry (behind a flag) and drift check (AC-11, AC-12, AC-15, AC-16, AC-17, AC-19, AC-20)
 - [ ] Verify it: `/check verify credits & billing`
 - [ ] Test it: `/test credits & billing`
 
-### 21. Abuse & AI cost guards · Beta · done
+### 21. Abuse & AI cost guards · Beta · in-progress
 Guest chat and starter credits still trigger paid AI calls, so cap abuse and spend before any public link: per guest and per IP rate limits, a bot check on guest start and chat, input and output size limits, and a daily AI spend cap (rules and defaults decided in spec 0001).
 **Done when:** a guest over a limit, or any guest after the daily spend cap trips, gets a friendly message instead of an AI call, and the limits come from config.
 spec [0008](../specs/0008-abuse-cost-guards/index.md) · code in `src/lib` (`limits.ts`, `spend-cap.ts`, `client-ip.ts`), `src/assistant`, `src/auth/guest-limit.ts`, `src/app/api`
 - [x] Design it (spec): `/architect abuse & ai cost guards`
-- [x] Build it: `/develop abuse & ai cost guards`
+- [ ] Build it: `/develop abuse & ai cost guards`
   - [x] Thin thread: client IP and limits modules, env config, the spend total on every AI call with the tripped marker, and the guest spend cap at chat (AC-1, AC-2, AC-3, AC-9, AC-10, AC-11)
   - [x] Run approval: guest flag and IP into the tools, guest spend cap and atomic run limits in startRun and restartRun, the cards in the turn (AC-2, AC-4)
   - [x] Chat route limits: burst windows, daily guest chat, new chat bound in turnContext, the new notices (AC-5, AC-6, AC-7)
   - [x] Guest sign in IP cap with its client card, the /design showcase and an e2e notice check (AC-8, AC-2, AC-5, AC-7)
+  - [ ] Card burst window: card taps get their own 30 a minute window, only typed messages create chats (AC-7, AC-12)
 - [ ] Verify it: `/check verify abuse & ai cost guards` (skipped)
 - [ ] Test it: `/test abuse & ai cost guards` (skipped)
 
 ## Slice 2: Accounts and memory
 
-### 8. Accounts & sign up to save · needs a decision · Beta
+### 8. Accounts & sign up to save · Beta · in-progress
 Sign up or sign in, and carry the guest's run into the new account so nothing is lost.
 **Done when:** a guest who finished a run signs up and finds that report in their account, signed in users only see their own data, and unclaimed guest data is deleted automatically after 30 days.
-- [ ] Design it (spec): `/architect accounts & sign up to save`
+spec [0009](../specs/0009-accounts-sign-up/index.md) · code in `src/auth`, `src/email`, `src/app/api/auth`, `src/app/api/account`, `src/components`, `src/db/queries/users.ts`
+- [x] Design it (spec): `/architect accounts & sign up to save`
+- [ ] Build it: `/develop accounts & sign up to save`
+  - [ ] Thin thread: code emails, email sign up through the code with the guest linked and the password set, the header account menu and sign out (AC-1, AC-2, AC-3, AC-6, AC-8, AC-11, AC-12, AC-17)
+  - [ ] Sign in and forgot password (AC-5, AC-7, AC-10)
+  - [ ] Abuse guards, the verified account hook, and the sign up prompts on reports and notices (AC-1, AC-15, AC-16)
+  - [ ] Delete account and the daily guest purge (AC-13, AC-14, AC-18)
+  - [ ] Later: Google sign in with account linking, once the Google OAuth client exists (AC-4, AC-9)
+- [ ] Verify it: `/check verify accounts & sign up to save`
+- [ ] Test it: `/test accounts & sign up to save`
 
 ### 9. Shared business profile · needs a decision
 One profile (name, industry, size, location, goals, and so on) built from answers across tools, so the client never answers the same question twice. They can view and edit it.
@@ -237,6 +248,7 @@ Left out of the current build pass, kept here so the plan stays honest.
 - **Accessibility audit (WCAG AA)**: a full pass beyond the base components' keyboard support
 - **General business advisor**: open business questions beyond the four tools · needs a decision
 - **More languages**: localized interface and reports
+- **Chat Stop button**: stop a streaming reply and pay only for what arrived, via a stop endpoint that aborts the AI call across function instances (from spec 0004) · needs a decision
 
 ## Legend
 

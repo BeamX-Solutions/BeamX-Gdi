@@ -11,6 +11,7 @@ Better Auth server and client config, with tables in Neon via the Drizzle adapte
 - Secrets and URLs come from `src/lib/env.ts`: `BETTER_AUTH_SECRET`, `NEXT_PUBLIC_APP_URL` as `baseURL`. `baseURL` falls back to `VERCEL_URL` on previews, and `trustedOrigins` adds `VERCEL_BRANCH_URL`, so the branch preview link can sign a guest in.
 - User data stays in our DB, so NDPA/GDPR export and delete stay possible.
 - `POST /api/auth/sign-in/anonymous` is BotID checked first (`isBot()` from `src/lib/bot-check.ts`), so a bot can't mint guests; a bot gets `403 {"code":"bot"}`.
+- Then `guest-limit.ts` caps new guests per IP a Lagos day (`LIMIT_GUESTS_PER_IP`, spec 0008): over the cap gets `429 {"code":"guest_limit"}`. Only a `200` sign in counts, with no IP the cap is skipped, and a Redis error allows.
 - A guest is signed in on the first send, never on page load: the resume route answers `204`, not `401`, with no session, because the chat client's `401` handling signs a guest in.
 - The guest session cookie is strictly necessary (no consent needed); tracking cookies wait for feature #18.
 
