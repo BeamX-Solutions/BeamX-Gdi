@@ -96,6 +96,10 @@ jobs:
           echo "DATABASE_URL=${{ steps.branch.outputs.db_url_pooled }}" >> "$GITHUB_ENV"
           echo "DATABASE_URL_UNPOOLED=${{ steps.branch.outputs.db_url }}" >> "$GITHUB_ENV"
           echo "BETTER_AUTH_SECRET=$(openssl rand -base64 32)" >> "$GITHUB_ENV"
+          # Keys the sign up grant's email hash. Without it the grant is skipped, and
+          # the Beacon flow (50 credits, more than a guest's starter) cannot be afforded.
+          # A fresh key per run is safe: each run has its own throwaway branch.
+          echo "BILLING_HASH_SECRET=$(openssl rand -base64 32)" >> "$GITHUB_ENV"
           echo "NEXT_PUBLIC_APP_URL=http://localhost:3000" >> "$GITHUB_ENV"
       - run: pnpm db:migrate
       - run: pnpm build

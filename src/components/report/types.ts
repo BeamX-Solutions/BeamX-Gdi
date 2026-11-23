@@ -4,6 +4,8 @@ export type {
   AdvicePriority,
   CategoryBarItem,
   ReportBlock,
+  RichLine,
+  RichPart,
   Verdict,
 } from "@/tools/_contract";
 

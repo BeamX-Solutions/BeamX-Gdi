@@ -210,6 +210,47 @@ test.describe("report panel states (spec 0005, AC-11)", () => {
   });
 });
 
+test.describe("Beacon rich sections (spec 0010, AC-11)", () => {
+  test("every part kind draws as text", async ({ page }) => {
+    const report = page
+      .getByTestId("panel-ready-beacon")
+      .getByTestId("report-view");
+    const critical = report.getByRole("region", {
+      name: "Critical Priorities (Next 30 Days)",
+    });
+    await expect(critical.getByText("CASH FLOW EMERGENCY")).toBeVisible();
+    await expect(critical.getByRole("list")).toHaveCount(1);
+    await expect(critical.getByText("Immediate:")).toBeVisible();
+
+    const next = report.getByRole("region", { name: "Your Next Steps" });
+    await expect(
+      next.getByRole("heading", {
+        level: 4,
+        name: "Immediate Actions (This Week):",
+      }),
+    ).toBeVisible();
+    await expect(next.locator("ol > li")).toHaveCount(2);
+    await expect(next.getByRole("separator")).toHaveCount(1);
+    await expect(next.getByText("Recommended:")).toBeVisible();
+
+    const resources = report.getByRole("region", { name: "Talk to BeamX" });
+    await expect(resources.getByRole("link")).toHaveAttribute(
+      "href",
+      "https://calendly.com/beamxsolutions",
+    );
+  });
+
+  test("an HTML string in the text shows literally", async ({ page }) => {
+    const critical = page
+      .getByTestId("panel-ready-beacon")
+      .getByRole("region", { name: "Critical Priorities (Next 30 Days)" });
+    await expect(
+      critical.getByText("<script>alert(1)</script>", { exact: false }),
+    ).toBeVisible();
+    await expect(critical.locator("script, b")).toHaveCount(0);
+  });
+});
+
 test("the report section of /design has no axe violations (AC-3)", async ({
   page,
 }) => {

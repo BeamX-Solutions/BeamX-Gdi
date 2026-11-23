@@ -9,9 +9,28 @@ import {
   reportErrorCopy,
   type ReportErrorViewKind,
 } from "@/components/feedback/error-copy";
-import type { ReportBlock } from "./types";
+import type { ReportBlock, RichPart } from "./types";
 
 const verdict = z.enum(["good", "caution", "risk"]);
+
+const tight = z.literal(true).optional();
+const richLine = z.object({ lead: z.string().optional(), text: z.string() });
+
+/** A rich section part (spec 0010): plain text fields only. */
+const richPartSchema: z.ZodType<RichPart> = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("paragraph"),
+    tight,
+    lead: z.string().optional(),
+    text: z.string(),
+  }),
+  z.object({ kind: z.literal("note"), tight, text: z.string() }),
+  z.object({ kind: z.literal("label"), tight, text: z.string() }),
+  z.object({ kind: z.literal("subheading"), tight, text: z.string() }),
+  z.object({ kind: z.literal("bullets"), tight, items: z.array(richLine) }),
+  z.object({ kind: z.literal("numbered"), tight, items: z.array(richLine) }),
+  z.object({ kind: z.literal("rule"), tight }),
+]);
 
 const reportBlockSchema: z.ZodType<ReportBlock> = z.discriminatedUnion("kind", [
   z.object({
@@ -59,6 +78,11 @@ const reportBlockSchema: z.ZodType<ReportBlock> = z.discriminatedUnion("kind", [
     kind: z.literal("timeline"),
     title: z.string(),
     steps: z.array(z.object({ label: z.string(), items: z.array(z.string()) })),
+  }),
+  z.object({
+    kind: z.literal("rich_section"),
+    title: z.string(),
+    parts: z.array(richPartSchema),
   }),
   z.object({
     kind: z.literal("resources"),
