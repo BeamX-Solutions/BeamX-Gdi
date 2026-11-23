@@ -6,17 +6,17 @@ Shared UI for the whole workspace, built in spec [0003](../../docs/specs/0003-de
 
 ## Folders
 
-| Folder          | Owns                                                                                                                                                        |
-| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ui/`           | shadcn primitives (Radix base), touch sizes raised to 44px. Add new ones with the `shadcn` CLI, then restyle with tokens only                               |
-| `ai-elements/`  | AI Elements parts (conversation, message, shimmer, suggestion), restyled with tokens                                                                        |
-| `workspace/`    | The shell (`WorkspaceShell`, header, history rail, report panel and sheet), `Thread`, `Composer`, `RunProgressBar`, theme toggle                            |
-| `answer-cards/` | The four card kinds from one `QuestionView` shape, the answered bubble, and pure helpers (`format-answer`, `validate`, `progress-label`)                    |
-| `report/`       | Score header, verdict badge, category bars, advice list, report section, skeleton, with pure `bar-math` and `verdict`                                       |
-| `credits/`      | The credit chip and the money cards (confirm, approval, short balance, stop), copy in `credit-copy.ts`                                                      |
-| `feedback/`     | `ErrorCard` for the four expected failure kinds, copy in `error-copy.ts`                                                                                    |
-| `auth/`         | The auth dialog (sign up, code, password, sign in, reset), the header account menu, the delete account dialog, the save prompt card; copy in `auth-copy.ts` |
-| `fixtures/`     | Typed mock data for every state, used by `/design`, Vitest, and Playwright                                                                                  |
+| Folder          | Owns                                                                                                                                                                                                                                                                                            |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ui/`           | shadcn primitives (Radix base), touch sizes raised to 44px. Add new ones with the `shadcn` CLI, then restyle with tokens only                                                                                                                                                                   |
+| `ai-elements/`  | AI Elements parts (conversation, message, shimmer, suggestion), restyled with tokens                                                                                                                                                                                                            |
+| `workspace/`    | The shell (`WorkspaceShell`, header, history rail, report panel and sheet), `Thread`, `Composer`, `RunProgressBar`, theme toggle                                                                                                                                                                |
+| `answer-cards/` | The four card kinds from one `QuestionView` shape, the answered bubble, and pure helpers (`format-answer`, `validate`, `progress-label`)                                                                                                                                                        |
+| `report/`       | Score header, verdict badge, category bars, advice list, report section, skeleton, with pure `bar-math` and `verdict`                                                                                                                                                                           |
+| `credits/`      | The credit chip and the money cards (confirm, approval, short balance, stop), the Buy buttons (`buy-packs.tsx`, `useBuy` in `buy.ts`, which takes the checkout Server Action as a prop so components never import from `src/app`), the `/credits` history and banners, copy in `credit-copy.ts` |
+| `feedback/`     | `ErrorCard` for the four expected failure kinds, copy in `error-copy.ts`                                                                                                                                                                                                                        |
+| `auth/`         | The auth dialog (sign up, code, password, sign in, reset), the header account menu, the delete account dialog, the save prompt card; copy in `auth-copy.ts`                                                                                                                                     |
+| `fixtures/`     | Typed mock data for every state, used by `/design`, Vitest, and Playwright                                                                                                                                                                                                                      |
 
 ## Conventions
 

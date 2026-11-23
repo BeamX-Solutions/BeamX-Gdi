@@ -23,7 +23,7 @@ Shared server helpers every feature leans on: the Zod checked env module, rate l
 
 ## Conventions
 
-- `env.ts`: required vars fail the app at boot; optional ones (`RESEND_API_KEY`, `BLOB_READ_WRITE_TOKEN`, `INNGEST_*`) fail only when their feature is used. `SKIP_ENV_VALIDATION=1` lets `next build` run in CI without secrets. Every var is listed in `.env.example`.
+- `env.ts`: required vars fail the app at boot; optional ones (`RESEND_API_KEY`, `PAYSTACK_SECRET_KEY`, `BLOB_READ_WRITE_TOKEN`, `INNGEST_*`) fail only when their feature is used. `SKIP_ENV_VALIDATION=1` lets `next build` run in CI without secrets. Every var is listed in `.env.example`.
 - `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` are optional in dev, CI and Preview (the turn lock is then off and logs `turn_lock_disabled`), but required when `VERCEL_ENV=production` (`envSchema`). A Redis error in `acquire` fails closed: the turn gets the `busy` notice, never a 500.
 - `ENABLE_DESIGN_PAGE=true` turns on `/design`. It is read at build time (Cache Components prerenders the page), so changing it needs a new build; set it explicitly to `false` to test the 404, since the local `.env` sets it on.
 - `utils.ts` holds `cn()` (clsx plus tailwind-merge) for class names; shadcn components import it.
