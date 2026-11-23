@@ -99,7 +99,9 @@ export const paymentToast = (
     case "succeeded":
       return "Payment received. Your credits are ready.";
     case "pending":
-      return "Confirming your payment. Your credits will appear shortly.";
+      // Also what a cancelled checkout returns as: Paystack keeps it open (`abandoned`,
+      // `ongoing`), so the copy must fit someone who paid and someone who cancelled.
+      return "We haven't received your payment yet. If you paid, your credits will appear shortly. If you cancelled, you weren't charged.";
     case "failed":
     case "not_found":
       return null;
@@ -128,9 +130,9 @@ export const paymentBanner = (
     case "pending":
       return {
         tone: "ok",
-        title: "Confirming your payment",
+        title: "We haven't received your payment yet",
         message:
-          "Your credits will appear here shortly. You don't need to pay again.",
+          "If you paid, your credits will appear here shortly, so you don't need to pay again. If you cancelled, you weren't charged.",
       };
     case "failed":
       return {

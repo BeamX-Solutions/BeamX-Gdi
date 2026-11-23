@@ -73,7 +73,11 @@ describe("buying copy (spec 0004, AC-8, AC-13, AC-15, AC-21)", () => {
 
   it("toasts only good news in the chat; failures go to /credits", () => {
     expect(paymentToast("succeeded")).toContain("credits are ready");
-    expect(paymentToast("pending")).toContain("shortly");
+    // Pending is also how a cancelled checkout comes back, so it speaks to both.
+    expect(paymentToast("pending")).toContain("haven't received your payment");
+    expect(paymentToast("pending")).toContain(
+      "If you cancelled, you weren't charged",
+    );
     expect(paymentToast("failed")).toBeNull();
     expect(paymentToast("not_found")).toBeNull();
   });
@@ -81,6 +85,9 @@ describe("buying copy (spec 0004, AC-8, AC-13, AC-15, AC-21)", () => {
   it("gives /credits a banner for every outcome", () => {
     expect(paymentBanner("succeeded").tone).toBe("ok");
     expect(paymentBanner("pending").tone).toBe("ok");
+    expect(paymentBanner("pending").message).toContain(
+      "If you cancelled, you weren't charged",
+    );
     expect(paymentBanner("failed").tone).toBe("error");
     expect(paymentBanner("not_found").tone).toBe("error");
   });

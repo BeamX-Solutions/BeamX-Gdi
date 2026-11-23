@@ -141,7 +141,7 @@ spec [0004](../specs/0004-credits-billing/index.md) · code in `src/billing`, `s
   - [x] Disconnect is never a stop: drain the stream copy when the Redis buffer fails, reword the Stop comments, tee billing test (AC-10)
   - [x] Buying credits, after #8 sign up: payment table, Paystack client, checkout, callback, webhook, pending sweep, buy from the card, `/credits` page (AC-8, AC-13, AC-14, AC-21)
   - [x] Accounts and money operations, after #8: sign up grant, Luna import and claim, guest link merge, deletion, adjust script, expiry (behind a flag) and drift check (AC-11, AC-12, AC-15, AC-16, AC-17, AC-19, AC-20)
-- [ ] Verify it: `/check verify credits & billing`
+- [x] Verify it: `/check verify credits & billing`
 - [ ] Test it: `/test credits & billing`
 
 ### 21. Abuse & AI cost guards · Beta · done
