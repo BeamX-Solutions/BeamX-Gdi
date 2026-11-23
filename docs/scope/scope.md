@@ -169,7 +169,7 @@ spec [0009](../specs/0009-accounts-sign-up/index.md) · code in `src/auth`, `src
   - [x] Thin thread: code emails, email sign up through the code with the guest linked and the password set, the header account menu and sign out (AC-1, AC-2, AC-3, AC-6, AC-8, AC-11, AC-12, AC-17)
   - [x] Sign in and forgot password (AC-5, AC-7, AC-10)
   - [x] Abuse guards, the verified account hook, and the sign up prompts on reports and notices (AC-1, AC-15, AC-16)
-  - [x] Delete account and the daily guest purge (AC-13, AC-14, AC-18); integration tests owe a green CI run
+  - [x] Delete account and the daily guest purge (AC-13, AC-14, AC-18)
   - [ ] Later: Google sign in with account linking, once the Google OAuth client exists (AC-4, AC-9)
 - [ ] Verify it: `/check verify accounts & sign up to save`
 - [ ] Test it: `/test accounts & sign up to save`
