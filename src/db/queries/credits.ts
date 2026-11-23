@@ -631,6 +631,9 @@ export const claimPendingGrants = async (
   }
   const email = who.email.trim().toLowerCase();
   const hash = opts.signup > 0 ? opts.hashEmail(email) : null;
+  // Built in ledger order: each statement takes its UUID v7 when built, and entries
+  // written in one commit share `created_at`, so the id orders them in the history.
+  const ensureStatement = ensureAccountStatement(userId, opts.starter);
   const signupStatement =
     hash === null
       ? db.execute(sql`SELECT 0 AS amount WHERE false`)
@@ -655,7 +658,7 @@ export const claimPendingGrants = async (
           SELECT amount FROM l
         `);
   const [opened, signup, luna] = await db.batch([
-    ensureAccountStatement(userId, opts.starter),
+    ensureStatement,
     signupStatement,
     db.execute(sql`
       WITH i AS (
