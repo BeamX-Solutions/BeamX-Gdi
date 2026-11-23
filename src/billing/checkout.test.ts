@@ -107,6 +107,31 @@ describe("startCheckout", () => {
       expect.objectContaining({ paymentId: PAYMENT }),
     );
   });
+
+  it("opens the credit account before it creates the payment, so the purchase lands", async () => {
+    const deps = checkoutDeps();
+    await startCheckout(deps, { packId: "p100", returnTo: null });
+    const opened =
+      vi.mocked(deps.openAccount).mock.invocationCallOrder[0] ?? Infinity;
+    const created =
+      vi.mocked(deps.createPayment).mock.invocationCallOrder[0] ?? -1;
+    expect(opened).toBeLessThan(created);
+  });
+
+  it("never writes the buyer's email to the logs", async () => {
+    for (const initialize of [
+      vi.fn(async () =>
+        ok({ authorizationUrl: "https://checkout.paystack.com/x" }),
+      ),
+      vi.fn(async () => err({ code: "paystack_unavailable" })),
+    ]) {
+      const deps = checkoutDeps({ initialize });
+      await startCheckout(deps, { packId: "p100", returnTo: CHAT });
+      expect(JSON.stringify(vi.mocked(deps.log).mock.calls)).not.toContain(
+        "ada@test.beamx",
+      );
+    }
+  });
 });
 
 describe("callbackUrl", () => {
@@ -212,6 +237,17 @@ describe("settle", () => {
       await settle(s.deps, s.row(), txn({ status: "failed" }), "sweep"),
     ).toBe("failed");
     expect(s.row().status).toBe("failed");
+  });
+
+  it("logs a failure only the first time it is marked", async () => {
+    const s = store();
+    const failed = txn({ status: "failed" });
+    await settle(s.deps, s.row(), failed, "callback");
+    await settle(s.deps, s.row(), failed, "sweep");
+    const failures = vi
+      .mocked(s.deps.log)
+      .mock.calls.filter(([event]) => event === "payment_failed");
+    expect(failures).toHaveLength(1);
   });
 });
 
@@ -351,6 +387,19 @@ describe("handleWebhook", () => {
     expect(s.grants()).toBe(0);
   });
 
+  it("never looks up a reference that is not one of our UUIDs", async () => {
+    const s = store();
+    const deps = webhookDeps(s, {
+      parsed: {
+        kind: "charge_success",
+        transaction: txn({ reference: "LUNA-123'; drop table payment" }),
+      },
+    });
+    const res = await handleWebhook(deps, "{}", "sig");
+    expect(res.status).toBe(200);
+    expect(deps.byId).not.toHaveBeenCalled();
+  });
+
   it("grants once when the webhook and the callback arrive together (AC-13)", async () => {
     const s = store();
     await Promise.all([
@@ -426,5 +475,28 @@ describe("sweepPayments", () => {
     );
     const counts = await sweepPayments(deps);
     expect(counts.checked).toBe(2);
+  });
+
+  it("leaves a still pending payment uncounted while it is under 24 hours old", async () => {
+    const deps = sweepDeps([payment()], async (ref) =>
+      ok(txn({ reference: ref, status: "pending" })),
+    );
+    deps.markAbandoned.mockResolvedValue(false);
+    const counts = await sweepPayments(deps);
+    expect(counts).toEqual({
+      checked: 1,
+      succeeded: 0,
+      failed: 0,
+      abandoned: 0,
+      unavailable: 0,
+    });
+  });
+
+  it("logs zero counts and calls Paystack for nothing when no payment is stale", async () => {
+    const deps = sweepDeps([], async () => ok(txn()));
+    const counts = await sweepPayments(deps);
+    expect(deps.verify).not.toHaveBeenCalled();
+    expect(deps.log).toHaveBeenCalledWith("payment_sweep", counts);
+    expect(counts.checked).toBe(0);
   });
 });

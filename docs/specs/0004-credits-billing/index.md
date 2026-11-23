@@ -1,7 +1,7 @@
 # 0004. Credits and billing for the BeamX Workspace
 
 **Date**: 2026-11-19
-**Status**: In Progress
+**Status**: Accepted
 
 ## Summary
 
