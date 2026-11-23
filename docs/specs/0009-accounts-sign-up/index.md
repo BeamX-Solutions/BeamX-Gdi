@@ -214,6 +214,7 @@ Tracer Bullet: one real sign up path end to end first (email check, code, accoun
 - A guest on two devices links only the device they signed up on; the other device's guest data is purged after 30 days.
 - Code emails depend on Resend deliverability; a slow or spam filed email stalls email sign up (resend and Google soften it).
 - Rate limits live in Upstash and fail open, so a Redis outage removes them for its duration.
+- Sending a code (`/email-otp/send-verification-otp`, `/email-otp/request-password-reset`) is limited per IP only, so an attacker rotating IPs could flood one inbox and spend Resend quota. Accepted for launch (review 2026-11-23); add a per email counter like the email check if Resend shows abuse.
 - A purge backlog right after launch can take several days to clear at 50 per batch within 120 seconds.
 
 **Neutral**:
@@ -231,4 +232,5 @@ Tracer Bullet: one real sign up path end to end first (email check, code, accoun
 - [ ] Spec 0004 milestone 4: plug `claimPendingGrants` into `onAccountVerified` and add the credit amount to the after sign up toast.
 - [ ] `src/auth/AGENTS.md`: record that accounts are created only by the code sign in (never re enable `/sign-up/email`), the hook seam, the BotID path list, and the auth rate limit storage (`/sync` after the build).
 - [ ] Install the official `resend/react-email` Agent Skill (its install failed on a registry fetch error during design) and record it with `resend` and `email-best-practices` in `src/auth/AGENTS.md` or a new `src/email/AGENTS.md`.
+- [ ] If code sends are abused: a per email limit on the two send paths (see Negative / tradeoffs).
 - [ ] Revisit email change and a signed in chat list (#14) later; both are out of scope here.
