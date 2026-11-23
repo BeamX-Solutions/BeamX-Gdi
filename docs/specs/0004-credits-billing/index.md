@@ -118,7 +118,7 @@ Reasoning and options: see [rationale.md](rationale.md).
 | | `luna_credits` | integer | no | CHECK `> 0`; as exported from Luna |
 | | `credits` | integer | no | `luna_credits × 10` |
 | | `claimed_by_user_id` | uuid | yes | FK `user.id` ON DELETE SET NULL |
-| | `claimed_at` | timestamptz | yes | CHECK both claim columns null or both set |
+| | `claimed_at` | timestamptz | yes | CHECK `claimed_by_user_id IS NULL OR claimed_at IS NOT NULL` (a claimer always has a claim time; see the note under Indexes and constraints) |
 | | `imported_at` | timestamptz | no | |
 | `signup_grant_claim` | `email_hash` | text | no | PK; HMAC SHA256, no readable email |
 | | `created_at` | timestamptz | no | no user link, survives deletion |
@@ -132,6 +132,7 @@ Indexes and constraints:
 - `credit_hold` index `(status, purpose)` WHERE `status = 'active'` for the idle sweep.
 - `payment` index `(status, created_at)` WHERE `status = 'pending'` for the sweep; index `(user_id)`.
 - Function `billing_assert(ok boolean, code text)`: raises `P0001` with `code` when `ok` is false.
+- `luna_credit_import_claim_time`: CHECK `claimed_by_user_id IS NULL OR claimed_at IS NOT NULL`, not "both null or both set". `claimed_by_user_id` is ON DELETE SET NULL, so deleting the claimer nulls the user and keeps `claimed_at`; a both or neither CHECK would then fail and abort the account deletion (AC-19). A row with `claimed_at` set and no user means "claimed by a deleted account": the claim query matches only `claimed_at IS NULL`, so those credits can never be claimed again. Updated 2026-11-23 to match migration `0003_money_ops`.
 
 Relationships: user 1──1 `credit_account` · user 1──N `credit_ledger` · user 1──N `credit_hold` · user 1──N `payment` (nullable) · `tool_run` 1──N `credit_hold` (at most 1 active) · `credit_hold` 1──0..1 ledger charge entry · `payment` 1──0..1 `purchase` entry · `luna_credit_import` N──0..1 user.
 

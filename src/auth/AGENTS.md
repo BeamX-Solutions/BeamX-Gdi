@@ -18,7 +18,8 @@ Better Auth server and client config, with tables in Neon via the Drizzle adapte
 - `/delete-user` answers `404` too: only `/api/account/delete` deletes (BotID, `typedEmailMatches`, and Better Auth's one day `freshAge`, answering `SESSION_EXPIRED` for an older session).
 - The BotID protected auth paths live once in `paths.ts`; the route's `isBot()` check and BotID's `protect` list in `src/instrumentation-client.ts` both read it. A path on only one side blocks every real user or lets bots through.
 - The auth POSTs are rate limited by Better Auth's `rateLimit` with the Upstash storage and rules in `rate-limit.ts` (shared by every function instance, fails open); the email check also limits per email under a sha256 key. The guest sign in keeps spec 0008's daily cap instead.
-- `account-verified.ts` (`afterUserWrite`, from the user create and update database hooks) is the hook seam for a verified, non guest user (spec 0004's grants plug in there). It is idempotent and never throws.
+- `account-verified.ts` (`afterUserWrite`, from the user create and update database hooks) is the hook seam for a verified, non guest user. It calls `claimGrants` (`grants.ts`, spec 0004: starter, sign up and Luna grants), is idempotent, and never throws (a failure logs `grant_claim_failed`).
+- On sign up from a guest, Better Auth creates the account (the hook grants 30 + 50) before `onLinkAccount` runs, so the guest link takes the "target already has credits" path: held credits move, spare free credits are forfeited.
 
 ## Gotchas
 
