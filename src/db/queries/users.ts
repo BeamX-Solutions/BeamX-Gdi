@@ -175,14 +175,16 @@ export type EmailStatus = "none" | "exists" | "google_only";
 
 /**
  * The account behind a lowercased email, for the sign up form's email check: `none`
- * (free to sign up), `exists` (has a password; sign in instead), or `google_only` (made
- * with Google; use Google or Forgot password to add one). Guests never count. One round
- * trip.
+ * (free to sign up), `exists` (sign in instead), or `google_only` (made with Google and
+ * no password; use Google or Forgot password to add one). An account with neither, from
+ * a code sign up closed before the password step, is `exists`: Forgot password on the
+ * sign in form sets one (spec 0009). Guests never count. One round trip.
  */
 export const emailStatus = async (email: string): Promise<EmailStatus> => {
   const [row] = await db
     .select({
       hasPassword: sql<boolean>`bool_or(${account.providerId} = 'credential')`,
+      hasGoogle: sql<boolean>`bool_or(${account.providerId} = 'google')`,
     })
     .from(user)
     .leftJoin(account, eq(account.userId, user.id))
@@ -195,5 +197,8 @@ export const emailStatus = async (email: string): Promise<EmailStatus> => {
     )
     .groupBy(user.id);
   if (row === undefined) return "none";
-  return row.hasPassword ? "exists" : "google_only";
+  // Over the left join, an account with no rows gives null for both: not Google.
+  return row.hasGoogle === true && row.hasPassword !== true
+    ? "google_only"
+    : "exists";
 };

@@ -67,6 +67,12 @@ describe("emailStatus (spec 0009, AC-8)", () => {
     expect(await emailStatus(email)).toBe("google_only");
   });
 
+  it("is exists, not google_only, for a code sign up closed before the password", async () => {
+    const email = `${newId()}@nopassword.test`;
+    await makeAccount(email, []);
+    expect(await emailStatus(email)).toBe("exists");
+  });
+
   it("counts an account whose is_anonymous is null as an account", async () => {
     const email = `${newId()}@null.test`;
     await makeAccount(email, ["credential"], null);
