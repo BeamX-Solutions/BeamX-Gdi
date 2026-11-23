@@ -12,8 +12,8 @@ _Steps derived from spec 0009 acceptance criteria. `/check verify` runs these; `
 - [ ] As a guest without enough credits for a run → the short balance card says "Sign up for a free account to keep going…" with a Sign up button that opens the dialog → AC-1
 - [ ] As a guest out of free messages (`chat_credits_guest`) → Sign up beside Got it, copy no longer says accounts are "coming soon" (added beyond AC-1's list, see the build report) → AC-1
 - [ ] `/design` → the "Sign up prompts" block shows the save card, a guest notice with two buttons, and the guest short balance card; axe clean in both themes → AC-1
-- [ ] On a Vercel preview with Require Log In off, send a plain `curl -X POST` (no BotID headers) to `/api/auth/sign-in/email`, `/api/auth/email-otp/send-verification-otp`, `/api/auth/sign-in/email-otp`, `/api/auth/email-otp/request-password-reset`, `/api/auth/email-otp/reset-password`, `/api/account/email-check`, `/api/account/set-password` → each answers `403 {"code":"bot"}` → AC-15
-- [ ] On the preview, sign in normally in the browser (BotID script loaded) → works, so every protected path is in `instrumentation-client.ts` → AC-15
+- [x] On a Vercel preview with Require Log In off, send a plain `curl -X POST` (no BotID headers) to `/api/auth/sign-in/email`, `/api/auth/email-otp/send-verification-otp`, `/api/auth/sign-in/email-otp`, `/api/auth/email-otp/request-password-reset`, `/api/auth/email-otp/reset-password`, `/api/account/email-check`, `/api/account/set-password` → each answers `403 {"code":"bot"}` → AC-15
+- [x] On the preview, sign in normally in the browser (BotID script loaded) → works, so every protected path is in `instrumentation-client.ts` → AC-15
 
 ## Commands
 - [x] `pnpm vitest run src/auth/rate-limit.test.ts` → the 6th sign in a minute from one IP is refused, the 4th email check of one email in an hour is refused, no IP skips the IP limit, Redis down allows and logs `limit_check_failed` → AC-15
@@ -54,7 +54,7 @@ _Build plan tasks 6 and 7 (AC-13, AC-14, AC-18). Google adds its steps when buil
 - [ ] On that sign in again step, Sign out → you land on `/` signed out → AC-13
 - [ ] Start a report, delete the account while it is generating → the delete works, and the runtime logs show the report step stopping (`stale_attempt`) with no 500 → AC-13
 - [x] Sign in as account A, copy a chat URL, sign in as account B in another browser, open it → `404` → AC-18
-- [ ] On a preview with Require Log In off, `curl -X POST` `/api/account/delete` with no BotID headers → `403 {"code":"bot"}` → AC-15
+- [x] On a preview with Require Log In off, `curl -X POST` `/api/account/delete` with no BotID headers → `403 {"code":"bot"}` → AC-15
 - [x] `curl -X POST /api/auth/delete-user` with a valid session cookie → `404` (only our route deletes) → AC-13
 
 ## Commands
