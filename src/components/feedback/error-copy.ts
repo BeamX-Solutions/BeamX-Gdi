@@ -166,8 +166,7 @@ export const chatErrorCopy: Readonly<Record<ChatErrorKind, ErrorCopy>> = {
   },
   chat_credits_guest: {
     title: "You've used today's free messages",
-    message:
-      "Free accounts are coming soon, with more credits. Come back tomorrow to keep chatting.",
+    message: "Sign up for a free account to keep going, or come back tomorrow.",
     actionLabel: "Got it",
   },
   free_chat_used: {

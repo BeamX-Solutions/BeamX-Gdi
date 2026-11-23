@@ -6,6 +6,7 @@ import { z } from "zod";
 import { loadChat, toolNames } from "@/assistant/chat-page";
 import { sessionUserId } from "@/auth/session";
 import { toCreditSummary } from "@/billing/summary";
+import { AccountControl } from "@/components/auth/account-control";
 import { CreditChip } from "@/components/credits/credit-chip";
 import * as conversations from "@/db/queries/conversations";
 import * as credits from "@/db/queries/credits";
@@ -41,12 +42,18 @@ async function SavedChat({ params }: Pick<PageProps<"/c/[id]">, "params">) {
     userId === null ? null : credits.getSummary(userId),
   ]);
   if (page.kind === "not_found") notFound();
+  const credit = toCreditSummary(summary);
   return (
     <Chat
       conversationId={id}
       initialMessages={page.messages}
       toolNames={toolNames()}
-      chip={<CreditChip initial={toCreditSummary(summary)} />}
+      chip={
+        <>
+          <CreditChip initial={credit} />
+          <AccountControl availableCredits={credit?.available ?? 0} />
+        </>
+      }
     />
   );
 }

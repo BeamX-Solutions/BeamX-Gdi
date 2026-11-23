@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { toolNames } from "@/assistant/chat-page";
 import { sessionUserId } from "@/auth/session";
 import { toCreditSummary } from "@/billing/summary";
+import { AccountControl } from "@/components/auth/account-control";
 import { CreditChip } from "@/components/credits/credit-chip";
 import { Chat } from "@/components/workspace/chat";
 import * as credits from "@/db/queries/credits";
@@ -25,9 +26,19 @@ export default function Home() {
   );
 }
 
-/** The chip's server read (AC-9): the user's credits, or nothing with no account. */
+/**
+ * The header's server read (AC-9): the user's credits, or nothing with no account. The
+ * account control beside the chip uses the same read for its forfeit note (spec 0009).
+ */
 async function ChipSeed() {
   const userId = await sessionUserId(await headers());
-  const summary = userId === null ? null : await credits.getSummary(userId);
-  return <CreditChip initial={toCreditSummary(summary)} />;
+  const summary = toCreditSummary(
+    userId === null ? null : await credits.getSummary(userId),
+  );
+  return (
+    <>
+      <CreditChip initial={summary} />
+      <AccountControl availableCredits={summary?.available ?? 0} />
+    </>
+  );
 }

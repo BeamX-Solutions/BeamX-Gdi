@@ -1,7 +1,7 @@
 # 0009. Accounts and sign up to save
 
 **Date**: 2026-11-22
-**Status**: Proposed
+**Status**: In Progress
 
 ## Summary
 
@@ -184,13 +184,13 @@ The daily purge joins the existing cron route through `runDailyJobs`: it checks 
 
 Tracer Bullet: one real sign up path end to end first (email check, code, account, link, password, toast), then sign in and recovery, then the rest of the account surface, then cleanup. Google comes last, as its own milestone.
 
-1. [ ] Email foundation: `src/email/` with a Resend client (`RESEND_API_KEY`, `EMAIL_FROM` in `env.ts` and `.env.example`, dev console fallback), a React Email `CodeEmail` template with plain text, and `sendCodeEmail(to, code, purpose)` returning a `Result`; unit test the template text, satisfies **AC-17**
-2. [ ] Thin thread, email sign up: Better Auth config (`emailOTP` with sign up through the code sign in, `requireEmailVerification`, session lengths, `haveIBeenPwned` paths); `/sign-up/email` blocked; `/api/account/email-check` and `/api/account/set-password`; the auth dialog with sign up, code and password screens (shadcn `Dialog`, bottom `Sheet` on narrow screens, design tokens), opened from the header Sign in button; the signed in header account menu (name, email, Sign out); the toast; integration tests that a guest's data moves on the code sign in and that a failed link keeps the guest, satisfies **AC-1** (header), **AC-2**, **AC-3**, **AC-6**, **AC-8**, **AC-11**, **AC-12**
-3. [ ] Sign in and recovery: sign in form with the forfeit note, forgot password by code with sessions revoked then a sign in; tests, satisfies **AC-5**, **AC-7**, **AC-10**
-4. [ ] Abuse guards and hook: BotID on every auth POST in the route and in `src/instrumentation-client.ts`; Better Auth `rateLimit` with the Upstash `consume` storage and `customRules` (anonymous sign in off); the per email limit on the email check; `onAccountVerified` from the user create and update hooks; tests, satisfies **AC-15**, **AC-16**
-5. [ ] More prompts: the save prompt card after a guest's ready report, and a Sign up action on `runs_daily`, `chat_daily`, `chats_daily` notices and the guest short balance card; `/design` showcase entries; e2e of sign up from the save prompt with axe clean, satisfies **AC-1**
-6. [ ] Delete account: menu item, dialog with typed email, `/api/account/delete` with the email check and Better Auth's fresh session rule; in flight writes drop cleanly for a missing user; integration test of the cascade, satisfies **AC-13**, **AC-18**
-7. [ ] Daily purge: `purgeUsers` (stale guests by last activity, skipping holds and generating reports, batches of 50, 120 second budget, forfeited credits logged) in `src/db/queries/users.ts`; `runDailyJobs` beside the billing sweeps in the cron route; integration test on a Neon branch, satisfies **AC-14**
+1. [x] Email foundation: `src/email/` with a Resend client (`RESEND_API_KEY`, `EMAIL_FROM` in `env.ts` and `.env.example`, dev console fallback), a React Email `CodeEmail` template with plain text, and `sendCodeEmail(to, code, purpose)` returning a `Result`; unit test the template text, satisfies **AC-17**
+2. [x] Thin thread, email sign up: Better Auth config (`emailOTP` with sign up through the code sign in, `requireEmailVerification`, session lengths, `haveIBeenPwned` paths); `/sign-up/email` blocked; `/api/account/email-check` and `/api/account/set-password`; the auth dialog with sign up, code and password screens (shadcn `Dialog`, bottom `Sheet` on narrow screens, design tokens), opened from the header Sign in button; the signed in header account menu (name, email, Sign out); the toast; integration tests that a guest's data moves on the code sign in and that a failed link keeps the guest, satisfies **AC-1** (header), **AC-2**, **AC-3**, **AC-6**, **AC-8**, **AC-11**, **AC-12**
+3. [x] Sign in and recovery: sign in form with the forfeit note, forgot password by code with sessions revoked then a sign in; tests, satisfies **AC-5**, **AC-7**, **AC-10**
+4. [x] Abuse guards and hook: BotID on every auth POST in the route and in `src/instrumentation-client.ts`; Better Auth `rateLimit` with the Upstash `consume` storage and `customRules` (anonymous sign in off); the per email limit on the email check; `onAccountVerified` from the user create and update hooks; tests, satisfies **AC-15**, **AC-16**
+5. [x] More prompts: the save prompt card after a guest's ready report, and a Sign up action on `runs_daily`, `chat_daily`, `chats_daily` notices and the guest short balance card; `/design` showcase entries; e2e of sign up from the save prompt with axe clean, satisfies **AC-1**
+6. [x] Delete account: menu item, dialog with typed email, `/api/account/delete` with the email check and Better Auth's fresh session rule; in flight writes drop cleanly for a missing user; integration test of the cascade, satisfies **AC-13**, **AC-18**
+7. [x] Daily purge: `purgeUsers` (stale guests by last activity, skipping holds and generating reports, batches of 50, 120 second budget, forfeited credits logged) in `src/db/queries/users.ts`; `runDailyJobs` beside the billing sweeps in the cron route; integration test on a Neon branch, satisfies **AC-14**
 
 **Later milestone: Google sign in** (start once the Google OAuth client exists; until then the Google button is never rendered)
 
@@ -214,6 +214,7 @@ Tracer Bullet: one real sign up path end to end first (email check, code, accoun
 - A guest on two devices links only the device they signed up on; the other device's guest data is purged after 30 days.
 - Code emails depend on Resend deliverability; a slow or spam filed email stalls email sign up (resend and Google soften it).
 - Rate limits live in Upstash and fail open, so a Redis outage removes them for its duration.
+- Sending a code (`/email-otp/send-verification-otp`, `/email-otp/request-password-reset`) is limited per IP only, so an attacker rotating IPs could flood one inbox and spend Resend quota. Accepted for launch (review 2026-11-23); add a per email counter like the email check if Resend shows abuse.
 - A purge backlog right after launch can take several days to clear at 50 per batch within 120 seconds.
 
 **Neutral**:
@@ -231,4 +232,5 @@ Tracer Bullet: one real sign up path end to end first (email check, code, accoun
 - [ ] Spec 0004 milestone 4: plug `claimPendingGrants` into `onAccountVerified` and add the credit amount to the after sign up toast.
 - [ ] `src/auth/AGENTS.md`: record that accounts are created only by the code sign in (never re enable `/sign-up/email`), the hook seam, the BotID path list, and the auth rate limit storage (`/sync` after the build).
 - [ ] Install the official `resend/react-email` Agent Skill (its install failed on a registry fetch error during design) and record it with `resend` and `email-best-practices` in `src/auth/AGENTS.md` or a new `src/email/AGENTS.md`.
+- [ ] If code sends are abused: a per email limit on the two send paths (see Negative / tradeoffs).
 - [ ] Revisit email change and a signed in chat list (#14) later; both are out of scope here.

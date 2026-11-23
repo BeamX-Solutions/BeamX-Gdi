@@ -3,6 +3,8 @@
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import {
+  useCallback,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -13,6 +15,11 @@ import { v7 as newId } from "uuid";
 import type { ChatUIMessage } from "@/assistant/chat-page";
 import type { AnswerData, PrefillResponseData } from "@/assistant/part-schemas";
 import { authClient } from "@/auth/client";
+import {
+  AuthOpenContext,
+  type AuthOpenState,
+  type AuthScreen,
+} from "@/components/auth/auth-open-context";
 import type { CreditSummary } from "@/billing/summary";
 import { Suggestion, Suggestions } from "@/components/ai-elements/suggestion";
 import { LiveCreditSummary } from "@/components/credits/credit-chip";
@@ -21,7 +28,14 @@ import { panelView } from "@/components/report/report-panel-state";
 import { ReportStatusView } from "@/components/report/report-status-view";
 import { useReportStatus } from "@/components/report/use-report-status";
 import { reportTitle } from "./chat-copy";
-import { ChatItem, OpenReportOnArrival, type ChatActions } from "./chat-items";
+import { NoticeContext, showQueuedNotice } from "./notice-context";
+import { Toast } from "./toast";
+import {
+  ChatItem,
+  OpenReportOnArrival,
+  SavePrompt,
+  type ChatActions,
+} from "./chat-items";
 import {
   chatRequestBody,
   failureCopy,
@@ -81,16 +95,42 @@ function ChatFrame({
   readonly report?: ReactNode | null;
   readonly reportName?: string;
 }) {
+  // The after sign in toast (spec 0009, AC-6), announced by the Thread.
+  const [notice, setNotice] = useState<string | null>(null);
+  const clearNotice = useCallback(() => setNotice(null), []);
+  const noticeValue = useMemo(() => ({ notice, show: setNotice }), [notice]);
+  // A notice left by the page before a full page load ("Your account was deleted.",
+  // AC-13). Read after mount: the server render has no `sessionStorage`.
+  useEffect(() => showQueuedNotice(setNotice), []);
+  // The one auth dialog's state, shared by the header and the thread's prompts (spec
+  // 0009, AC-1).
+  const [auth, setAuth] = useState<AuthOpenState>({
+    open: false,
+    screen: "sign-up",
+  });
+  const authValue = useMemo(
+    () => ({
+      ...auth,
+      openAuth: (screen: AuthScreen) => setAuth({ open: true, screen }),
+      setOpen: (open: boolean) => setAuth((s) => ({ ...s, open })),
+    }),
+    [auth],
+  );
   return (
-    <WorkspaceShell
-      header={<Header>{chip}</Header>}
-      rail={<HistoryRail items={[]} />}
-      report={report}
-      reportTitle={reportName}
-    >
-      {thread}
-      {composer}
-    </WorkspaceShell>
+    <AuthOpenContext.Provider value={authValue}>
+      <NoticeContext.Provider value={noticeValue}>
+        <WorkspaceShell
+          header={<Header>{chip}</Header>}
+          rail={<HistoryRail items={[]} />}
+          report={report}
+          reportTitle={reportName}
+        >
+          {thread}
+          {composer}
+        </WorkspaceShell>
+        <Toast message={notice} onDone={clearNotice} />
+      </NoticeContext.Provider>
+    </AuthOpenContext.Provider>
   );
 }
 
@@ -397,6 +437,13 @@ function LiveChat({
   else if (polled && !sameSummary(polled, live.polled))
     setLive({ ...live, polled, summary: polled });
 
+  // Signed in users never see the sign up prompts (spec 0009, AC-1).
+  const guest = session.data?.user.isAnonymous ?? true;
+  // The save prompt waits for the newest report to be ready.
+  const reportReady =
+    shown?.runId === latest?.runId &&
+    report.state.kind === "loaded" &&
+    report.state.payload.status === "ready";
   const entries = items.map((item): ThreadEntry =>
     item.kind === "text"
       ? {
@@ -412,14 +459,23 @@ function LiveChat({
           kind: "node",
           id: item.id,
           node: (
-            <ChatItem
-              item={item}
-              actions={actions}
-              busy={busy}
-              guest={session.data?.user.isAnonymous ?? true}
-              editing={editing}
-              toolNames={toolNames}
-            />
+            <>
+              <ChatItem
+                item={item}
+                actions={actions}
+                busy={busy}
+                guest={guest}
+                editing={editing}
+                toolNames={toolNames}
+              />
+              {item.kind === "report" && item.data.runId === latest?.runId ? (
+                <SavePrompt
+                  conversationId={id}
+                  guest={guest}
+                  reportReady={reportReady}
+                />
+              ) : null}
+            </>
           ),
         },
   );

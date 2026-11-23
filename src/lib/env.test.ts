@@ -12,6 +12,8 @@ const base = {
   BETTER_AUTH_SECRET: "x".repeat(32),
   NEXT_PUBLIC_APP_URL: "https://beamx.test",
   CRON_SECRET: "c".repeat(32),
+  RESEND_API_KEY: "re_test",
+  EMAIL_FROM: "BeamX <no-reply@beamx.test>",
 };
 
 const upstash = {
@@ -75,6 +77,26 @@ describe("envSchema: CRON_SECRET for the daily billing job (spec 0004)", () => {
     expect(
       envSchema(false).safeParse({ ...base, CRON_SECRET: "short" }).success,
     ).toBe(false);
+  });
+});
+
+describe("envSchema: the Resend variables for code emails (spec 0009)", () => {
+  it("are optional in dev, CI and preview (codes are logged instead)", () => {
+    const rest = { ...base, RESEND_API_KEY: undefined, EMAIL_FROM: undefined };
+    expect(envSchema(false).safeParse(rest).success).toBe(true);
+  });
+
+  it("fail a production deploy missing either one, or with an empty line", () => {
+    const result = envSchema(true).safeParse({
+      ...base,
+      ...upstash,
+      RESEND_API_KEY: "",
+      EMAIL_FROM: undefined,
+    });
+    expect(result.error?.issues.map((i) => i.path[0])).toEqual([
+      "RESEND_API_KEY",
+      "EMAIL_FROM",
+    ]);
   });
 });
 

@@ -52,7 +52,7 @@ export const shortfallLine = (shortfall: number): string =>
 
 /** Spec 0007, AC-10: until accounts (#8), a guest is told an account will offer more. */
 export const guestShortLine =
-  "Free accounts are coming soon, with more credits. Your answers so far are kept.";
+  "Sign up for a free account to keep going. Your answers so far are kept.";
 
 /** "100 credits for ₦10,000". */
 export const packLine = (pack: Pack): string =>
