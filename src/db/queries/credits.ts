@@ -643,23 +643,31 @@ export const claimPendingGrants = async (
   const signupStatement =
     hash === null
       ? db.execute(sql`SELECT 0 AS amount WHERE false`)
-      : db.execute(sql`
+      : // Ledger first, then the balance only for an entry actually written: a hash new
+        // to `signup_grant_claim` while `signup:<userId>` already exists (an email
+        // change, a rotated BILLING_HASH_SECRET) grants nothing instead of raising the
+        // balance with no ledger entry. The row lock keeps `balance_after` exact.
+        db.execute(sql`
           WITH c AS (
             INSERT INTO signup_grant_claim (email_hash) VALUES (${hash})
             ON CONFLICT (email_hash) DO NOTHING
             RETURNING email_hash
-          ), a AS (
-            UPDATE credit_account
-            SET balance = balance + ${opts.signup}::int, updated_at = now()
+          ), acc AS (
+            SELECT user_id, balance FROM credit_account
             WHERE user_id = ${userId}::uuid AND EXISTS (SELECT 1 FROM c)
-            RETURNING user_id, balance
+            FOR UPDATE
           ), l AS (
             INSERT INTO credit_ledger (id, user_id, kind, amount, balance_after, idempotency_key)
-            SELECT ${newId()}::uuid, user_id, 'signup_grant', ${opts.signup}::int, balance,
-                   'signup:' || user_id
-            FROM a
+            SELECT ${newId()}::uuid, user_id, 'signup_grant', ${opts.signup}::int,
+                   balance + ${opts.signup}::int, 'signup:' || user_id
+            FROM acc
             ON CONFLICT (idempotency_key) DO NOTHING
-            RETURNING amount
+            RETURNING user_id, amount
+          ), a AS (
+            UPDATE credit_account
+            SET balance = credit_account.balance + l.amount, updated_at = now()
+            FROM l WHERE credit_account.user_id = l.user_id
+            RETURNING credit_account.user_id
           )
           SELECT amount FROM l
         `);
