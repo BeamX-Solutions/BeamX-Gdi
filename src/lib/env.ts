@@ -74,6 +74,14 @@ const schema = z.object({
     (v) => (v === "" ? undefined : v),
     z.string().min(32).optional(),
   ),
+  // Paystack (spec 0004): the checkout's initialize and verify calls and the webhook
+  // signature check. Optional at boot, like `RESEND_API_KEY`: without it buying credits
+  // answers `paystack_unavailable` and the webhook refuses every call. A test key
+  // (`sk_test_...`) on Preview and local, the live key only on Production.
+  PAYSTACK_SECRET_KEY: z.preprocess(
+    (v) => (v === "" ? undefined : v),
+    z.string().min(1).optional(),
+  ),
   // Resend (spec 0009): the 6 digit code emails for sign up and password reset. Both are
   // required in production; in dev without a key the code is logged to the console.
   RESEND_API_KEY: z.preprocess(
@@ -195,6 +203,7 @@ export const env: Env = skip
       LIMIT_GUESTS_PER_IP: rawLimit(process.env.LIMIT_GUESTS_PER_IP, 30),
       CRON_SECRET: process.env.CRON_SECRET || undefined,
       BILLING_HASH_SECRET: process.env.BILLING_HASH_SECRET || undefined,
+      PAYSTACK_SECRET_KEY: process.env.PAYSTACK_SECRET_KEY || undefined,
       RESEND_API_KEY: process.env.RESEND_API_KEY || undefined,
       EMAIL_FROM: process.env.EMAIL_FROM || undefined,
       E2E_FAKE_AI: process.env.E2E_FAKE_AI === "true",

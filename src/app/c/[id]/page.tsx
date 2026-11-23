@@ -12,6 +12,7 @@ import { CreditChip } from "@/components/credits/credit-chip";
 import * as conversations from "@/db/queries/conversations";
 import * as credits from "@/db/queries/credits";
 import { Chat } from "@/components/workspace/chat";
+import { startCheckoutAction } from "@/app/credits/actions";
 
 /**
  * A saved chat (spec 0007, AC-5, AC-7). The shell is static; the id, the session and the
@@ -49,6 +50,7 @@ async function SavedChat({ params }: Pick<PageProps<"/c/[id]">, "params">) {
       conversationId={id}
       initialMessages={page.messages}
       toolNames={toolNames()}
+      buy={startCheckoutAction}
       chip={
         <>
           <CreditChip

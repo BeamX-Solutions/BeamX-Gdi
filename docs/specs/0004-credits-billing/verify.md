@@ -120,3 +120,41 @@ Built: tasks 15 to 18, and task 19's expiry job, drift check and chip warning do
 - AC-17 · adjust integration tests, `parseAdjustArgs` tests · adjust script steps
 - AC-19 · deletion keeps `signup_grant_claim` and a claimed import stays claimed (integration) · `payment` rows come with milestone 3
 - AC-20 · `findDrift` integration test, `runDriftCheck` unit test · cron step
+
+## Milestone 3: buying credits · updated 2026-11-23
+
+Built: tasks 11 to 14 (payment table, Paystack client, checkout Server Action, callback, webhook, stale pending sweep, Buy on the short balance card, `/credits` page) and the `/credits` expiry banner from task 19. Use the Paystack TEST key (`sk_test_...`) and test card `4084 0840 8408 4081` (any future expiry, CVV `408`, PIN `0000`, OTP `123456`). For the webhook locally, expose the dev server (for example with a tunnel) and set that URL in the Paystack test dashboard, or skip the webhook steps locally and run them on a preview.
+
+### UI / manual
+- [ ] As a signed in account with fewer credits than a tool's price, approve a run → the short balance card shows the shortfall and a Buy button per covering pack → AC-8
+- [ ] Tap Buy on a pack → the button says "Opening Paystack…", the browser goes to `checkout.paystack.com`, amount ₦ matches the pack → AC-8, AC-13
+- [ ] Pay with the test card → you land back on the same `/c/<id>` with a "Payment received" toast, `?payment=` is gone from the address bar, the header chip shows the new balance; approve again and the run starts → AC-8, AC-13, AC-14
+- [ ] On Paystack, cancel instead of paying → you land on `/credits?payment=failed` or `pending` with a friendly banner, nothing is granted → AC-13, AC-21
+- [ ] As a guest, the short balance card shows Sign up, never Buy; `/credits` says sign up to buy → AC-8, AC-13
+- [ ] Tap the header chip → `/credits` shows available, held, expiry date, the three packs with Buy, and the history newest first; with more than 20 entries, Older and Newest page through without repeats → AC-14
+- [ ] Set an account's `last_activity_at` to 11.5 months ago on the dev branch → `/credits` shows the "Your credits expire soon" banner with the right date and the chip shows the warning dot → AC-15
+- [ ] Unset `PAYSTACK_SECRET_KEY` and tap Buy → the line "Payments are unavailable right now… You were not charged." shows under the buttons, no error page → AC-21
+- [ ] Tap Buy 11 times within an hour (with Upstash set) → the 11th shows the rate limited line → AC-13, AC-21
+
+### Commands
+- [ ] `curl -i -X POST -H "x-paystack-signature: abc" -d '{"event":"charge.success"}' http://localhost:3000/api/webhooks/paystack` → `401 {"code":"unauthorized"}`, nothing changes → AC-13
+- [ ] `curl -i "http://localhost:3000/credits/callback?reference=<uuid>"` with no session → `303` to `/credits?payment=pending` → AC-13
+- [ ] Open `/credits/callback?reference=<another user's payment id>` signed in → lands on `/credits?payment=not_found`, nothing is shown about that payment → AC-13
+- [ ] After a test payment, `SELECT count(*) FROM credit_ledger WHERE payment_id = '<id>'` → exactly 1, even though both the webhook and the callback ran (check the logs for `payment_succeeded` once) → AC-13
+- [ ] Create a pending payment, set its `created_at` to 2 hours ago, call `/api/cron/billing` with the bearer token → the response has a `payments` job with `checked >= 1`; at 25 hours old with no success it becomes `abandoned` → AC-13
+- [ ] `pnpm test:integration` on a throwaway branch → `payments.int.test.ts` passes (grant once under a race, amount mismatch grants nothing, late success after abandoned, payment kept with a null user after deletion, history keyset paging) → AC-13, AC-14, AC-19
+
+### Value sourcing checks
+- [ ] Paystack amount: for each pack, the `payment.amount_kobo` row equals `priceNgn × 100` (₦10,000 → 1000000), never a value from the browser
+- [ ] Credits to grant: edit a pack's credits in `billing/config.ts` after a checkout started, then finish paying → the grant uses the `payment.credits` copied at checkout
+- [ ] Amount check: a webhook (validly signed) whose `amount` differs from `payment.amount_kobo` → no grant, `payment_amount_mismatch` logged
+- [ ] Callback URL: the Paystack page's return goes to `NEXT_PUBLIC_APP_URL/credits/callback?returnTo=<chat id>`; a `returnTo` that is not your chat sends you to `/credits` instead
+- [ ] Expiry date: an account with `last_activity_at` at 23:30 UTC on 31 January shows the Lagos date plus 12 months (1 February next year, not 31 January)
+
+### Acceptance criteria coverage
+- AC-8 · Buy on the card and land back in the chat (manual), guest variant
+- AC-13 · `checkout.test.ts`, `paystack.test.ts`, `payments.int.test.ts` · webhook 401, callback, race, mismatch, sweep steps
+- AC-14 · `/credits` page and history paging (manual), `history.test.ts`, keyset integration test
+- AC-15 · `/credits` expiry banner step (closes the banner owed above)
+- AC-19 · payment kept with a null user (integration)
+- AC-21 · unavailable and rate limited lines, failed and not found banners

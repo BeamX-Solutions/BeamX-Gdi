@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import { Suspense } from "react";
 import { toolNames } from "@/assistant/chat-page";
+import { startCheckoutAction } from "./credits/actions";
 import { sessionUserId } from "@/auth/session";
 import { billingConfig } from "@/billing/config";
 import { expiryWarning, toCreditSummary } from "@/billing/summary";
@@ -18,6 +19,7 @@ export default function Home() {
   return (
     <Chat
       toolNames={toolNames()}
+      buy={startCheckoutAction}
       chip={
         <Suspense fallback={null}>
           <ChipSeed />

@@ -1,8 +1,14 @@
-import { and, eq, sql, type SQL } from "drizzle-orm";
+import { and, desc, eq, sql, type SQL } from "drizzle-orm";
 import { db } from "../client";
 import { billingAssertCode, isUniqueViolation } from "../errors";
 import { newId } from "../id";
-import { creditAccount, creditHold, toolRun, user } from "../schema";
+import {
+  creditAccount,
+  creditHold,
+  creditLedger,
+  toolRun,
+  user,
+} from "../schema";
 import { releaseRunHoldCtes } from "./credit-holds";
 import {
   resumeStatements,
@@ -922,4 +928,48 @@ export const findDrift = async (): Promise<readonly Drift[]> => {
     driftQuery(first.rows.map((r) => toDrift(r).userId)),
   );
   return again.rows.map(toDrift);
+};
+
+export type LedgerEntry = {
+  readonly id: string;
+  readonly kind: (typeof creditLedger.$inferSelect)["kind"];
+  readonly amount: number;
+  readonly balanceAfter: number;
+  readonly createdAt: string;
+};
+
+/**
+ * One page of the user's credit history (spec 0004, AC-14), newest first, by keyset on
+ * `(created_at, id)` (the `credit_ledger_user_created_idx` index). Pass the last entry of
+ * the previous page as `after`. Reads `limit + 1` rows so the caller knows whether an
+ * older page exists. Owner scoped: only the user's own entries.
+ */
+export const listLedger = async (
+  userId: string,
+  after: { readonly createdAt: string; readonly id: string } | null,
+  limit: number,
+): Promise<{
+  readonly entries: readonly LedgerEntry[];
+  readonly hasMore: boolean;
+}> => {
+  const rows = await db
+    .select({
+      id: creditLedger.id,
+      kind: creditLedger.kind,
+      amount: creditLedger.amount,
+      balanceAfter: creditLedger.balanceAfter,
+      createdAt: creditLedger.createdAt,
+    })
+    .from(creditLedger)
+    .where(
+      and(
+        eq(creditLedger.userId, userId),
+        after === null
+          ? undefined
+          : sql`(${creditLedger.createdAt}, ${creditLedger.id}) < (${after.createdAt}::timestamptz, ${after.id}::uuid)`,
+      ),
+    )
+    .orderBy(desc(creditLedger.createdAt), desc(creditLedger.id))
+    .limit(limit + 1);
+  return { entries: rows.slice(0, limit), hasMore: rows.length > limit };
 };

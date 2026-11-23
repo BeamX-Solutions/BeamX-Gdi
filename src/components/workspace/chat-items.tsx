@@ -20,6 +20,7 @@ import { SavePromptCard } from "@/components/auth/save-prompt-card";
 import { AnsweredBubble } from "@/components/answer-cards/answered-bubble";
 import { PrefillCard } from "@/components/answer-cards/prefill-card";
 import { ConfirmCard } from "@/components/credits/confirm-card";
+import type { BuyCredits } from "@/components/credits/buy";
 import { ShortBalanceCard } from "@/components/credits/short-balance-card";
 import { StopCard } from "@/components/credits/stop-card";
 import { ErrorCard } from "@/components/feedback/error-card";
@@ -68,6 +69,10 @@ type ChatItemProps = {
   /** The answer bubble being edited, if any. */
   readonly editing: string | null;
   readonly toolNames: Readonly<Record<string, string>>;
+  /** The chat this card is in: where a purchase from the short balance card returns. */
+  readonly conversationId?: string;
+  /** Starts a credit checkout; without it the short balance card only lists the packs. */
+  readonly buy?: BuyCredits;
 };
 
 /** One card of the thread (spec 0007, "Part renderers"). Renders from props only. */
@@ -78,6 +83,8 @@ export function ChatItem({
   guest,
   editing,
   toolNames,
+  conversationId,
+  buy,
 }: ChatItemProps) {
   // Guests get a Sign up action on their limit notices and short balance card (spec
   // 0009, AC-1); null outside a chat frame, where no prompt can open the dialog.
@@ -234,6 +241,8 @@ export function ChatItem({
           guest={guest}
           packs={coveringPacks(billingConfig.packs, item.shortfall)}
           onSignUp={signUp}
+          buy={buy}
+          returnTo={conversationId ?? null}
         />
       );
     default: {

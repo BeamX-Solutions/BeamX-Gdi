@@ -3,6 +3,8 @@ import { useId } from "react";
 import type { Pack } from "@/billing/config";
 import { SIGN_UP_LABEL } from "@/components/auth/auth-copy";
 import { Button } from "@/components/ui/button";
+import type { BuyCredits } from "./buy";
+import { BuyPacks } from "./buy-packs";
 import {
   guestShortLine,
   packLine,
@@ -18,18 +20,25 @@ type ShortBalanceCardProps = {
   readonly packs: readonly Pack[];
   /** Opens the auth dialog on sign up; a guest card shows the button only with it. */
   readonly onSignUp?: () => void;
+  /** Starts a checkout; with it an account sees Buy buttons instead of a plain list. */
+  readonly buy?: BuyCredits;
+  /** The chat to land back in after paying. */
+  readonly returnTo?: string | null;
 };
 
 /**
  * The short balance card (spec 0004 AC-8, spec 0007 AC-10): how many credits are
  * missing. A guest is told an account offers more, with a Sign up button (spec 0009,
- * AC-1); an account sees the packs, with buying from #22's checkout milestone.
+ * AC-1); an account sees the packs that cover the shortfall and can buy one through
+ * Paystack, landing back in the same chat to approve again.
  */
 export function ShortBalanceCard({
   shortfall,
   guest,
   packs,
   onSignUp,
+  buy,
+  returnTo = null,
 }: ShortBalanceCardProps) {
   const titleId = useId();
   return (
@@ -60,6 +69,8 @@ export function ShortBalanceCard({
             </Button>
           ) : null}
         </>
+      ) : buy ? (
+        <BuyPacks packs={packs} buy={buy} returnTo={returnTo} />
       ) : (
         <ul className="flex flex-col gap-1 text-sm text-muted-foreground">
           {packs.map((pack) => (

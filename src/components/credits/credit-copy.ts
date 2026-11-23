@@ -63,3 +63,119 @@ export const chipText = (available: number): string => credits(available);
 
 /** The chip's expiry warning dot, read out and shown on hover (spec 0004, AC-15). */
 export const EXPIRY_SOON = "Your credits expire soon";
+
+/** A pack's buy button: "Buy 100 credits for ₦10,000". */
+export const buyLabel = (pack: Pack): string => `Buy ${packLine(pack)}`;
+
+/** Shown on the pack's button while the Paystack page opens. */
+export const BUY_PENDING = "Opening Paystack…";
+
+/** Why a checkout could not start (spec 0004, AC-21): a friendly line, never an error page. */
+export const checkoutErrorLine = (
+  code:
+    "not_signed_in" | "unknown_pack" | "rate_limited" | "paystack_unavailable",
+): string => {
+  switch (code) {
+    case "not_signed_in":
+      return "Sign in to your account to buy credits.";
+    case "unknown_pack":
+      return "That pack is no longer available. Pick another one.";
+    case "rate_limited":
+      return "You've started a lot of checkouts in the last hour. Try again a little later.";
+    case "paystack_unavailable":
+      return "Payments are unavailable right now. Try again in a few minutes. You were not charged.";
+    default: {
+      const unreachable: never = code;
+      return unreachable;
+    }
+  }
+};
+
+/** The toast after Paystack sends the client back to the chat (spec 0004, AC-8). */
+export const paymentToast = (
+  notice: "succeeded" | "pending" | "failed" | "not_found",
+): string | null => {
+  switch (notice) {
+    case "succeeded":
+      return "Payment received. Your credits are ready.";
+    case "pending":
+      return "Confirming your payment. Your credits will appear shortly.";
+    case "failed":
+    case "not_found":
+      return null;
+    default: {
+      const unreachable: never = notice;
+      return unreachable;
+    }
+  }
+};
+
+/** The `/credits` status message after a checkout (spec 0004, AC-13, AC-21). */
+export const paymentBanner = (
+  notice: "succeeded" | "pending" | "failed" | "not_found",
+): {
+  readonly tone: "ok" | "error";
+  readonly title: string;
+  readonly message: string;
+} => {
+  switch (notice) {
+    case "succeeded":
+      return {
+        tone: "ok",
+        title: "Payment received",
+        message: "Your credits are ready to use.",
+      };
+    case "pending":
+      return {
+        tone: "ok",
+        title: "Confirming your payment",
+        message:
+          "Your credits will appear here shortly. You don't need to pay again.",
+      };
+    case "failed":
+      return {
+        tone: "error",
+        title: "Payment didn't go through",
+        message: "You were not charged. You can try again with any pack below.",
+      };
+    case "not_found":
+      return {
+        tone: "error",
+        title: "We couldn't find that payment",
+        message:
+          "If you paid, your credits will appear here once Paystack confirms it.",
+      };
+    default: {
+      const unreachable: never = notice;
+      return unreachable;
+    }
+  }
+};
+
+/** The `/credits` expiry banner (spec 0004, AC-15), shown from 30 days before. */
+export const expiryBannerTitle = "Your credits expire soon";
+export const expiryBannerLine = (date: string, passed: boolean): string =>
+  passed
+    ? `Your balance reached its expiry date on ${date}. Buy credits or run a tool to keep it.`
+    : `Your balance expires on ${date} unless you buy credits or run a tool before then.`;
+
+/** "12 March 2027" from a calendar day (`YYYY-MM-DD`, already a Lagos date). */
+export const formatDay = (day: string): string =>
+  new Date(`${day}T12:00:00Z`).toLocaleDateString("en-NG", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+
+/** A history line's time: "23 Nov 2026, 14:05", in Lagos time. */
+export const formatEntryTime = (iso: string, timeZone: string): string =>
+  new Date(iso).toLocaleString("en-NG", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone,
+  });
