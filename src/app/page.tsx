@@ -2,7 +2,8 @@ import { headers } from "next/headers";
 import { Suspense } from "react";
 import { toolNames } from "@/assistant/chat-page";
 import { sessionUserId } from "@/auth/session";
-import { toCreditSummary } from "@/billing/summary";
+import { billingConfig } from "@/billing/config";
+import { expiryWarning, toCreditSummary } from "@/billing/summary";
 import { AccountControl } from "@/components/auth/account-control";
 import { CreditChip } from "@/components/credits/credit-chip";
 import { Chat } from "@/components/workspace/chat";
@@ -32,12 +33,14 @@ export default function Home() {
  */
 async function ChipSeed() {
   const userId = await sessionUserId(await headers());
-  const summary = toCreditSummary(
-    userId === null ? null : await credits.getSummary(userId),
-  );
+  const account = userId === null ? null : await credits.getSummary(userId);
+  const summary = toCreditSummary(account);
   return (
     <>
-      <CreditChip initial={summary} />
+      <CreditChip
+        initial={summary}
+        expiring={expiryWarning(account, new Date(), billingConfig)}
+      />
       <AccountControl availableCredits={summary?.available ?? 0} />
     </>
   );

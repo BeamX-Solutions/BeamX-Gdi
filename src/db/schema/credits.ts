@@ -158,3 +158,46 @@ export const creditLedger = pgTable(
     ),
   ],
 );
+
+/**
+ * One row per email that ever got the sign up grant (AC-11). Only a keyed hash of the
+ * email, no user link, so it survives account deletion and the same email never gets
+ * the grant twice.
+ */
+export const signupGrantClaim = pgTable("signup_grant_claim", {
+  emailHash: text("email_hash").primaryKey(),
+  createdAt: ts("created_at").notNull().defaultNow(),
+});
+
+/**
+ * Luna credit balances moved in at cutover (AC-16): `credits = luna_credits × rate`,
+ * granted once as `luna_import` to the first verified user with that email.
+ */
+export const lunaCreditImport = pgTable(
+  "luna_credit_import",
+  {
+    id: uuid("id").primaryKey().$defaultFn(newId),
+    email: text("email").notNull().unique(),
+    lunaCredits: integer("luna_credits").notNull(),
+    credits: integer("credits").notNull(),
+    claimedByUserId: uuid("claimed_by_user_id").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    claimedAt: ts("claimed_at"),
+    importedAt: ts("imported_at").notNull().defaultNow(),
+  },
+  (t) => [
+    check("luna_credit_import_luna_positive", sql`${t.lunaCredits} > 0`),
+    check("luna_credit_import_credits_positive", sql`${t.credits} > 0`),
+    // A claimer always has a claim time. Not "both or neither": deleting the claimer sets
+    // the user to null, the time stays, and the credits can never be claimed again.
+    check(
+      "luna_credit_import_claim_time",
+      sql`${t.claimedByUserId} IS NULL OR ${t.claimedAt} IS NOT NULL`,
+    ),
+    check(
+      "luna_credit_import_email_normalized",
+      sql`${t.email} = lower(btrim(${t.email}))`,
+    ),
+  ],
+);

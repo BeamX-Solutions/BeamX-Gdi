@@ -12,6 +12,7 @@ const base = {
   BETTER_AUTH_SECRET: "x".repeat(32),
   NEXT_PUBLIC_APP_URL: "https://beamx.test",
   CRON_SECRET: "c".repeat(32),
+  BILLING_HASH_SECRET: "h".repeat(32),
   RESEND_API_KEY: "re_test",
   EMAIL_FROM: "BeamX <no-reply@beamx.test>",
 };
@@ -76,6 +77,34 @@ describe("envSchema: CRON_SECRET for the daily billing job (spec 0004)", () => {
   it("refuses a secret under 16 characters", () => {
     expect(
       envSchema(false).safeParse({ ...base, CRON_SECRET: "short" }).success,
+    ).toBe(false);
+  });
+});
+
+describe("envSchema: BILLING_HASH_SECRET for the sign up grant (spec 0004)", () => {
+  it("is optional in dev, CI and preview", () => {
+    const rest = { ...base, BILLING_HASH_SECRET: undefined };
+    expect(envSchema(false).safeParse(rest).success).toBe(true);
+  });
+
+  it("fails a production deploy without it, or with an empty line", () => {
+    const rest = { ...base, BILLING_HASH_SECRET: undefined };
+    for (const extra of [{}, { BILLING_HASH_SECRET: "" }]) {
+      const result = envSchema(true).safeParse({
+        ...rest,
+        ...upstash,
+        ...extra,
+      });
+      expect(result.error?.issues.map((i) => i.path[0])).toEqual([
+        "BILLING_HASH_SECRET",
+      ]);
+    }
+  });
+
+  it("refuses a key under 32 characters", () => {
+    expect(
+      envSchema(false).safeParse({ ...base, BILLING_HASH_SECRET: "short" })
+        .success,
     ).toBe(false);
   });
 });

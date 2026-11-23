@@ -4,6 +4,8 @@ import {
   cronAuthorized,
   runBillingSweeps,
   runDailyJobs,
+  runDriftCheck,
+  runExpiry,
   type BillingSweepDeps,
 } from "./cron";
 
@@ -55,6 +57,69 @@ describe("runBillingSweeps", () => {
       idleHolds: 2,
       chatHolds: 1,
     });
+  });
+});
+
+describe("runExpiry (AC-15)", () => {
+  it("only counts while enforcement is off, with the config's months and Lagos day", async () => {
+    const expireInactive = vi.fn(async () => ({
+      due: 2,
+      expired: 0,
+      credits: 80,
+    }));
+    const log = vi.fn();
+    expect(
+      await runExpiry({ expireInactive, config: billingConfig, log }),
+    ).toEqual({ enforced: false, due: 2, expired: 0, credits: 80 });
+    expect(expireInactive).toHaveBeenCalledWith(12, "Africa/Lagos", false);
+    expect(log).toHaveBeenCalledWith("credit_expiry", {
+      enforced: false,
+      due: 2,
+      expired: 0,
+      credits: 80,
+    });
+  });
+
+  it("passes enforce through when the flag is on", async () => {
+    const expireInactive = vi.fn(async () => ({
+      due: 1,
+      expired: 1,
+      credits: 30,
+    }));
+    await runExpiry({
+      expireInactive,
+      config: {
+        ...billingConfig,
+        expiry: { ...billingConfig.expiry, enforce: true },
+      },
+      log: vi.fn(),
+    });
+    expect(expireInactive).toHaveBeenCalledWith(12, "Africa/Lagos", true);
+  });
+});
+
+describe("runDriftCheck (AC-20)", () => {
+  it("logs one credit_drift line per drifted user and repairs nothing", async () => {
+    const d = {
+      userId: "u1",
+      balance: 30,
+      ledgerSum: 20,
+      held: 0,
+      activeHeld: 0,
+    };
+    const log = vi.fn();
+    expect(await runDriftCheck({ findDrift: async () => [d], log })).toEqual({
+      drifted: 1,
+    });
+    expect(log).toHaveBeenCalledWith("credit_drift", d);
+  });
+
+  it("logs nothing when every account checks out", async () => {
+    const log = vi.fn();
+    expect(await runDriftCheck({ findDrift: async () => [], log })).toEqual({
+      drifted: 0,
+    });
+    expect(log).not.toHaveBeenCalled();
   });
 });
 

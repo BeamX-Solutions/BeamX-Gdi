@@ -16,6 +16,8 @@
     "db:check": "drizzle-kit check",
     "test": "vitest run --project unit --passWithNoTests",
     "test:integration": "vitest run --project integration",
+    "credits:adjust": "tsx --env-file-if-exists=.env scripts/credits/adjust.ts",
+    "credits:import-luna": "tsx --env-file-if-exists=.env scripts/credits/import-luna.ts",
     "eval:assistant": "tsx --env-file-if-exists=.env evals/assistant/run.ts",
     "check:colors": "bash scripts/check-raw-colors.sh",
     "e2e": "playwright test"

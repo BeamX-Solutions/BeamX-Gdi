@@ -1,5 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
-import { afterUserWrite, isVerifiedAccount } from "./account-verified";
+
+const { claimGrants, logEvent } = vi.hoisted(() => ({
+  claimGrants: vi.fn(),
+  logEvent: vi.fn(),
+}));
+vi.mock("./grants", () => ({ claimGrants }));
+vi.mock("@/lib/log", () => ({ logEvent }));
+
+const { afterUserWrite, isVerifiedAccount, onAccountVerified } =
+  await import("./account-verified");
 
 describe("afterUserWrite (spec 0009, AC-16)", () => {
   const account = { id: "u1", emailVerified: true, isAnonymous: false };
@@ -42,6 +51,23 @@ describe("afterUserWrite (spec 0009, AC-16)", () => {
     await expect(hook(account)).resolves.toBeUndefined();
     expect(log).toHaveBeenCalledWith("account_verified_failed", {
       userId: "u1",
+    });
+  });
+});
+
+describe("onAccountVerified (spec 0004, AC-11, AC-16)", () => {
+  it("claims the account grants", async () => {
+    claimGrants.mockResolvedValueOnce({ starter: 30, signup: 50, luna: 0 });
+    await onAccountVerified("u1");
+    expect(claimGrants).toHaveBeenCalledWith("u1");
+  });
+
+  it("logs grant_claim_failed and never throws, so sign up goes on", async () => {
+    claimGrants.mockRejectedValueOnce(new TypeError("db down"));
+    await expect(onAccountVerified("u2")).resolves.toBeUndefined();
+    expect(logEvent).toHaveBeenCalledWith("grant_claim_failed", {
+      userId: "u2",
+      error: "TypeError",
     });
   });
 });

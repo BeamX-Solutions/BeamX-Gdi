@@ -60,3 +60,6 @@ export const packLine = (pack: Pack): string =>
 
 /** The header chip's text. */
 export const chipText = (available: number): string => credits(available);
+
+/** The chip's expiry warning dot, read out and shown on hover (spec 0004, AC-15). */
+export const EXPIRY_SOON = "Your credits expire soon";
