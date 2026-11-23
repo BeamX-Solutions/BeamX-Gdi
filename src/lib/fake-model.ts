@@ -2,11 +2,11 @@
  * Server only. Scripted AI SDK mock models for `pnpm e2e` (spec 0007). Used only when
  * `fakeAiEnabled()` (`env.ts`): `E2E_FAKE_AI=true` and not a production deploy.
  *
- * - `chat`: replies keyed by the latest user text. "business idea" proposes Stellar
+ * - `chat`: replies keyed by the latest user text. "business idea" proposes Stellar and "how healthy" proposes Beacon
  *   (a `startRun` call, which waits for approval); a tool result (the approved run) gets
  *   a short text; anything else gets a short steer towards a tool.
  * - `helper`: known facts extraction finds nothing, so a run opens on its first card.
- * - `report`: a fixed Stellar analysis.
+ * - `report`: a fixed Stellar analysis, or for Beacon its own rule advisory back.
  *
  * Keep the chat script in step with the assistant's tool flow (spec 0007, Consequences).
  */
@@ -61,17 +61,43 @@ const textOf = (message: ReturnType<typeof lastTurn>): string =>
 export const chatScript = (prompt: Prompt): StreamPart[] => {
   const last = lastTurn(prompt);
   if (last?.role === "tool") return textParts(FAKE_REPLIES.approved);
-  if (/business idea/i.test(textOf(last)))
+  const toolId = /business idea/i.test(textOf(last))
+    ? "stellar"
+    : /how healthy/i.test(textOf(last))
+      ? "beacon"
+      : null;
+  if (toolId)
     return [
       {
         type: "tool-call",
         toolCallId: `fake-${prompt.length}`,
         toolName: "startRun",
-        input: JSON.stringify({ toolId: "stellar" }),
+        input: JSON.stringify({ toolId }),
       },
       finish("tool-calls"),
     ];
   return textParts(FAKE_REPLIES.steer);
+};
+
+const ADVISORY_MARK = "Advisory (JSON):\n";
+
+/**
+ * What the scripted report model returns, from the prompt alone. Pure. Beacon's
+ * advisory phase gets its own rule advisory back unchanged (it carries it in the
+ * prompt), which passes the phase check; every other phase gets the Stellar analysis.
+ */
+export const reportScript = (prompt: Prompt): unknown => {
+  const text = prompt
+    .flatMap((m) =>
+      m.role === "user"
+        ? m.content.flatMap((p) => (p.type === "text" ? [p.text] : []))
+        : [],
+    )
+    .join("\n");
+  const start = text.indexOf(ADVISORY_MARK);
+  if (start === -1) return FAKE_STELLAR_ANALYSIS;
+  const json = text.slice(start + ADVISORY_MARK.length);
+  return JSON.parse(json.slice(0, json.indexOf("\n</client_data>"))) as unknown;
 };
 
 const streaming = (script: (prompt: Prompt) => StreamPart[]) =>
@@ -82,11 +108,11 @@ const streaming = (script: (prompt: Prompt) => StreamPart[]) =>
     }),
   });
 
-const generating = (modelId: string, json: unknown) =>
+const generating = (modelId: string, reply: (prompt: Prompt) => unknown) =>
   new MockLanguageModelV4({
     modelId,
-    doGenerate: async () => ({
-      content: [{ type: "text", text: JSON.stringify(json) }],
+    doGenerate: async (options) => ({
+      content: [{ type: "text", text: JSON.stringify(reply(options.prompt)) }],
       finishReason: { unified: "stop", raw: "stop" },
       usage,
       warnings: [],
@@ -134,9 +160,9 @@ export const fakeModel = (role: FakeRole): LanguageModel => {
     case "chat":
       return streaming(chatScript);
     case "helper":
-      return generating("fake-helper", { answers: [] });
+      return generating("fake-helper", () => ({ answers: [] }));
     case "report":
-      return generating("fake-report", FAKE_STELLAR_ANALYSIS);
+      return generating("fake-report", reportScript);
     default: {
       const unreachable: never = role;
       return unreachable;
