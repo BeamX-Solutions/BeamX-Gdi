@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useContext, useState } from "react";
-import { LogOutIcon, UserRoundIcon } from "lucide-react";
+import { LogOutIcon, Trash2Icon, UserRoundIcon } from "lucide-react";
 import { authClient } from "@/auth/client";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,7 +15,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { LiveCreditSummary } from "@/components/credits/credit-chip";
 import { useNotice } from "@/components/workspace/notice-context";
+import { DELETE_LABEL } from "./auth-copy";
 import { AuthDialog } from "./auth-dialog";
+import { DeleteAccountDialog } from "./delete-account-dialog";
 import { useAuthOpen, type AuthOpenState } from "./auth-open-context";
 
 /**
@@ -43,6 +45,7 @@ export function AccountControl({
     open: false,
     screen: "sign-up",
   });
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const { open, screen } = shared ?? local;
   const setOpen =
     shared?.setOpen ??
@@ -86,25 +89,39 @@ export function AccountControl({
   };
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label="Account menu">
-          <UserRoundIcon aria-hidden />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="min-w-56">
-        <DropdownMenuLabel className="flex flex-col gap-0.5">
-          <span className="truncate font-medium">{user.name}</span>
-          <span className="truncate text-sm font-normal text-muted-foreground">
-            {user.email}
-          </span>
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={() => void signOut()}>
-          <LogOutIcon aria-hidden />
-          Sign out
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon" aria-label="Account menu">
+            <UserRoundIcon aria-hidden />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="min-w-56">
+          <DropdownMenuLabel className="flex flex-col gap-0.5">
+            <span className="truncate font-medium">{user.name}</span>
+            <span className="truncate text-sm font-normal text-muted-foreground">
+              {user.email}
+            </span>
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onSelect={() => void signOut()}>
+            <LogOutIcon aria-hidden />
+            Sign out
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            variant="destructive"
+            onSelect={() => setDeleteOpen(true)}
+          >
+            <Trash2Icon aria-hidden />
+            {DELETE_LABEL}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <DeleteAccountDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        email={user.email}
+      />
+    </>
   );
 }

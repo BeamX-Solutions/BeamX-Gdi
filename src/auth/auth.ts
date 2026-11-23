@@ -51,6 +51,9 @@ export const auth = betterAuth({
   // 30 days, extended at most once a day while used (AC-11); a session counts as fresh
   // for deleting the account for one day after it was created (AC-13).
   session: { expiresIn: 30 * DAY_S, updateAge: DAY_S, freshAge: DAY_S },
+  // Deleting your own account (AC-13). Only `/api/account/delete` calls it, never with a
+  // password, so the fresh session rule above always applies; its HTTP path is blocked.
+  user: { deleteUser: { enabled: true } },
   // Per IP limits on the auth POSTs, kept in Upstash so every function instance shares
   // them (AC-15). The storage fails open; the guest sign in has spec 0008's cap instead.
   rateLimit: {

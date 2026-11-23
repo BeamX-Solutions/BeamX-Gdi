@@ -10,6 +10,9 @@ import {
   FORFEIT_NOTE,
   isFullCode,
   needsNewCode,
+  DELETE_LOSSES,
+  DELETED_TOAST,
+  deleteErrorMessage,
 } from "./auth-copy";
 
 // Spec 0009, AC-2, AC-3, AC-5, AC-7: the auth dialog's checks and messages.
@@ -121,5 +124,28 @@ describe("sign up prompts (spec 0009, AC-1)", () => {
 
   it("keys the dismissed state per chat", () => {
     expect(savePromptKey("a")).not.toBe(savePromptKey("b"));
+  });
+});
+
+describe("delete account copy (AC-13)", () => {
+  it("names chats, reports and unspent credits as lost", () => {
+    const text = DELETE_LOSSES.join(" ").toLowerCase();
+    expect(text).toContain("chats");
+    expect(text).toContain("reports");
+    expect(text).toContain("unspent credits");
+  });
+
+  it("confirms the delete with the spec's toast", () => {
+    expect(DELETED_TOAST).toBe("Your account was deleted.");
+  });
+
+  it("explains a mismatched email and falls back to the auth messages", () => {
+    expect(deleteErrorMessage("email_mismatch")).toContain("doesn't match");
+    expect(deleteErrorMessage("rate_limited")).toBe(
+      "Too many tries, wait a minute.",
+    );
+    expect(deleteErrorMessage(undefined)).toBe(
+      "Something went wrong. Try again.",
+    );
   });
 });

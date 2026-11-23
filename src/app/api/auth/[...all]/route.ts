@@ -2,7 +2,8 @@
  * Better Auth's handler (spec 0007). The anonymous sign in is BotID checked first, so a
  * bot can't mint guests, then held to the guest per IP cap (spec 0008, AC-8).
  * `/sign-up/email` is blocked: accounts are only created by the email code sign in, so no
- * unverified account can exist (spec 0009). The other auth POSTs of spec 0009 AC-15 are
+ * unverified account can exist (spec 0009). `/delete-user` is blocked too: our own
+ * `/api/account/delete` route is the only way in. The other auth POSTs of spec 0009 AC-15 are
  * BotID checked too, then rate limited by Better Auth itself (`rateLimit` in `auth.ts`);
  * its `429` gets our `rate_limited` code so the dialog can say so.
  */
@@ -20,6 +21,16 @@ import { logEvent } from "@/lib/log";
 const handler = toNextJsHandler(auth);
 
 export const GET = handler.GET;
+
+/**
+ * Better Auth endpoints we never serve over HTTP: `/sign-up/email` (accounts come only
+ * from the code sign in) and `/delete-user` (only `/api/account/delete` deletes, after
+ * BotID and the typed email check, spec 0009 AC-13).
+ */
+const BLOCKED_PATHS: ReadonlySet<string> = new Set([
+  "/sign-up/email",
+  "/delete-user",
+]);
 
 const BOT = () => Response.json({ code: "bot" }, { status: 403 });
 
@@ -41,7 +52,7 @@ export async function POST(request: NextRequest) {
   const path = new URL(request.url).pathname
     .slice(AUTH_BASE.length)
     .replace(/\/+$/, "");
-  if (path === "/sign-up/email")
+  if (BLOCKED_PATHS.has(path))
     return Response.json({ code: "not_found" }, { status: 404 });
   if (path === "/sign-in/anonymous") {
     if (await isBot()) return BOT();

@@ -4,6 +4,7 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import {
   useCallback,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -27,7 +28,7 @@ import { panelView } from "@/components/report/report-panel-state";
 import { ReportStatusView } from "@/components/report/report-status-view";
 import { useReportStatus } from "@/components/report/use-report-status";
 import { reportTitle } from "./chat-copy";
-import { NoticeContext } from "./notice-context";
+import { NoticeContext, showQueuedNotice } from "./notice-context";
 import { Toast } from "./toast";
 import {
   ChatItem,
@@ -98,6 +99,9 @@ function ChatFrame({
   const [notice, setNotice] = useState<string | null>(null);
   const clearNotice = useCallback(() => setNotice(null), []);
   const noticeValue = useMemo(() => ({ notice, show: setNotice }), [notice]);
+  // A notice left by the page before a full page load ("Your account was deleted.",
+  // AC-13). Read after mount: the server render has no `sessionStorage`.
+  useEffect(() => showQueuedNotice(setNotice), []);
   // The one auth dialog's state, shared by the header and the thread's prompts (spec
   // 0009, AC-1).
   const [auth, setAuth] = useState<AuthOpenState>({

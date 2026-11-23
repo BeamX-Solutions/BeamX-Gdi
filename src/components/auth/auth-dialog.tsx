@@ -680,7 +680,7 @@ export function AuthDialog({
   );
 }
 
-function Field({
+export function Field({
   id,
   label,
   hint,
@@ -711,7 +711,7 @@ function Field({
 }
 
 /** The dialog's one error line, read out when it appears. */
-function ErrorText({ error }: { readonly error: string | null }) {
+export function ErrorText({ error }: { readonly error: string | null }) {
   return error ? (
     <p id="auth-error" role="alert" className="text-sm text-destructive">
       {error}

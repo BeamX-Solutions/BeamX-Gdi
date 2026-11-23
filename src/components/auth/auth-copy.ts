@@ -130,6 +130,40 @@ export const showSavePrompt = (state: {
   readonly dismissed: boolean;
 }): boolean => state.guest && state.reportReady && !state.dismissed;
 
+/** Delete account (AC-13). */
+export const DELETE_LABEL = "Delete account";
+export const DELETE_TITLE = "Delete your account";
+export const DELETE_DESCRIPTION =
+  "This can't be undone. Deleting your account removes:";
+export const DELETE_LOSSES = [
+  "All your chats",
+  "All your reports",
+  "Your unspent credits",
+] as const;
+export const DELETE_CONFIRM_LABEL = "Type your email to confirm";
+export const DELETE_ACTION = "Delete my account";
+export const DELETED_TOAST = "Your account was deleted.";
+export const REAUTH_TITLE = "Sign in again first";
+export const REAUTH_DESCRIPTION =
+  "For your safety, deleting needs a sign in from the last 24 hours. Enter your password to continue.";
+export const REAUTH_SIGN_OUT_HINT =
+  "No password yet? Sign out, then use Forgot password on the sign in form.";
+
+/** The delete dialog's message for a failure code from `/api/account/delete`. */
+export const deleteErrorMessage = (code: string | undefined): string => {
+  switch (code) {
+    case "email_mismatch":
+      return "That email doesn't match your account.";
+    case "bot":
+      return "We couldn't confirm this request. Reload the page and try again.";
+    case "unauthenticated":
+      return "You're signed out. Reload the page and sign in again.";
+    case undefined:
+    default:
+      return authErrorMessage(code);
+  }
+};
+
 /** The `sessionStorage` key that remembers a dismissed save prompt, per chat. */
 export const savePromptKey = (conversationId: string): string =>
   `beamx:save-prompt-dismissed:${conversationId}`;
