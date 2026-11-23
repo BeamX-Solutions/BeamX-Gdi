@@ -2,7 +2,7 @@ import { and, eq, sql, type SQL } from "drizzle-orm";
 import { db } from "../client";
 import { billingAssertCode, isUniqueViolation } from "../errors";
 import { newId } from "../id";
-import { creditAccount, creditHold, toolRun } from "../schema";
+import { creditAccount, creditHold, toolRun, user } from "../schema";
 import { releaseRunHoldCtes } from "./credit-holds";
 import {
   resumeStatements,
@@ -66,21 +66,7 @@ export const ensureAccount = async (
   userId: string,
   starterGrant: number,
 ): Promise<{ readonly created: boolean; readonly granted: number }> => {
-  const result = await db.execute(sql`
-    WITH acc AS (
-      INSERT INTO credit_account (user_id, balance)
-      SELECT u.id, ${starterGrant}::int FROM "user" u WHERE u.id = ${userId}::uuid
-      ON CONFLICT (user_id) DO NOTHING
-      RETURNING user_id, balance
-    ), led AS (
-      INSERT INTO credit_ledger (id, user_id, kind, amount, balance_after, idempotency_key)
-      SELECT ${newId()}::uuid, user_id, 'starter_grant', balance, balance, 'starter:' || user_id
-      FROM acc WHERE balance > 0
-      ON CONFLICT (idempotency_key) DO NOTHING
-      RETURNING id
-    )
-    SELECT balance FROM acc
-  `);
+  const result = await ensureAccountStatement(userId, starterGrant);
   const row = result.rows[0] as { balance: number } | undefined;
   return row
     ? { created: true, granted: Number(row.balance) }
@@ -582,4 +568,358 @@ export const linkGuestCreditStatements = (
       DELETE FROM credit_account WHERE user_id = ${guestUserId}::uuid RETURNING user_id
     `),
   ] as const;
+};
+
+/** The starter grant statement `ensureAccount` runs, reused inside larger batches. */
+const ensureAccountStatement = (userId: string, starterGrant: number) =>
+  db.execute(sql`
+    WITH acc AS (
+      INSERT INTO credit_account (user_id, balance)
+      SELECT u.id, ${starterGrant}::int FROM "user" u WHERE u.id = ${userId}::uuid
+      ON CONFLICT (user_id) DO NOTHING
+      RETURNING user_id, balance
+    ), led AS (
+      INSERT INTO credit_ledger (id, user_id, kind, amount, balance_after, idempotency_key)
+      SELECT ${newId()}::uuid, user_id, 'starter_grant', balance, balance, 'starter:' || user_id
+      FROM acc WHERE balance > 0
+      ON CONFLICT (idempotency_key) DO NOTHING
+      RETURNING id
+    )
+    SELECT balance FROM acc
+  `);
+
+export type ClaimedGrants = {
+  /** False for a guest or an unverified email: only the account was ensured. */
+  readonly eligible: boolean;
+  readonly starter: number;
+  readonly signup: number;
+  readonly luna: number;
+};
+
+const amountOf = (r: { rows: unknown[] }, column: string): number =>
+  Number((r.rows[0] as Record<string, unknown> | undefined)?.[column] ?? 0);
+
+/**
+ * Opens the account if needed (starter grant) and claims what a verified account is owed,
+ * once ever (spec 0004, AC-11, AC-16), in one batch:
+ * - the sign up grant, only when the email's keyed hash is new to `signup_grant_claim`
+ *   (that row outlives the account, so a deleted and re-created email gets nothing);
+ * - the Luna import for this email, only while it is unclaimed (bumps `last_activity_at`).
+ * Idempotent: the claim row, the import's `claimed_at` and the ledger keys
+ * (`signup:<userId>`, `luna:<importId>`) make a repeat a no-op. `hashEmail` returns null
+ * when the hash key is not set, which skips the sign up grant.
+ */
+export const claimPendingGrants = async (
+  userId: string,
+  opts: {
+    readonly starter: number;
+    readonly signup: number;
+    readonly hashEmail: (email: string) => string | null;
+  },
+): Promise<ClaimedGrants> => {
+  const [who] = await db
+    .select({
+      email: user.email,
+      emailVerified: user.emailVerified,
+      isAnonymous: user.isAnonymous,
+    })
+    .from(user)
+    .where(eq(user.id, userId));
+  if (!who || !who.emailVerified || who.isAnonymous === true) {
+    const opened = await ensureAccount(userId, opts.starter);
+    return { eligible: false, starter: opened.granted, signup: 0, luna: 0 };
+  }
+  const email = who.email.trim().toLowerCase();
+  const hash = opts.signup > 0 ? opts.hashEmail(email) : null;
+  // Built in ledger order: each statement takes its UUID v7 when built, and entries
+  // written in one commit share `created_at`, so the id orders them in the history.
+  const ensureStatement = ensureAccountStatement(userId, opts.starter);
+  const signupStatement =
+    hash === null
+      ? db.execute(sql`SELECT 0 AS amount WHERE false`)
+      : db.execute(sql`
+          WITH c AS (
+            INSERT INTO signup_grant_claim (email_hash) VALUES (${hash})
+            ON CONFLICT (email_hash) DO NOTHING
+            RETURNING email_hash
+          ), a AS (
+            UPDATE credit_account
+            SET balance = balance + ${opts.signup}::int, updated_at = now()
+            WHERE user_id = ${userId}::uuid AND EXISTS (SELECT 1 FROM c)
+            RETURNING user_id, balance
+          ), l AS (
+            INSERT INTO credit_ledger (id, user_id, kind, amount, balance_after, idempotency_key)
+            SELECT ${newId()}::uuid, user_id, 'signup_grant', ${opts.signup}::int, balance,
+                   'signup:' || user_id
+            FROM a
+            ON CONFLICT (idempotency_key) DO NOTHING
+            RETURNING amount
+          )
+          SELECT amount FROM l
+        `);
+  const [opened, signup, luna] = await db.batch([
+    ensureStatement,
+    signupStatement,
+    db.execute(sql`
+      WITH i AS (
+        UPDATE luna_credit_import
+        SET claimed_by_user_id = ${userId}::uuid, claimed_at = now()
+        WHERE email = ${email} AND claimed_at IS NULL
+        RETURNING id, credits
+      ), a AS (
+        UPDATE credit_account acc
+        SET balance = acc.balance + i.credits, last_activity_at = now(), updated_at = now()
+        FROM i WHERE acc.user_id = ${userId}::uuid
+        RETURNING acc.user_id, acc.balance, i.id AS import_id, i.credits
+      ), l AS (
+        INSERT INTO credit_ledger (id, user_id, kind, amount, balance_after, idempotency_key)
+        SELECT ${newId()}::uuid, user_id, 'luna_import', credits, balance, 'luna:' || import_id
+        FROM a
+        ON CONFLICT (idempotency_key) DO NOTHING
+        RETURNING amount
+      )
+      SELECT amount FROM l
+    `),
+  ]);
+  return {
+    eligible: true,
+    starter: amountOf(opened, "balance"),
+    signup: amountOf(signup, "amount"),
+    luna: amountOf(luna, "amount"),
+  };
+};
+
+export type AdjustError =
+  | { readonly code: "user_not_found" }
+  | {
+      readonly code: "would_go_below_held";
+      readonly balance: number;
+      readonly held: number;
+    };
+
+type AccountRow = {
+  balance: number;
+  held: number;
+  last_activity_at: string | Date;
+};
+
+const toSummary = (row: AccountRow): Summary => {
+  const balance = Number(row.balance);
+  const held = Number(row.held);
+  return {
+    balance,
+    held,
+    available: balance - held,
+    lastActivityAt:
+      row.last_activity_at instanceof Date
+        ? row.last_activity_at.toISOString()
+        : String(row.last_activity_at),
+  };
+};
+
+/**
+ * A staff correction (spec 0004, AC-17): one `adjustment` ledger entry with its reason
+ * and actor, key `adjust:<uuid>` (new per call). Refuses, changing nothing, a change that
+ * would leave the balance below what is held (which also keeps it at 0 or more). Does not
+ * reset the expiry clock. The caller opens the account first if the user has none.
+ */
+export const adjust = async (
+  userId: string,
+  amount: number,
+  reason: string,
+  actor: string,
+): Promise<Result<Summary, AdjustError>> => {
+  const [changed, account] = await db.batch([
+    db.execute(sql`
+      WITH a AS (
+        UPDATE credit_account
+        SET balance = balance + ${amount}::int, updated_at = now()
+        WHERE user_id = ${userId}::uuid AND balance + ${amount}::int >= held
+        RETURNING user_id, balance, held, last_activity_at
+      ), l AS (
+        INSERT INTO credit_ledger
+          (id, user_id, kind, amount, balance_after, reason, actor, idempotency_key)
+        SELECT ${newId()}::uuid, user_id, 'adjustment', ${amount}::int, balance,
+               ${reason}, ${actor}, ${`adjust:${newId()}`}
+        FROM a
+        RETURNING id
+      )
+      SELECT balance, held, last_activity_at FROM a
+    `),
+    db
+      .select({ balance: creditAccount.balance, held: creditAccount.held })
+      .from(creditAccount)
+      .where(eq(creditAccount.userId, userId)),
+  ]);
+  const row = changed.rows[0] as AccountRow | undefined;
+  if (row) return ok(toSummary(row));
+  const current = account[0];
+  return current
+    ? err({
+        code: "would_go_below_held",
+        balance: current.balance,
+        held: current.held,
+      })
+    : err({ code: "user_not_found" });
+};
+
+/** The id of the user with this email (staff scripts only), or null. */
+export const userIdByEmail = async (email: string): Promise<string | null> => {
+  const [row] = await db
+    .select({ id: user.id })
+    .from(user)
+    .where(sql`lower(${user.email}) = ${email.trim().toLowerCase()}`);
+  return row?.id ?? null;
+};
+
+/**
+ * Loads the Luna balances (spec 0004, AC-16) in one statement. An email already imported
+ * is skipped, never changed, so running the same file twice imports nothing new.
+ */
+export const importLunaCredits = async (
+  rows: readonly {
+    readonly email: string;
+    readonly lunaCredits: number;
+    readonly credits: number;
+  }[],
+): Promise<{ readonly imported: number; readonly skipped: number }> => {
+  if (rows.length === 0) return { imported: 0, skipped: 0 };
+  const values = sql.join(
+    rows.map(
+      (r) =>
+        sql`(${newId()}::uuid, ${r.email}, ${r.lunaCredits}::int, ${r.credits}::int)`,
+    ),
+    sql`, `,
+  );
+  const result = await db.execute(sql`
+    INSERT INTO luna_credit_import (id, email, luna_credits, credits)
+    VALUES ${values}
+    ON CONFLICT (email) DO NOTHING
+    RETURNING id
+  `);
+  return {
+    imported: result.rows.length,
+    skipped: rows.length - result.rows.length,
+  };
+};
+
+/**
+ * Accounts whose balance has expired (spec 0004, AC-15): a balance above 0, nothing held,
+ * and the Lagos calendar date of `last_activity_at` plus `months` is today or earlier.
+ * Postgres month arithmetic clamps the day (31 Jan + 1 month = 28 or 29 Feb), like
+ * `addMonths` in `billing/pricing.ts`.
+ */
+const expiredAccounts = (months: number, timeZone: string) => sql`
+  SELECT user_id, balance, last_activity_at FROM credit_account
+  WHERE balance > 0 AND held = 0
+    AND ((last_activity_at AT TIME ZONE ${timeZone})::date
+         + make_interval(months => ${months}::int))::date
+        <= (now() AT TIME ZONE ${timeZone})::date
+`;
+
+/**
+ * The daily expiry job (AC-15). With `enforce` off it only counts what would expire.
+ * With it on, each expired account gets one `expiry` entry of `-balance` (key
+ * `expiry:<userId>:<lastActivityAt>`, so a replay changes nothing) and its balance goes to
+ * 0, in one statement. Rows other work holds a lock on are skipped until tomorrow.
+ */
+export const expireInactive = async (
+  months: number,
+  timeZone: string,
+  enforce: boolean,
+): Promise<{
+  readonly due: number;
+  readonly expired: number;
+  readonly credits: number;
+}> => {
+  if (!enforce) {
+    const result = await db.execute(sql`
+      SELECT count(*)::int AS due, COALESCE(sum(balance), 0)::int AS credits
+      FROM (${expiredAccounts(months, timeZone)}) e
+    `);
+    return {
+      due: amountOf(result, "due"),
+      expired: 0,
+      credits: amountOf(result, "credits"),
+    };
+  }
+  const result = await db.execute(sql`
+    WITH e AS (
+      ${expiredAccounts(months, timeZone)}
+      FOR UPDATE SKIP LOCKED
+    ), l AS (
+      INSERT INTO credit_ledger (id, user_id, kind, amount, balance_after, idempotency_key)
+      SELECT gen_random_uuid(), user_id, 'expiry', -balance, 0,
+             'expiry:' || user_id || ':' || last_activity_at::text
+      FROM e
+      ON CONFLICT (idempotency_key) DO NOTHING
+      RETURNING user_id, amount
+    ), a AS (
+      UPDATE credit_account acc
+      SET balance = 0, updated_at = now()
+      FROM l WHERE acc.user_id = l.user_id
+      RETURNING acc.user_id
+    )
+    SELECT count(*)::int AS expired, COALESCE(-sum(l.amount), 0)::int AS credits
+    FROM l JOIN a ON a.user_id = l.user_id
+  `);
+  const expired = amountOf(result, "expired");
+  return { due: expired, expired, credits: amountOf(result, "credits") };
+};
+
+export type Drift = {
+  readonly userId: string;
+  readonly balance: number;
+  readonly ledgerSum: number;
+  readonly held: number;
+  readonly activeHeld: number;
+};
+
+/** Accounts whose ledger sum is not their balance, or whose `held` is not their active holds. */
+const driftQuery = (only: readonly string[] | null) => sql`
+  SELECT a.user_id, a.balance, a.held,
+         COALESCE(l.total, 0)::int AS ledger_sum,
+         COALESCE(h.total, 0)::int AS active_held
+  FROM credit_account a
+  LEFT JOIN (
+    SELECT user_id, sum(amount) AS total FROM credit_ledger GROUP BY user_id
+  ) l ON l.user_id = a.user_id
+  LEFT JOIN (
+    SELECT user_id, sum(amount) AS total FROM credit_hold
+    WHERE status = 'active' GROUP BY user_id
+  ) h ON h.user_id = a.user_id
+  WHERE (a.balance <> COALESCE(l.total, 0) OR a.held <> COALESCE(h.total, 0))
+  ${only === null ? sql`` : sql`AND a.user_id = ANY(${`{${only.join(",")}}`}::uuid[])`}
+`;
+
+const toDrift = (r: unknown): Drift => {
+  const row = r as {
+    user_id: string;
+    balance: number;
+    held: number;
+    ledger_sum: number;
+    active_held: number;
+  };
+  return {
+    userId: row.user_id,
+    balance: Number(row.balance),
+    ledgerSum: Number(row.ledger_sum),
+    held: Number(row.held),
+    activeHeld: Number(row.active_held),
+  };
+};
+
+/**
+ * The daily drift check (spec 0004, AC-20): both sums in one statement (one snapshot),
+ * then each hit checked once more, so a money write that landed between the reads is
+ * not reported. Returns only the users that still fail. Never repairs anything: staff
+ * fix with `credits:adjust`.
+ */
+export const findDrift = async (): Promise<readonly Drift[]> => {
+  const first = await db.execute(driftQuery(null));
+  if (first.rows.length === 0) return [];
+  const again = await db.execute(
+    driftQuery(first.rows.map((r) => toDrift(r).userId)),
+  );
+  return again.rows.map(toDrift);
 };

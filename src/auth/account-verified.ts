@@ -4,9 +4,11 @@
  * user with a verified email. That can happen many times for one user (every name or
  * password change is an update), so whatever plugs in here must be idempotent.
  *
- * In #8 it only logs `account_verified`; spec 0004 milestone 4 adds `claimPendingGrants`.
- * A failure is logged and swallowed: it never blocks sign up or sign in.
+ * It claims the account grants (spec 0004, AC-11, AC-16: starter, sign up, Luna), which
+ * are idempotent. A failure is logged as `grant_claim_failed` and swallowed: it never
+ * blocks sign up or sign in, and the next billable action claims again.
  */
+import { claimGrants } from "./grants";
 import { logEvent } from "@/lib/log";
 
 export type UserWrite = {
@@ -21,6 +23,14 @@ export const isVerifiedAccount = (user: UserWrite): boolean =>
 
 export const onAccountVerified = async (userId: string): Promise<void> => {
   logEvent("account_verified", { userId });
+  try {
+    await claimGrants(userId);
+  } catch (e) {
+    logEvent("grant_claim_failed", {
+      userId,
+      error: e instanceof Error ? e.name : "unknown",
+    });
+  }
 };
 
 type Log = typeof logEvent;

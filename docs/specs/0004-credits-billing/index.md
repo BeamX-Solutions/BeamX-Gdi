@@ -285,10 +285,10 @@ Ordered Tracer Bullet: milestone 1 is one thin, real thread (a guest pays for a 
 14. "Buy" on the short balance card, returning to the chat; `/credits` page with summary, packs, and keyset paginated history, satisfies **AC-8**, **AC-14**
 
 **Milestone 4: accounts, grants, and money operations**
-15. Migration 3: `signup_grant_claim` and `luna_credit_import`, satisfies **AC-11**, **AC-16**
-16. `claimPendingGrants` (sign up grant plus Luna claim) wired to the Better Auth database hook, the `/credits` load, and the first billable action, satisfies **AC-11**, **AC-16**
-17. Extend `users.linkGuest` with the move and merge rules; extend `link.int.test.ts` and the deletion cascade test, satisfies **AC-12**, **AC-19**
-18. `pnpm credits:adjust` and `pnpm credits:import-luna` scripts with confirmation and validation, satisfies **AC-16**, **AC-17**
+15. [x] Migration 3: `signup_grant_claim` and `luna_credit_import`, satisfies **AC-11**, **AC-16**
+16. [x] `claimPendingGrants` (sign up grant plus Luna claim) wired to the Better Auth database hook, the `/credits` load, and the first billable action, satisfies **AC-11**, **AC-16**
+17. [x] Extend `users.linkGuest` with the move and merge rules; extend `link.int.test.ts` and the deletion cascade test, satisfies **AC-12**, **AC-19**
+18. [x] `pnpm credits:adjust` and `pnpm credits:import-luna` scripts with confirmation and validation, satisfies **AC-16**, **AC-17**
 19. Cron jobs `expireInactive` (behind `expiry.enforce`) and `findDrift`; expiry warning dot and banner, satisfies **AC-15**, **AC-20**
 
 ## Consequences

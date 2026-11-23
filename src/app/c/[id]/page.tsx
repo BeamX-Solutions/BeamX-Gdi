@@ -5,7 +5,8 @@ import { Suspense } from "react";
 import { z } from "zod";
 import { loadChat, toolNames } from "@/assistant/chat-page";
 import { sessionUserId } from "@/auth/session";
-import { toCreditSummary } from "@/billing/summary";
+import { billingConfig } from "@/billing/config";
+import { expiryWarning, toCreditSummary } from "@/billing/summary";
 import { AccountControl } from "@/components/auth/account-control";
 import { CreditChip } from "@/components/credits/credit-chip";
 import * as conversations from "@/db/queries/conversations";
@@ -50,7 +51,10 @@ async function SavedChat({ params }: Pick<PageProps<"/c/[id]">, "params">) {
       toolNames={toolNames()}
       chip={
         <>
-          <CreditChip initial={credit} />
+          <CreditChip
+            initial={credit}
+            expiring={expiryWarning(summary, new Date(), billingConfig)}
+          />
           <AccountControl availableCredits={credit?.available ?? 0} />
         </>
       }

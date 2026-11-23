@@ -3,7 +3,7 @@
 import { CoinsIcon } from "lucide-react";
 import { createContext, useContext } from "react";
 import type { CreditSummary } from "@/billing/summary";
-import { chipText } from "./credit-copy";
+import { EXPIRY_SOON, chipText } from "./credit-copy";
 
 /**
  * The newest summary the chat has seen this visit (an approval, a stop, a report poll),
@@ -14,12 +14,15 @@ export const LiveCreditSummary = createContext<CreditSummary | null>(null);
 /**
  * The header credit chip (spec 0007, AC-9): "N credits" available. Seeded by the
  * header's server read of `credits.getSummary`, then updated from the chat. Hidden
- * while the user has no credit account.
+ * while the user has no credit account. `expiring` adds a warning dot from 30 days before
+ * the balance expires (spec 0004, AC-15), worked out on the server.
  */
 export function CreditChip({
   initial,
+  expiring = false,
 }: {
   readonly initial: CreditSummary | null;
+  readonly expiring?: boolean;
 }) {
   const live = useContext(LiveCreditSummary);
   const summary = live ?? initial;
@@ -34,6 +37,15 @@ export function CreditChip({
         <span className="sr-only">Available: </span>
         {chipText(summary.available)}
       </span>
+      {expiring ? (
+        <span
+          data-testid="credit-chip-expiry"
+          className="size-2 rounded-full bg-destructive"
+          role="img"
+          aria-label={EXPIRY_SOON}
+          title={EXPIRY_SOON}
+        />
+      ) : null}
     </p>
   );
 }

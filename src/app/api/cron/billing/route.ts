@@ -1,13 +1,22 @@
 /**
- * Vercel Cron, once a day: the billing sweeps (spec 0004) and the guest purge (spec 0009,
- * AC-14), each run independently by `runDailyJobs` in `billing/cron.ts`. This route only
+ * Vercel Cron, once a day: the billing sweeps, the expiry job and the drift check (spec
+ * 0004) and the guest purge (spec 0009, AC-14), each run independently by `runDailyJobs` in `billing/cron.ts`. This route only
  * wires the jobs and passes the `Authorization` header in. The path stays
  * `/api/cron/billing`, so `vercel.json` does not change.
  */
 import type { NextRequest } from "next/server";
 import { billingConfig } from "@/billing/config";
-import { runBillingSweeps, runDailyJobs } from "@/billing/cron";
-import { releaseIdleHolds } from "@/db/queries/credits";
+import {
+  runBillingSweeps,
+  runDailyJobs,
+  runDriftCheck,
+  runExpiry,
+} from "@/billing/cron";
+import {
+  expireInactive,
+  findDrift,
+  releaseIdleHolds,
+} from "@/db/queries/credits";
 import { purgeUsers } from "@/db/queries/users";
 import { env } from "@/lib/env";
 import { logEvent } from "@/lib/log";
@@ -26,6 +35,9 @@ export async function GET(request: NextRequest) {
             config: billingConfig,
             log: logEvent,
           }),
+        expiry: () =>
+          runExpiry({ expireInactive, config: billingConfig, log: logEvent }),
+        drift: () => runDriftCheck({ findDrift, log: logEvent }),
         purge: () => purgeUsers(),
       },
       log: logEvent,

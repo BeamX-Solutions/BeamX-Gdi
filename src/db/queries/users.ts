@@ -19,8 +19,16 @@ export const LINKED_TABLES = [
   "credit_ledger",
   "credit_hold",
 ] as const;
-/** Better Auth owns these; its own link flow deals with the guest's session. */
-export const LINK_EXCLUDED_TABLES = ["session", "account"] as const;
+/**
+ * Left alone on purpose: Better Auth owns `session` and `account` (its own link flow
+ * deals with the guest's session); `luna_credit_import` is claimed only by a verified
+ * account, never by a guest (spec 0004, AC-16).
+ */
+export const LINK_EXCLUDED_TABLES = [
+  "session",
+  "account",
+  "luna_credit_import",
+] as const;
 
 export type LinkCounts = {
   readonly conversation: number;

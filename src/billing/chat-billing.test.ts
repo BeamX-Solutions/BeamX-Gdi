@@ -152,14 +152,16 @@ describe("accountOpener (AC-11, the guest grant IP cap)", () => {
       created: true,
       granted: grant > 0 ? granted : 0,
     }));
+    const claimGrants = vi.fn(async () => ({ starter: 30 }));
     const open = accountOpener({
       store,
       ensureAccount,
+      claimGrants,
       config: billingConfig,
       now: () => LATE,
     });
     const key = billingKeys.guestGrant("1.2.3.4", "2026-03-02");
-    return { open, ensureAccount, values, key };
+    return { open, ensureAccount, claimGrants, values, key };
   };
 
   it("gives a guest the starter grant and counts the IP", async () => {
@@ -182,6 +184,7 @@ describe("accountOpener (AC-11, the guest grant IP cap)", () => {
     const open = accountOpener({
       store,
       ensureAccount: async () => ({ created: false, granted: 0 }),
+      claimGrants: async () => ({ starter: 0 }),
       config: billingConfig,
       now: () => LATE,
     });
@@ -190,12 +193,27 @@ describe("accountOpener (AC-11, the guest grant IP cap)", () => {
   });
 
   it("never caps a signed in user or a guest with no IP", async () => {
-    const { open, ensureAccount, values, key } = setup();
+    const { open, ensureAccount, claimGrants, values, key } = setup();
     values.set(key, 99);
-    await open("a1", false, "1.2.3.4");
+    expect(await open("a1", false, "1.2.3.4")).toEqual({
+      created: true,
+      granted: 30,
+    });
     await open("g2", true, null);
-    expect(ensureAccount).toHaveBeenNthCalledWith(1, "a1", 30);
-    expect(ensureAccount).toHaveBeenNthCalledWith(2, "g2", 30);
+    expect(claimGrants).toHaveBeenCalledWith("a1");
+    expect(ensureAccount).toHaveBeenCalledTimes(1);
+    expect(ensureAccount).toHaveBeenCalledWith("g2", 30);
     expect(values.get(key)).toBe(99);
+  });
+
+  it("claims a signed in user's grants instead of only opening the account (AC-11, AC-16)", async () => {
+    const { open, ensureAccount, claimGrants } = setup();
+    claimGrants.mockResolvedValueOnce({ starter: 0 });
+    expect(await open("a2", false, null)).toEqual({
+      created: false,
+      granted: 0,
+    });
+    expect(claimGrants).toHaveBeenCalledWith("a2");
+    expect(ensureAccount).not.toHaveBeenCalled();
   });
 });

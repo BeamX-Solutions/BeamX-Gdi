@@ -102,9 +102,10 @@ export type FreeChat = ReturnType<typeof freeChat>;
 /**
  * Opens the credit account at the first billable action, with the starter grant (AC-11).
  * A guest from an IP that already got `guestPerIpPerDay` grants today gets an account
- * with 0 credits. The IP counter goes up only when a grant was actually written. Signed
- * in users, and guests with no known IP, always get the grant. An existing account is
- * left untouched (`ensureAccount` is idempotent).
+ * with 0 credits. The IP counter goes up only when a grant was actually written. Guests
+ * with no known IP always get the grant. A signed in user goes through `claimGrants`
+ * instead: the starter grant plus anything a verified account is owed (the sign up
+ * grant, a Luna import), so a missed sign up hook heals here. Both are idempotent.
  */
 export const accountOpener =
   (deps: {
@@ -113,6 +114,9 @@ export const accountOpener =
       userId: string,
       starterGrant: number,
     ) => Promise<{ readonly created: boolean; readonly granted: number }>;
+    readonly claimGrants: (
+      userId: string,
+    ) => Promise<{ readonly starter: number }>;
     readonly config: Pick<BillingConfig, "grants">;
     readonly now: () => Date;
   }) =>
@@ -122,7 +126,11 @@ export const accountOpener =
     ip: string | null,
   ): Promise<{ readonly created: boolean; readonly granted: number }> => {
     const { starter, guestPerIpPerDay } = deps.config.grants;
-    if (!isGuest || ip === null) return deps.ensureAccount(userId, starter);
+    if (!isGuest) {
+      const claimed = await deps.claimGrants(userId);
+      return { created: claimed.starter > 0, granted: claimed.starter };
+    }
+    if (ip === null) return deps.ensureAccount(userId, starter);
     const key = billingKeys.guestGrant(ip, billingDay(deps.now()));
     const given = await deps.store.read("guest_grant", key);
     const opened = await deps.ensureAccount(
