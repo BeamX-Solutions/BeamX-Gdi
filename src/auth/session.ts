@@ -28,3 +28,19 @@ export const sessionUser = async (
     ? { id: session.user.id, isAnonymous: session.user.isAnonymous === true }
     : null;
 };
+
+export type SessionAccount = SessionUser & { readonly email: string };
+
+/** The session user with their email (the checkout's Paystack customer), or null. */
+export const sessionAccount = async (
+  headers: Headers,
+): Promise<SessionAccount | null> => {
+  const session = await auth.api.getSession({ headers });
+  return session
+    ? {
+        id: session.user.id,
+        isAnonymous: session.user.isAnonymous === true,
+        email: session.user.email,
+      }
+    : null;
+};

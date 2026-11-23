@@ -22,12 +22,14 @@ export const LINKED_TABLES = [
 /**
  * Left alone on purpose: Better Auth owns `session` and `account` (its own link flow
  * deals with the guest's session); `luna_credit_import` is claimed only by a verified
- * account, never by a guest (spec 0004, AC-16).
+ * account, never by a guest (spec 0004, AC-16); a `payment` is only ever started by a
+ * signed in account, never a guest (spec 0004, AC-13).
  */
 export const LINK_EXCLUDED_TABLES = [
   "session",
   "account",
   "luna_credit_import",
+  "payment",
 ] as const;
 
 export type LinkCounts = {

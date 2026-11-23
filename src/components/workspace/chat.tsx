@@ -28,7 +28,12 @@ import { panelView } from "@/components/report/report-panel-state";
 import { ReportStatusView } from "@/components/report/report-status-view";
 import { useReportStatus } from "@/components/report/use-report-status";
 import { reportTitle } from "./chat-copy";
-import { NoticeContext, showQueuedNotice } from "./notice-context";
+import type { BuyCredits } from "@/components/credits/buy";
+import {
+  NoticeContext,
+  showPaymentNotice,
+  showQueuedNotice,
+} from "./notice-context";
 import { Toast } from "./toast";
 import {
   ChatItem,
@@ -79,6 +84,8 @@ type ChatProps = {
   readonly chip?: ReactNode;
   /** Tool names by id, from the registry, for the confirm card ("Start Stellar?"). */
   readonly toolNames?: Readonly<Record<string, string>>;
+  /** Starts a credit checkout (the route's Server Action); Buy on the short balance card. */
+  readonly buy?: BuyCredits;
 };
 
 /** The shell, the thread area and the composer: one layout for every chat state. */
@@ -102,6 +109,8 @@ function ChatFrame({
   // A notice left by the page before a full page load ("Your account was deleted.",
   // AC-13). Read after mount: the server render has no `sessionStorage`.
   useEffect(() => showQueuedNotice(setNotice), []);
+  // Back from Paystack (spec 0004, AC-8): the callback adds `?payment=`.
+  useEffect(() => showPaymentNotice(setNotice), []);
   // The one auth dialog's state, shared by the header and the thread's prompts (spec
   // 0009, AC-1).
   const [auth, setAuth] = useState<AuthOpenState>({
@@ -174,6 +183,7 @@ export function Chat({
   loading,
   chip,
   toolNames = {},
+  buy,
 }: ChatProps) {
   const freshId = useBrowserId();
   const id = conversationId ?? freshId;
@@ -185,6 +195,7 @@ export function Chat({
       initialMessages={initialMessages ?? []}
       chip={chip}
       toolNames={toolNames}
+      buy={buy}
     />
   );
 }
@@ -220,11 +231,13 @@ function LiveChat({
   initialMessages,
   chip,
   toolNames,
+  buy,
 }: {
   readonly id: string;
   readonly initialMessages: readonly ChatUIMessage[];
   readonly chip?: ReactNode;
   readonly toolNames: Readonly<Record<string, string>>;
+  readonly buy?: BuyCredits;
 }) {
   const session = authClient.useSession();
   const [failure, setFailure] = useState<ChatFailure | null>(null);
@@ -467,6 +480,8 @@ function LiveChat({
                 guest={guest}
                 editing={editing}
                 toolNames={toolNames}
+                conversationId={id}
+                buy={buy}
               />
               {item.kind === "report" && item.data.runId === latest?.runId ? (
                 <SavePrompt

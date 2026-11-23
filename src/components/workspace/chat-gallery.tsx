@@ -9,6 +9,17 @@ import { CreditChip } from "@/components/credits/credit-chip";
 import { SIGN_UP_LABEL } from "@/components/auth/auth-copy";
 import { SavePromptCard } from "@/components/auth/save-prompt-card";
 import { ShortBalanceCard } from "@/components/credits/short-balance-card";
+import type { BuyCredits } from "@/components/credits/buy";
+import {
+  CreditHistory,
+  type HistoryEntry,
+} from "@/components/credits/credit-history";
+import {
+  expiryBannerLine,
+  expiryBannerTitle,
+  paymentBanner,
+} from "@/components/credits/credit-copy";
+import { CreditsBanner } from "@/components/credits/credits-banner";
 import { StopCard } from "@/components/credits/stop-card";
 import { ErrorCard } from "@/components/feedback/error-card";
 import {
@@ -38,6 +49,36 @@ import { RunProgressBar } from "./run-progress-bar";
 import { StatusLine } from "./status-line";
 import { Thread } from "./thread";
 import type { MessageView } from "./types";
+
+/** The gallery's Buy: never reaches Paystack, it shows the friendly failure line. */
+const demoBuy: BuyCredits = async () => ({
+  ok: false,
+  error: { code: "paystack_unavailable" },
+});
+
+const demoHistory: readonly HistoryEntry[] = [
+  {
+    id: "h3",
+    kind: "purchase",
+    amount: 100,
+    balanceAfter: 130,
+    createdAt: "2026-11-23T10:15:00.000Z",
+  },
+  {
+    id: "h2",
+    kind: "run_charge",
+    amount: -30,
+    balanceAfter: 30,
+    createdAt: "2026-11-22T18:40:00.000Z",
+  },
+  {
+    id: "h1",
+    kind: "starter_grant",
+    amount: 30,
+    balanceAfter: 60,
+    createdAt: "2026-11-22T18:30:00.000Z",
+  },
+];
 
 function Block({
   title,
@@ -269,6 +310,26 @@ export function ChatGallery() {
             shortfall={30}
             guest={false}
             packs={coveringPacks(billingConfig.packs, 30)}
+          />
+          <ShortBalanceCard
+            shortfall={30}
+            guest={false}
+            packs={coveringPacks(billingConfig.packs, 30)}
+            buy={demoBuy}
+            returnTo={null}
+          />
+          <CreditsBanner {...paymentBanner("pending")} />
+          <CreditsBanner {...paymentBanner("failed")} />
+          <CreditsBanner
+            tone="warn"
+            title={expiryBannerTitle}
+            message={expiryBannerLine("12 March 2027", false)}
+          />
+          <CreditHistory
+            entries={demoHistory}
+            timeZone={billingConfig.chat.dayTimeZone}
+            olderHref="/design"
+            newestHref={null}
           />
           <PrefillCard
             title="From our chat"

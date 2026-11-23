@@ -20,7 +20,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 5 | Tool module contract & registry | Foundation | done |
 | 6 | Assistant brain | Foundation | done |
 | 7 | Validate an idea in chat (Stellar) | Slice 1 | done |
-| 22 | Credits & billing | Slice 1 | in-progress |
+| 22 | Credits & billing | Slice 1 | done |
 | 21 | Abuse & AI cost guards | Slice 1 | done |
 | 8 | Accounts & sign up to save | Slice 2 | in-progress |
 | 9 | Shared business profile | Slice 2 | planned |
@@ -130,19 +130,19 @@ spec [0007](../specs/0007-validate-idea-chat/index.md) · code in `src/app`, `sr
   - [x] Playwright full flow with axe, and a real model run (AC-4, AC-12)
 - [x] Verify it: `/check verify validate an idea in chat`
 
-### 22. Credits & billing · Beta · in-progress
+### 22. Credits & billing · Beta · done
 Clients pay for tool runs with credits from one balance. Each tool has a fixed price per run, and chat beyond a small daily free allowance costs a little. The assistant always confirms before spending ("this uses 30 credits, go ahead?"). Credits are held when a run starts, charged when the report arrives, and released if it fails; Luna's phased plan resumes without charging twice. New accounts get starter credits, top ups are paid through Paystack in naira, credits expire after 12 months of inactivity (with a reminder first), and existing Luna credit balances move in. Comes right after the first Stellar thread and before any public link.
 **Done when:** a client sees a tool's price, confirms, and is charged only when the report arrives (a failed run costs nothing), can buy credits with Paystack, and sees their balance and history; prices and the free chat allowance come from config.
-spec [0004](../specs/0004-credits-billing/index.md) · code in `src/billing`, `src/db`
+spec [0004](../specs/0004-credits-billing/index.md) · code in `src/billing`, `src/db`, `src/app/credits`, `src/app/api/webhooks/paystack`, `src/components/credits`
 - [x] Design it (spec): `/architect credits & billing`
-- [ ] Build it: `/develop credits & billing`
+- [x] Build it: `/develop credits & billing`
   - [x] Thin thread: a guest pays for a Stellar run with starter credits (config, ledger and holds migration, hold on approve, charge on report ready, release on failure, confirm card, header chip) (AC-1, AC-2, AC-3, AC-4, AC-5, AC-8, AC-11, AC-14, AC-18, AC-20, AC-21)
   - [x] Hold lifecycle and paid chat: resume and reconfirm, daily cron with idle and chat hold sweeps, free allowance and metered chat, guest grant IP cap, charge once across phases (AC-2, AC-6, AC-7, AC-9, AC-10, AC-11, AC-21)
   - [x] Disconnect is never a stop: drain the stream copy when the Redis buffer fails, reword the Stop comments, tee billing test (AC-10)
-  - [ ] Buying credits, after #8 sign up: payment table, Paystack client, checkout, callback, webhook, pending sweep, buy from the card, `/credits` page (AC-8, AC-13, AC-14, AC-21)
-  - [ ] Accounts and money operations, after #8: sign up grant, Luna import and claim, guest link merge, deletion, adjust script, expiry (behind a flag) and drift check (AC-11, AC-12, AC-15, AC-16, AC-17, AC-19, AC-20)
-- [ ] Verify it: `/check verify credits & billing`
-- [ ] Test it: `/test credits & billing`
+  - [x] Buying credits, after #8 sign up: payment table, Paystack client, checkout, callback, webhook, pending sweep, buy from the card, `/credits` page (AC-8, AC-13, AC-14, AC-21)
+  - [x] Accounts and money operations, after #8: sign up grant, Luna import and claim, guest link merge, deletion, adjust script, expiry (behind a flag) and drift check (AC-11, AC-12, AC-15, AC-16, AC-17, AC-19, AC-20)
+- [x] Verify it: `/check verify credits & billing`
+- [x] Test it: `/test credits & billing`
 
 ### 21. Abuse & AI cost guards · Beta · done
 Guest chat and starter credits still trigger paid AI calls, so cap abuse and spend before any public link: per guest and per IP rate limits, a bot check on guest start and chat, input and output size limits, and a daily AI spend cap (rules and defaults decided in spec 0001).

@@ -12,6 +12,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { newId } from "../id";
 import { user } from "./auth";
+import { payment } from "./payments";
 import { toolRun } from "./runs";
 
 const ts = (name: string) =>
@@ -138,8 +139,10 @@ export const creditLedger = pgTable(
     runId: uuid("run_id").references(() => toolRun.id, {
       onDelete: "set null",
     }),
-    /** FK to `payment.id` is added with the payment table (spec 0004, milestone 3). */
-    paymentId: uuid("payment_id"),
+    /** The purchase this entry grants (spec 0004, milestone 3); kept as null after deletion. */
+    paymentId: uuid("payment_id").references(() => payment.id, {
+      onDelete: "set null",
+    }),
     reason: text("reason"),
     actor: text("actor").notNull().default("system"),
     idempotencyKey: text("idempotency_key").notNull().unique(),

@@ -1,7 +1,7 @@
 # 0004. Credits and billing for the BeamX Workspace
 
 **Date**: 2026-11-19
-**Status**: In Progress
+**Status**: Accepted
 
 ## Summary
 
@@ -280,17 +280,17 @@ Ordered Tracer Bullet: milestone 1 is one thin, real thread (a guest pays for a 
 21. [x] Reword every comment and test name that calls a cancelled chat stream a "Stop" to say it is a disconnect with resumable streams off: the `chat-api.ts` header comment, `onAbort`, the `billing` and `settleOnce` comment, `stopped` and `onEnd`; `chat-billing.ts` `ChatEnd` and `chatSettleAmount`; `pricing.ts` `chatChargeOnStop`. No renames. Done when `grep -rn "Stop" src/assistant src/billing` shows only the run Stop (the stop card and `stopRun`). The existing cancel test in `chat-api.test.ts` stays as the resumable off case. Add a `chat-api.test.ts` case that emulates the route's tee (cancel one branch, drain the other) and checks the turn settles `completed` with one charge and a saved reply; it checks billing, not the route wiring, which the manual verify step covers, satisfies **AC-10**
 
 **Milestone 3: buying credits (needs #8 sign up)**
-11. Migration 2: `payment` table and enum, plus the `credit_ledger.payment_id` FK, satisfies **AC-13**
-12. `src/billing/paystack.ts`: typed `fetch` wrapper (initialize, verify) with Zod parsed responses returning `Result`, and the HMAC check; unit tests with recorded fixtures, satisfies **AC-13**
-13. `startCheckout` Server Action (rate limited), `/credits/callback` page, `/api/webhooks/paystack` route, `payments.markSucceeded` with the grant in one batch; the stale pending sweep job, satisfies **AC-13**, **AC-21**
-14. "Buy" on the short balance card, returning to the chat; `/credits` page with summary, packs, and keyset paginated history, satisfies **AC-8**, **AC-14**
+11. [x] Migration 2: `payment` table and enum, plus the `credit_ledger.payment_id` FK, satisfies **AC-13**
+12. [x] `src/billing/paystack.ts`: typed `fetch` wrapper (initialize, verify) with Zod parsed responses returning `Result`, and the HMAC check; unit tests with recorded fixtures, satisfies **AC-13**
+13. [x] `startCheckout` Server Action (rate limited), `/credits/callback` page, `/api/webhooks/paystack` route, `payments.markSucceeded` with the grant in one batch; the stale pending sweep job, satisfies **AC-13**, **AC-21**
+14. [x] "Buy" on the short balance card, returning to the chat; `/credits` page with summary, packs, and keyset paginated history, satisfies **AC-8**, **AC-14**
 
 **Milestone 4: accounts, grants, and money operations**
 15. [x] Migration 3: `signup_grant_claim` and `luna_credit_import`, satisfies **AC-11**, **AC-16**
 16. [x] `claimPendingGrants` (sign up grant plus Luna claim) wired to the Better Auth database hook, the `/credits` load, and the first billable action, satisfies **AC-11**, **AC-16**
 17. [x] Extend `users.linkGuest` with the move and merge rules; extend `link.int.test.ts` and the deletion cascade test, satisfies **AC-12**, **AC-19**
 18. [x] `pnpm credits:adjust` and `pnpm credits:import-luna` scripts with confirmation and validation, satisfies **AC-16**, **AC-17**
-19. Cron jobs `expireInactive` (behind `expiry.enforce`) and `findDrift`; expiry warning dot and banner, satisfies **AC-15**, **AC-20**
+19. [x] Cron jobs `expireInactive` (behind `expiry.enforce`) and `findDrift`; expiry warning dot and banner, satisfies **AC-15**, **AC-20**
 
 ## Consequences
 
