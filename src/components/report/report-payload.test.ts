@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ReportStatusPayload } from "@/assistant/report-status";
+import { panelPayloads } from "@/components/fixtures/report";
+import { getTool } from "@/tools/registry";
 import { reportPayloadSchema, type ReportPayload } from "./report-payload";
 
 // Compile time: every payload the server builds is one the client schema describes.
@@ -85,5 +87,61 @@ describe("reportPayloadSchema", () => {
       ...patch,
     });
     expect(parsed.success).toBe(false);
+  });
+});
+
+describe("reportPayloadSchema and rich sections (spec 0010)", () => {
+  it("parses the Beacon ready payload with every rich part kind", () => {
+    const parsed = reportPayloadSchema.safeParse(panelPayloads.beaconReady);
+    expect(parsed.success).toBe(true);
+    expect(parsed.data?.view).toEqual(panelPayloads.beaconReady.view);
+  });
+
+  it("parses a real Beacon view, as the server builds it", () => {
+    const beacon = getTool("beacon");
+    if (!beacon.ok) throw new Error("beacon is not registered");
+    const answers = Object.fromEntries(
+      beacon.value.questions.map((q) => [
+        q.id,
+        q.kind === "single" ? (q.options.at(-1)?.value ?? "") : "Ada Foods",
+      ]),
+    );
+    const scored = beacon.value.score(answers);
+    if (!scored.ok) throw new Error("incomplete");
+    const scores = scored.value as { readonly advisory: unknown };
+    const view = beacon.value.toView({
+      scores: scored.value,
+      content: { advisory: scores.advisory },
+      answers,
+    });
+    expect(
+      reportPayloadSchema.safeParse({
+        status: "ready",
+        phases: [],
+        error: null,
+        canRetry: false,
+        stale: false,
+        view,
+      }).success,
+    ).toBe(true);
+  });
+
+  it("refuses an unknown part kind", () => {
+    expect(
+      reportPayloadSchema.safeParse({
+        status: "ready",
+        phases: [],
+        error: null,
+        canRetry: false,
+        stale: false,
+        view: [
+          {
+            kind: "rich_section",
+            title: "S",
+            parts: [{ kind: "html", text: "x" }],
+          },
+        ],
+      }).success,
+    ).toBe(false);
   });
 });
