@@ -171,8 +171,8 @@ spec [0009](../specs/0009-accounts-sign-up/index.md) · code in `src/auth`, `src
   - [x] Abuse guards, the verified account hook, and the sign up prompts on reports and notices (AC-1, AC-15, AC-16)
   - [x] Delete account and the daily guest purge (AC-13, AC-14, AC-18)
   - [ ] Later: Google sign in with account linking, once the Google OAuth client exists (AC-4, AC-9)
-- [ ] Verify it: `/check verify accounts & sign up to save`
-- [ ] Test it: `/test accounts & sign up to save`
+- [x] Verify it: `/check verify accounts & sign up to save`
+- [x] Test it: `/test accounts & sign up to save`
 
 ### 9. Shared business profile · needs a decision
 One profile (name, industry, size, location, goals, and so on) built from answers across tools, so the client never answers the same question twice. They can view and edit it.
