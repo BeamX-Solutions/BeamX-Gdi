@@ -6,9 +6,10 @@
  */
 import type { ToolModule } from "./_contract";
 import { makeRegistry } from "./_kit/registry";
+import { beacon } from "./beacon";
 import { stellar } from "./stellar";
 
-export const tools: readonly ToolModule[] = [stellar];
+export const tools: readonly ToolModule[] = [stellar, beacon];
 
 const registry = makeRegistry(tools);
 
@@ -20,10 +21,14 @@ export type {
   Answers,
   AnswerValue,
   ModelRole,
+  PhaseClient,
+  PhaseContext,
   QuestionProgress,
   QuestionView,
   ReportBlock,
   ReportPhase,
+  RichLine,
+  RichPart,
   ToolModule,
   ToolQuestion,
   ToolReader,

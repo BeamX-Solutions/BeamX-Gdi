@@ -188,8 +188,8 @@ spec [0010](../specs/0010-beacon-health-check/index.md)
 - [x] Design it (spec): `/architect beacon health check in chat`
 - [ ] Build it: `/develop beacon health check in chat`
   - [x] Questions, scoring and the typed rule advisory with both parity tests (AC-2, AC-3, AC-4, AC-5, AC-6)
-  - [ ] Contract additions (first name, phase check) in the runner, then the Beacon report phase, view and registry line (AC-1, AC-7, AC-8, AC-9, AC-10)
-  - [ ] The `rich_section` block on `/design` with axe (AC-11)
+  - [x] Contract additions (first name, phase check) in the runner, then the Beacon report phase, view and registry line (AC-1, AC-7, AC-8, AC-9, AC-10)
+  - [x] The `rich_section` block on `/design` with axe (AC-11)
   - [ ] Thread end to end: Playwright flow, a real model run, and the assistant eval results (AC-12, AC-13)
 - [ ] Verify it: `/check verify beacon health check in chat`
 

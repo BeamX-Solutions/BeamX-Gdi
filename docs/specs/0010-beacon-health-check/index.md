@@ -242,9 +242,9 @@ Tracer Bullet: the thinnest real Beacon thread first (score, polish with the moc
 
 1. [x] Questions and scoring: `questions.ts` (23 questions, slugs, labels, areas, factKeys), `scoring.ts` (score maps, categories, grades, insights, flags, band, `score` with the completeness check), the scores Zod schema, and the 200 case scoring parity test, satisfies **AC-2**, **AC-3**, **AC-4**, **AC-5**
 2. [x] Rule advisory: the `Advisory` types and schema, `advisory.ts` ported to typed sections, `advisory-markdown.ts`, the 34 case advisory parity test; `score` now includes the advisory, satisfies **AC-4**, **AC-6**
-3. [ ] Contract and runner: `client` in the phase context, the owner lookup's `firstName` (with a DB integration test for a guest and an account), optional `check` and the runner's repair path for its issues, with runner tests on the mock model, satisfies **AC-7**, **AC-8**
-4. [ ] Report and view: `report.ts` (instructions, prompt, output schema, `check`), `view.ts` (band lines, AC-9 order, AC-10 verdicts), `index.ts` and the registry line, satisfies **AC-1**, **AC-7**, **AC-8**, **AC-9**, **AC-10**
-5. [ ] `rich_section` block: contract type, renderer part, a `/design` Beacon ready fixture, axe, satisfies **AC-11**
+3. [x] Contract and runner: `client` in the phase context, the owner lookup's `firstName` (with a DB integration test for a guest and an account), optional `check` and the runner's repair path for its issues, with runner tests on the mock model, satisfies **AC-7**, **AC-8**
+4. [x] Report and view: `report.ts` (instructions, prompt, output schema, `check`), `view.ts` (band lines, AC-9 order, AC-10 verdicts), `index.ts` and the registry line, satisfies **AC-1**, **AC-7**, **AC-8**, **AC-9**, **AC-10**
+5. [x] `rich_section` block: contract type, renderer part, a `/design` Beacon ready fixture, axe, satisfies **AC-11**
 6. [ ] Thread end to end: Playwright flow with the fake model (approve, 23 cards, ready report, refresh), then one real model run; `pnpm eval:assistant` and commit the results file, satisfies **AC-12**, **AC-13**
 
 ## Consequences
