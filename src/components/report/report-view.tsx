@@ -4,6 +4,7 @@ import { AdviceList } from "./advice-list";
 import { CategoryBars } from "./category-bars";
 import { ReportSection } from "./report-section";
 import { ResourceList } from "./resource-list";
+import { RichSection } from "./rich-section";
 import { ScoreHeader } from "./score-header";
 import { TimelineList } from "./timeline-list";
 import { defaultVerdictLabel } from "./verdict";
@@ -78,6 +79,8 @@ function Block({ block }: { readonly block: ReportBlock }) {
           <TimelineList label={block.title} steps={block.steps} />
         </ReportSection>
       );
+    case "rich_section":
+      return <RichSection title={block.title} parts={block.parts} />;
     case "resources":
       return (
         <ReportSection title={block.title}>

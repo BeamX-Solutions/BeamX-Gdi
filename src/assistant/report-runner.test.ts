@@ -78,6 +78,8 @@ type Setup = {
   readonly attempts?: number;
   readonly hold?: boolean;
   readonly spendCap?: boolean;
+  /** The run owner's first name (null, a guest, by default). */
+  readonly firstName?: string | null;
   /** Runs before each status check; lets a test steal the attempt mid run. */
   readonly onStatus?: (row: Row, checks: number) => void;
 };
@@ -141,7 +143,7 @@ const setup = (s: Setup) => {
 
   const deps: RunnerDeps = {
     getTool: registry.getTool,
-    ownerOf: async () => ok(OWNER),
+    ownerOf: async () => ok({ userId: OWNER, firstName: s.firstName ?? null }),
     getRun: async () =>
       ok({
         run: {
@@ -507,5 +509,110 @@ describe("providerErrorKind (AC-9)", () => {
         new DOMException("The operation timed out.", "TimeoutError"),
       ),
     ).toBe("timeout");
+  });
+});
+
+describe("runReport, phase check and client (spec 0010, AC-7, AC-8)", () => {
+  const firstPhase = onePhaseTool.phases[0];
+  if (!firstPhase) throw new Error("onePhaseTool has no phase");
+  const checks: { output: unknown; firstName: string | null }[] = [];
+  /** Accepts any text but "bad", and says hello to the client in its prompt. */
+  const checkedTool: ToolModule = {
+    ...onePhaseTool,
+    phases: [
+      {
+        ...firstPhase,
+        buildPrompt: (ctx) => ({
+          instructions: "Write step one.",
+          prompt: `Client: ${ctx.client.firstName ?? "none"}`,
+        }),
+        check: (output, ctx) => {
+          checks.push({ output, firstName: ctx.client.firstName });
+          const { text } = z.object({ text: z.string() }).parse(output);
+          return text === "bad" ? ["Section 1, part 2: the text was bad."] : [];
+        },
+      },
+    ],
+  };
+
+  it("passes the owner's first name to the prompt and the check", async () => {
+    checks.length = 0;
+    const t = setup({
+      tool: checkedTool,
+      firstName: "Ada",
+      replies: [{ text: step("A") }],
+    });
+    expect((await runReport(t.deps, { runId: RUN, attempt: 1 })).outcome).toBe(
+      "ready",
+    );
+    expect(t.prompts[0]).toContain("Client: Ada");
+    expect(checks).toEqual([{ output: { text: "A" }, firstName: "Ada" }]);
+  });
+
+  it("gives a guest no first name", async () => {
+    const t = setup({ tool: checkedTool, replies: [{ text: step("A") }] });
+    await runReport(t.deps, { runId: RUN, attempt: 1 });
+    expect(t.prompts[0]).toContain("Client: none");
+  });
+
+  it("repairs an output the check rejects, sending its issues", async () => {
+    const t = setup({
+      tool: checkedTool,
+      replies: [{ text: step("bad") }, { text: step("good") }],
+    });
+    expect(await runReport(t.deps, { runId: RUN, attempt: 1 })).toEqual({
+      outcome: "ready",
+    });
+    expect(t.prompts).toHaveLength(2);
+    expect(t.prompts[1]).toContain("did not match the required format");
+    expect(t.prompts[1]).toContain("- Section 1, part 2: the text was bad.");
+    expect(t.row.content).toEqual({ one: { text: "good" } });
+    expect(t.usageRows.map((u) => u.callKey)).toEqual([
+      `report:${RUN}:1:one:1`,
+      `report:${RUN}:1:one:2`,
+    ]);
+    expect(t.logs).toContainEqual({
+      event: "report_phase_repair",
+      fields: { runId: RUN, attempt: 1, phaseKey: "one", reason: "check" },
+    });
+  });
+
+  it("fails with invalid_output when the repair is rejected too", async () => {
+    const t = setup({
+      tool: checkedTool,
+      replies: [{ text: step("bad") }, { text: step("bad") }],
+    });
+    expect(await runReport(t.deps, { runId: RUN, attempt: 1 })).toEqual({
+      outcome: "failed",
+      kind: "invalid_output",
+    });
+    expect(t.usageRows).toHaveLength(2);
+    expect(t.row.content).toBeNull();
+  });
+
+  it("repairs once across a schema failure then a check failure", async () => {
+    const t = setup({
+      tool: checkedTool,
+      replies: [{ text: "not json" }, { text: step("bad") }],
+    });
+    expect(await runReport(t.deps, { runId: RUN, attempt: 1 })).toEqual({
+      outcome: "failed",
+      kind: "invalid_output",
+    });
+    expect(t.prompts).toHaveLength(2);
+  });
+
+  it("skips a saved phase on resume without checking it again", async () => {
+    checks.length = 0;
+    const t = setup({
+      tool: checkedTool,
+      content: { one: { text: "bad" } },
+      replies: [],
+    });
+    expect((await runReport(t.deps, { runId: RUN, attempt: 1 })).outcome).toBe(
+      "ready",
+    );
+    expect(t.prompts).toHaveLength(0);
+    expect(checks).toHaveLength(0);
   });
 });

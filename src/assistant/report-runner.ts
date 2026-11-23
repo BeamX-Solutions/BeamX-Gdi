@@ -23,6 +23,7 @@ import type {
   StatusError,
   WriteError,
 } from "@/db/queries/reports";
+import type { RunOwner } from "@/db/queries/runs";
 import type { UsageInput } from "@/db/queries/usage";
 import { costUsd } from "@/lib/ai-cost";
 import { err, ok, type Result } from "@/lib/result";
@@ -31,6 +32,8 @@ import {
   toAnswers,
   type Answers,
   type ModelRole,
+  type PhaseClient,
+  type PhaseContext,
   type ReportPhase,
   type ToolModule,
   type UnknownTool,
@@ -57,9 +60,10 @@ export type RunForReport = {
 
 export type RunnerDeps = {
   readonly getTool: (id: string) => Result<ToolModule, UnknownTool>;
+  /** The run owner at write time, with the first name prompts may use (spec 0010). */
   readonly ownerOf: (
     runId: string,
-  ) => Promise<Result<string, { readonly code: "not_found" }>>;
+  ) => Promise<Result<RunOwner, { readonly code: "not_found" }>>;
   readonly getRun: (
     userId: string,
     runId: string,
@@ -183,17 +187,18 @@ export const describeOutputError = (e: NoObjectGeneratedError): string => {
 // One phase
 // ---------------------------------------------------------------------------
 
-type PhaseContext = {
+type RunContext = {
   readonly deps: RunnerDeps;
   readonly owner: string;
   readonly runId: string;
   readonly attempt: number;
   readonly answers: Answers;
   readonly scores: unknown;
+  readonly client: PhaseClient;
 };
 
 const toUsageInput = (
-  ctx: PhaseContext,
+  ctx: RunContext,
   phase: ReportPhase,
   modelId: string,
   attemptTry: number,
@@ -227,17 +232,29 @@ const repairPrompt = (prompt: string, problems: string): string =>
     "Return the complete answer again, matching the schema exactly.",
   ].join("\n");
 
-/** Runs one phase: a call, and one repair call if the output fails its schema. */
+/** Problems from a phase check, in the same short lines as schema problems. */
+const describeCheckIssues = (issues: readonly string[]): string =>
+  issues
+    .slice(0, 20)
+    .map((issue) => `- ${issue}`)
+    .join("\n");
+
+/**
+ * Runs one phase: a call, and one repair call if the output fails its schema or its
+ * `check` (spec 0010, AC-8). A second failure ends the attempt as `invalid_output`.
+ */
 const runPhase = async (
-  ctx: PhaseContext,
+  ctx: RunContext,
   phase: ReportPhase,
   earlier: Readonly<Record<string, unknown>>,
 ): Promise<Result<unknown, ReportErrorKind>> => {
-  const { instructions, prompt } = phase.buildPrompt({
+  const phaseCtx: PhaseContext = {
     answers: ctx.answers,
     scores: ctx.scores,
     earlier,
-  });
+    client: ctx.client,
+  };
+  const { instructions, prompt } = phase.buildPrompt(phaseCtx);
   const resolved = ctx.deps.model(phase.modelRole);
   const maxOutputTokens = Math.min(
     phase.maxOutputTokens,
@@ -261,7 +278,16 @@ const runPhase = async (
       await ctx.deps.recordUsage(
         toUsageInput(ctx, phase, resolved.id, attemptTry, result.usage),
       );
-      return ok(result.output);
+      const issues = phase.check?.(result.output, phaseCtx) ?? [];
+      if (issues.length === 0) return ok(result.output);
+      if (attemptTry === 2) return err("invalid_output");
+      problems = describeCheckIssues(issues);
+      ctx.deps.log("report_phase_repair", {
+        runId: ctx.runId,
+        attempt: ctx.attempt,
+        phaseKey: phase.key,
+        reason: "check",
+      });
     } catch (e) {
       if (!NoObjectGeneratedError.isInstance(e))
         return err(providerErrorKind(e));
@@ -275,6 +301,7 @@ const runPhase = async (
         runId: ctx.runId,
         attempt: ctx.attempt,
         phaseKey: phase.key,
+        reason: "schema",
       });
     }
   }
@@ -322,7 +349,8 @@ const run = async (deps: RunnerDeps, input: RunInput): Promise<RunOutcome> => {
   // 1. Owner at write time (a guest may link an account mid run), then the run.
   const owner = await deps.ownerOf(runId);
   if (!owner.ok) return STOPPED("run_not_found");
-  const stored = await deps.getRun(owner.value, runId);
+  const { userId, firstName } = owner.value;
+  const stored = await deps.getRun(userId, runId);
   if (!stored.ok) return STOPPED("run_not_found");
   const { run: storedRun, answers: rows, report } = stored.value;
 
@@ -342,13 +370,14 @@ const run = async (deps: RunnerDeps, input: RunInput): Promise<RunOutcome> => {
     return fail(deps, input, "unknown");
   }
 
-  const ctx: PhaseContext = {
+  const ctx: RunContext = {
     deps,
-    owner: owner.value,
+    owner: userId,
     runId,
     attempt,
     answers: answers.value,
     scores: scores.data,
+    client: { firstName },
   };
   const saved = isRecord(report?.content) ? report.content : {};
   const earlier: Record<string, unknown> = {};
@@ -363,9 +392,9 @@ const run = async (deps: RunnerDeps, input: RunInput): Promise<RunOutcome> => {
       continue;
     }
 
-    if (!(await stillCurrent(deps, owner.value, input)))
+    if (!(await stillCurrent(deps, userId, input)))
       return STOPPED("stale_attempt");
-    const cap = await deps.checkSpendCap(owner.value);
+    const cap = await deps.checkSpendCap(userId);
     if (!cap.ok) return fail(deps, input, "spend_cap");
 
     const started = deps.now();

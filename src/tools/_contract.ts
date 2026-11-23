@@ -104,6 +104,27 @@ export type AdviceItem = {
   readonly priority: AdvicePriority;
 };
 
+/** A line of a rich section list: an optional bold lead, then text. */
+export type RichLine = { readonly lead?: string; readonly text: string };
+
+/**
+ * One part of a rich section (spec 0010). Plain text only: the renderer draws text
+ * nodes, never HTML or markdown. `tight` changes only the spacing above the part.
+ */
+export type RichPart = { readonly tight?: true } & (
+  | {
+      readonly kind: "paragraph";
+      readonly lead?: string;
+      readonly text: string;
+    }
+  | { readonly kind: "note"; readonly text: string }
+  | { readonly kind: "label"; readonly text: string }
+  | { readonly kind: "subheading"; readonly text: string }
+  | { readonly kind: "bullets"; readonly items: readonly RichLine[] }
+  | { readonly kind: "numbered"; readonly items: readonly RichLine[] }
+  | { readonly kind: "rule" }
+);
+
 export type ReportBlock =
   | {
       readonly kind: "score_header";
@@ -142,6 +163,11 @@ export type ReportBlock =
       }[];
     }
   | {
+      readonly kind: "rich_section";
+      readonly title: string;
+      readonly parts: readonly RichPart[];
+    }
+  | {
       readonly kind: "resources";
       readonly title: string;
       readonly items: readonly {
@@ -164,6 +190,23 @@ export type PromptParts = {
   readonly prompt: string;
 };
 
+/** Who the report is for, filled by the runner from the run owner (spec 0010). */
+export type PhaseClient = {
+  /** The account holder's name, or null for a guest or a blank name. */
+  readonly firstName: string | null;
+};
+
+/** What `buildPrompt` and `check` see. */
+export type PhaseContext = {
+  /** Visible answers only. */
+  readonly answers: Answers;
+  /** Parsed by `scoresSchema`. */
+  readonly scores: unknown;
+  /** Outputs of the phases before this one, by phase key. */
+  readonly earlier: Readonly<Record<string, unknown>>;
+  readonly client: PhaseClient;
+};
+
 export type ReportPhase = {
   /** Top level key in the report content. */
   readonly key: string;
@@ -176,14 +219,13 @@ export type ReportPhase = {
   readonly timeoutMs: number;
   /** What this phase must return. */
   readonly output: z.ZodType;
-  readonly buildPrompt: (ctx: {
-    /** Visible answers only. */
-    readonly answers: Answers;
-    /** Parsed by `scoresSchema`. */
-    readonly scores: unknown;
-    /** Outputs of the phases before this one, by phase key. */
-    readonly earlier: Readonly<Record<string, unknown>>;
-  }) => PromptParts;
+  readonly buildPrompt: (ctx: PhaseContext) => PromptParts;
+  /**
+   * Optional and pure: problems with an output that passed `output`, as short lines.
+   * An empty list accepts it. The runner calls it only with the value its own schema
+   * parse produced, and treats problems like schema problems (one repair call).
+   */
+  readonly check?: (output: unknown, ctx: PhaseContext) => readonly string[];
 };
 
 export type ViewInput = {
@@ -229,12 +271,23 @@ export type ToolModule = ToolReader & {
 // Typed definitions, erased by defineTool / defineReader
 // ---------------------------------------------------------------------------
 
-export type TypedPhase<S> = Omit<ReportPhase, "buildPrompt"> & {
-  readonly buildPrompt: (ctx: {
-    readonly answers: Answers;
-    readonly scores: S;
-    readonly earlier: Readonly<Record<string, unknown>>;
-  }) => PromptParts;
+export type TypedPhaseContext<S> = Omit<PhaseContext, "scores"> & {
+  readonly scores: S;
+};
+
+/** A phase with typed scores `S` and a typed output `O`. */
+export type TypedPhase<S, O = unknown> = Omit<
+  ReportPhase,
+  "buildPrompt" | "check" | "output"
+> & {
+  readonly output: z.ZodType<O>;
+  readonly buildPrompt: (ctx: TypedPhaseContext<S>) => PromptParts;
+  /**
+   * Method syntax on purpose: it lets a phase with a typed output sit in a tool's
+   * phase list (`TypedPhase<S>`). `defineTool` passes it only a value parsed by
+   * `output`.
+   */
+  check?(output: O, ctx: TypedPhaseContext<S>): readonly string[];
 };
 
 export type TypedReader<S, C> = {
@@ -307,14 +360,24 @@ export const defineTool = <S, C>(def: TypedTool<S, C>): ToolModule => ({
   whenToUse: def.whenToUse,
   creditPrice: def.creditPrice,
   score: def.score,
-  phases: def.phases.map((phase): ReportPhase => ({
-    ...phase,
-    buildPrompt: (ctx) =>
-      phase.buildPrompt({
-        answers: ctx.answers,
-        scores: parseWith(def.scoresSchema, ctx.scores, "scores"),
-        earlier: ctx.earlier,
-      }),
-  })),
+  phases: def.phases.map((phase): ReportPhase => {
+    const typed = (ctx: PhaseContext): TypedPhaseContext<S> => ({
+      answers: ctx.answers,
+      scores: parseWith(def.scoresSchema, ctx.scores, "scores"),
+      earlier: ctx.earlier,
+      client: ctx.client,
+    });
+    const { check, ...rest } = phase;
+    return {
+      ...rest,
+      buildPrompt: (ctx) => phase.buildPrompt(typed(ctx)),
+      ...(check
+        ? {
+            check: (output: unknown, ctx: PhaseContext) =>
+              check(parseWith(phase.output, output, "output"), typed(ctx)),
+          }
+        : {}),
+    };
+  }),
   ...(def.readers ? { readers: def.readers } : {}),
 });

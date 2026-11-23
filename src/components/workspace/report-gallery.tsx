@@ -245,6 +245,14 @@ export function ReportGallery() {
             title="Ready"
             view={panelView({ kind: "loaded", payload: panelPayloads.ready })}
           />
+          <PanelDemo
+            testId="panel-ready-beacon"
+            title="Ready, Beacon"
+            view={panelView({
+              kind: "loaded",
+              payload: panelPayloads.beaconReady,
+            })}
+          />
         </div>
         <p className="text-sm text-muted-foreground">
           Retries: {retries} · Start again: {startAgain}

@@ -186,6 +186,109 @@ export const allBlocksView: readonly ReportBlock[] = [
   },
 ];
 
+/**
+ * A ready Beacon report (spec 0010, AC-11): every rich section part kind, plus an HTML
+ * string that must show as plain text.
+ */
+export const beaconReadyView: readonly ReportBlock[] = [
+  {
+    kind: "score_header",
+    title: "Building Blocks",
+    score: 60.3,
+    max: 100,
+    verdict: "caution",
+    summary: "The basics are in place, and some key areas need work.",
+  },
+  {
+    kind: "category_bars",
+    title: "Your five areas",
+    items: [
+      { label: "Financial Health (D)", score: 5, max: 20, verdict: "risk" },
+      { label: "Customer Strength (B)", score: 14.7, max: 20, verdict: "good" },
+      {
+        label: "Operational Maturity (C)",
+        score: 10.7,
+        max: 20,
+        verdict: "caution",
+      },
+    ],
+  },
+  {
+    kind: "advice_list",
+    title: "What we found",
+    items: [
+      {
+        title: "Less than 30 days cash runway",
+        detail: "Financial Health",
+        priority: "high",
+      },
+      {
+        title: "Organic acquisition - sustainable and low-cost growth engine",
+        detail: "Customer Strength",
+        priority: "low",
+      },
+    ],
+  },
+  {
+    kind: "rich_section",
+    title: "Critical Priorities (Next 30 Days)",
+    parts: [
+      {
+        kind: "note",
+        text: "Ada, these need your attention before anything else.",
+      },
+      { kind: "label", text: "CASH FLOW EMERGENCY" },
+      {
+        kind: "bullets",
+        tight: true,
+        items: [
+          { text: "You are burning cash, and that cannot wait." },
+          {
+            lead: "Immediate:",
+            text: "Start a simple daily cash tracker, cash in against cash out.",
+          },
+        ],
+      },
+      {
+        kind: "paragraph",
+        text: "Shown as text: <script>alert(1)</script> and <b>not bold</b>.",
+      },
+    ],
+  },
+  {
+    kind: "rich_section",
+    title: "Your Next Steps",
+    parts: [
+      { kind: "subheading", text: "Immediate Actions (This Week):" },
+      {
+        kind: "numbered",
+        tight: true,
+        items: [
+          { text: "Deal with your top critical priority first." },
+          { lead: "Track:", text: "Set up cash flow and P&L tracking." },
+        ],
+      },
+      { kind: "rule" },
+      {
+        kind: "paragraph",
+        lead: "Recommended:",
+        text: "90-Day Business Transformation Program",
+      },
+    ],
+  },
+  {
+    kind: "resources",
+    title: "Talk to BeamX",
+    items: [
+      {
+        title: "Book a free 30-minute strategy call",
+        description: "Book a free 30-minute strategy call",
+        url: "https://calendly.com/beamxsolutions",
+      },
+    ],
+  },
+];
+
 const stellarPhases = [{ label: "Writing your analysis" }] as const;
 
 const threePhases = [
@@ -234,5 +337,13 @@ export const panelPayloads = {
     canRetry: false,
     stale: false,
     view: [...allBlocksView],
+  },
+  beaconReady: {
+    status: "ready",
+    phases: [{ label: "Writing your advice", done: true }],
+    error: null,
+    canRetry: false,
+    stale: false,
+    view: [...beaconReadyView],
   },
 } as const satisfies Readonly<Record<string, ReportPayload>>;

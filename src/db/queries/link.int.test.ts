@@ -133,7 +133,7 @@ describe("guest to account (AC-6)", () => {
     // onFinish and the report step resolve the owner at write time, not from the session.
     const owner = unwrap(await conversations.ownerOf(conv.id));
     expect(owner).toBe(account);
-    expect(unwrap(await runs.ownerOf(run.id))).toBe(account);
+    expect(unwrap(await runs.ownerOf(run.id)).userId).toBe(account);
     unwrap(
       await messages.append(owner, conv.id, [
         { id: newId(), role: "assistant", parts: [] },
@@ -167,6 +167,40 @@ describe("guest to account (AC-6)", () => {
       ok: false,
       error: { code: "not_found" },
     });
+  });
+});
+
+describe("runs.ownerOf first name (spec 0010, AC-7)", () => {
+  const named = async (name: string) => {
+    const id = await t.guest();
+    await db
+      .update(user)
+      .set({ name, isAnonymous: false })
+      .where(eq(user.id, id));
+    return id;
+  };
+
+  it("gives a guest no first name", async () => {
+    const guest = await t.guest();
+    const { run } = await runWithAnswers(guest);
+    expect(unwrap(await runs.ownerOf(run.id))).toEqual({
+      userId: guest,
+      firstName: null,
+    });
+  });
+
+  it("gives an account holder their name, trimmed and cut to 50", async () => {
+    const account = await named(`  Ada ${"x".repeat(60)}  `);
+    const { run } = await runWithAnswers(account);
+    const owner = unwrap(await runs.ownerOf(run.id));
+    expect(owner.userId).toBe(account);
+    expect(owner.firstName).toBe(`Ada ${"x".repeat(46)}`);
+  });
+
+  it("gives a blank account name no first name", async () => {
+    const account = await named("   ");
+    const { run } = await runWithAnswers(account);
+    expect(unwrap(await runs.ownerOf(run.id)).firstName).toBeNull();
   });
 });
 

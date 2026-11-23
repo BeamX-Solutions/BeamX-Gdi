@@ -2,7 +2,7 @@ import { and, asc, eq, sql } from "drizzle-orm";
 import { db } from "../client";
 import { isUniqueViolation } from "../errors";
 import { newId } from "../id";
-import { report, toolRun, toolRunAnswer } from "../schema";
+import { report, toolRun, toolRunAnswer, user } from "../schema";
 import { releaseRunHolds } from "./credit-holds";
 import { err, ok, type Result } from "@/lib/result";
 
@@ -438,19 +438,53 @@ export const get = async (
   });
 };
 
+/** The run owner at write time, with the first name report prompts may use. */
+export type RunOwner = {
+  readonly userId: string;
+  /** Null for a guest or a blank name. */
+  readonly firstName: string | null;
+};
+
+/** The longest first name a prompt carries (spec 0010). */
+export const FIRST_NAME_MAX = 50;
+
+/**
+ * The account name trimmed and cut to 50 characters, for account holders only; null
+ * for a guest or a blank name (spec 0010, contract addition 4). Pure.
+ */
+export const toFirstName = (
+  name: string | null,
+  isAnonymous: boolean | null,
+): string | null => {
+  if (isAnonymous === true) return null;
+  const cut = (name ?? "").trim().slice(0, FIRST_NAME_MAX).trim();
+  return cut.length > 0 ? cut : null;
+};
+
 /**
  * Server only (the report step). Reads the run's current owner at write time, the run
- * twin of `conversations.ownerOf` (spec 0002, "Writes after a link").
+ * twin of `conversations.ownerOf` (spec 0002, "Writes after a link"), with the
+ * owner's first name, in one statement.
  */
 export const ownerOf = async (
   runId: string,
-): Promise<Result<string, GetRunError>> => {
+): Promise<Result<RunOwner, GetRunError>> => {
   const rows = await db
-    .select({ userId: toolRun.userId })
+    .select({
+      userId: toolRun.userId,
+      name: user.name,
+      isAnonymous: user.isAnonymous,
+    })
     .from(toolRun)
+    .innerJoin(user, eq(user.id, toolRun.userId))
     .where(eq(toolRun.id, runId));
   const row = rows[0];
-  return row ? ok(row.userId) : err({ code: "not_found" });
+  return row
+    ? ok({
+        userId: row.userId,
+        firstName: toFirstName(row.name, row.isAnonymous),
+      })
+    : err({ code: "not_found" });
 };
 
 /** The chat's active run with its answers (or null), plus its paused runs. */
