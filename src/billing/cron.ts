@@ -1,23 +1,25 @@
 /**
- * The daily billing job (spec 0004, `/api/cron/billing`): checks Vercel Cron's bearer
- * token, then runs the sweeps. Milestone 2 releases idle run holds and stale chat holds
- * (AC-7, AC-10); the payment, expiry and drift jobs join in milestones 3 and 4.
+ * The daily jobs behind `/api/cron/billing` (spec 0004, spec 0009): checks Vercel Cron's
+ * bearer token once, then runs each job independently. The billing sweeps release idle
+ * run holds and stale chat holds (AC-7, AC-10); the payment, expiry and drift jobs join
+ * in milestones 3 and 4. The guest purge (spec 0009, AC-14) is passed in as a job, so
+ * this module never reaches into users.
  */
 import { createHash, timingSafeEqual } from "node:crypto";
 import type { BillingConfig } from "./config";
 
-export type CronDeps = {
-  /** `CRON_SECRET`, or undefined when unset (then every call is refused). */
-  readonly secret: string | undefined;
+export type CronLog = (
+  event: string,
+  fields: Readonly<Record<string, string | number | boolean | null>>,
+) => void;
+
+export type BillingSweepDeps = {
   readonly releaseIdleHolds: (
     idleDays: number,
     chatStaleMinutes: number,
   ) => Promise<{ readonly idle: number; readonly chat: number }>;
   readonly config: Pick<BillingConfig, "holdIdleDays" | "chatHoldStaleMinutes">;
-  readonly log: (
-    event: string,
-    fields: Readonly<Record<string, string | number | boolean | null>>,
-  ) => void;
+  readonly log: CronLog;
 };
 
 export type CronResponse = {
@@ -39,13 +41,13 @@ export const cronAuthorized = (
   header !== null &&
   timingSafeEqual(digest(header), digest(`Bearer ${secret}`));
 
-/** One cron call: 401 without the token, else the counts per job. */
-export const runBillingCron = async (
-  deps: CronDeps,
-  authorization: string | null,
-): Promise<CronResponse> => {
-  if (!cronAuthorized(authorization, deps.secret))
-    return { status: 401, body: { code: "unauthorized" } };
+/** The billing sweeps: idle run holds and stale chat holds (AC-7, AC-10). */
+export const runBillingSweeps = async (
+  deps: BillingSweepDeps,
+): Promise<{
+  readonly releasedIdle: number;
+  readonly releasedChat: number;
+}> => {
   const released = await deps.releaseIdleHolds(
     deps.config.holdIdleDays,
     deps.config.chatHoldStaleMinutes,
@@ -54,8 +56,39 @@ export const runBillingCron = async (
     idleHolds: released.idle,
     chatHolds: released.chat,
   });
-  return {
-    status: 200,
-    body: { releasedIdle: released.idle, releasedChat: released.chat },
-  };
+  return { releasedIdle: released.idle, releasedChat: released.chat };
+};
+
+/** The daily jobs by name; each returns its counts or throws. */
+export type DailyJobs = Readonly<
+  Record<string, () => Promise<Readonly<Record<string, unknown>>>>
+>;
+
+/**
+ * One cron call (spec 0009, "API surface"): 401 without the token; otherwise every job
+ * runs, independently, and the answer is always 200 with each job's counts, or
+ * `{ error }` for a job that threw (also logged), so one failing job never stops another.
+ */
+export const runDailyJobs = async (
+  deps: {
+    readonly secret: string | undefined;
+    readonly jobs: DailyJobs;
+    readonly log: CronLog;
+  },
+  authorization: string | null,
+): Promise<CronResponse> => {
+  if (!cronAuthorized(authorization, deps.secret))
+    return { status: 401, body: { code: "unauthorized" } };
+  const results = await Promise.all(
+    Object.entries(deps.jobs).map(async ([name, job]) => {
+      try {
+        return [name, await job()] as const;
+      } catch (e) {
+        const error = e instanceof Error ? e.name : "unknown";
+        deps.log("daily_job_failed", { job: name, error });
+        return [name, { error }] as const;
+      }
+    }),
+  );
+  return { status: 200, body: Object.fromEntries(results) };
 };

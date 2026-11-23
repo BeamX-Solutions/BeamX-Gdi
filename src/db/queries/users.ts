@@ -2,6 +2,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { db } from "../client";
 import { account, aiUsage, conversation, toolRun, user } from "../schema";
 import { linkGuestCreditStatements } from "./credits";
+import { runInBatches } from "@/lib/batches";
 import { logEvent } from "@/lib/log";
 
 /**
@@ -86,6 +87,87 @@ export const deleteAccount = async (userId: string): Promise<boolean> => {
     .returning({ id: user.id });
   logEvent("user_deleted", { userId, deleted: deleted.length > 0 });
   return deleted.length > 0;
+};
+
+/** The daily guest purge (spec 0009, AC-14). */
+export const PURGE = {
+  staleDays: 30,
+  batchSize: 50,
+  budgetMs: 120_000,
+} as const;
+
+/**
+ * One purge batch: deletes up to `limit` guests whose last activity (the newest of the
+ * user row, their sessions, chats and runs) is older than `staleDays`, and who have no
+ * active credit hold and no report generating. Never touches a non guest. Rows locked
+ * by other work are skipped for now. Everything they own goes by cascade. Returns how
+ * many went and the guest credits they forfeited. One round trip.
+ */
+export const deleteStaleGuests = async (
+  limit: number,
+  staleDays: number = PURGE.staleDays,
+): Promise<{ readonly count: number; readonly total: number }> => {
+  const result = await db.execute(sql`
+    WITH stale AS (
+      SELECT u.id,
+        COALESCE((SELECT ca.balance FROM credit_account ca WHERE ca.user_id = u.id), 0)
+          AS balance
+      FROM "user" u
+      WHERE u.is_anonymous IS TRUE
+        AND GREATEST(
+          u.updated_at,
+          (SELECT max(s.updated_at) FROM session s WHERE s.user_id = u.id),
+          (SELECT max(c.updated_at) FROM conversation c WHERE c.user_id = u.id),
+          (SELECT max(t.updated_at) FROM tool_run t WHERE t.user_id = u.id)
+        ) < now() - make_interval(days => ${staleDays})
+        AND NOT EXISTS (
+          SELECT 1 FROM credit_hold h WHERE h.user_id = u.id AND h.status = 'active'
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM report r JOIN tool_run t ON t.id = r.run_id
+          WHERE t.user_id = u.id AND r.status = 'generating'
+        )
+      LIMIT ${limit}
+      FOR UPDATE OF u SKIP LOCKED
+    )
+    DELETE FROM "user" u USING stale
+    WHERE u.id = stale.id AND u.is_anonymous IS TRUE
+    RETURNING u.id, stale.balance
+  `);
+  // Postgres sends the balance back as a number or a numeric string.
+  return {
+    count: result.rows.length,
+    total: result.rows.reduce((sum, row) => sum + Number(row.balance), 0),
+  };
+};
+
+export type PurgeSummary = {
+  readonly deleted: number;
+  readonly forfeitedCredits: number;
+  readonly batches: number;
+  readonly complete: boolean;
+};
+
+/**
+ * Server only (the daily job). Purges stale guests in batches of 50 within 120 seconds,
+ * leaving the rest for the next day, and logs the counts and forfeited credits.
+ */
+export const purgeUsers = async (
+  now: () => number = Date.now,
+): Promise<PurgeSummary> => {
+  const run = await runInBatches((limit) => deleteStaleGuests(limit), {
+    batchSize: PURGE.batchSize,
+    budgetMs: PURGE.budgetMs,
+    now,
+  });
+  const summary = {
+    deleted: run.count,
+    forfeitedCredits: run.total,
+    batches: run.batches,
+    complete: run.complete,
+  };
+  logEvent("guests_purged", summary);
+  return summary;
 };
 
 /** Whether an email already belongs to an account (spec 0009, AC-8). */
