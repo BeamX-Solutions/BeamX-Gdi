@@ -1,6 +1,8 @@
 import { WalletIcon } from "lucide-react";
 import { useId } from "react";
 import type { Pack } from "@/billing/config";
+import { SIGN_UP_LABEL } from "@/components/auth/auth-copy";
+import { Button } from "@/components/ui/button";
 import {
   guestShortLine,
   packLine,
@@ -14,17 +16,20 @@ type ShortBalanceCardProps = {
   readonly guest: boolean;
   /** `coveringPacks(billingConfig.packs, shortfall)`, for accounts. */
   readonly packs: readonly Pack[];
+  /** Opens the auth dialog on sign up; a guest card shows the button only with it. */
+  readonly onSignUp?: () => void;
 };
 
 /**
  * The short balance card (spec 0004 AC-8, spec 0007 AC-10): how many credits are
- * missing. In #7 a guest is told an account will offer more, with no button until #8;
- * an account sees the packs, with buying from #22's checkout milestone.
+ * missing. A guest is told an account offers more, with a Sign up button (spec 0009,
+ * AC-1); an account sees the packs, with buying from #22's checkout milestone.
  */
 export function ShortBalanceCard({
   shortfall,
   guest,
   packs,
+  onSignUp,
 }: ShortBalanceCardProps) {
   const titleId = useId();
   return (
@@ -45,9 +50,16 @@ export function ShortBalanceCard({
         </div>
       </div>
       {guest ? (
-        <p className="text-sm wrap-anywhere text-muted-foreground">
-          {guestShortLine}
-        </p>
+        <>
+          <p className="text-sm wrap-anywhere text-muted-foreground">
+            {guestShortLine}
+          </p>
+          {onSignUp ? (
+            <Button className="self-start" onClick={onSignUp}>
+              {SIGN_UP_LABEL}
+            </Button>
+          ) : null}
+        </>
       ) : (
         <ul className="flex flex-col gap-1 text-sm text-muted-foreground">
           {packs.map((pack) => (

@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  noticeOffersSignUp,
+  savePromptKey,
+  showSavePrompt,
   authErrorMessage,
   checkEmail,
   checkPassword,
@@ -88,5 +91,35 @@ describe("authErrorMessage", () => {
     expect(needsNewCode("OTP_EXPIRED")).toBe(true);
     expect(needsNewCode("TOO_MANY_ATTEMPTS")).toBe(true);
     expect(needsNewCode("INVALID_OTP")).toBe(false);
+  });
+});
+
+describe("sign up prompts (spec 0009, AC-1)", () => {
+  it("offers Sign up on the guest limit notices, to guests only", () => {
+    for (const kind of ["runs_daily", "chat_daily", "chats_daily"]) {
+      expect(noticeOffersSignUp(kind, true)).toBe(true);
+      expect(noticeOffersSignUp(kind, false)).toBe(false);
+    }
+    expect(noticeOffersSignUp("spend_cap", true)).toBe(false);
+    expect(noticeOffersSignUp("slow_down", true)).toBe(false);
+  });
+
+  it("shows the save prompt to a guest with a ready report, until dismissed", () => {
+    expect(
+      showSavePrompt({ guest: true, reportReady: true, dismissed: false }),
+    ).toBe(true);
+    expect(
+      showSavePrompt({ guest: false, reportReady: true, dismissed: false }),
+    ).toBe(false);
+    expect(
+      showSavePrompt({ guest: true, reportReady: false, dismissed: false }),
+    ).toBe(false);
+    expect(
+      showSavePrompt({ guest: true, reportReady: true, dismissed: true }),
+    ).toBe(false);
+  });
+
+  it("keys the dismissed state per chat", () => {
+    expect(savePromptKey("a")).not.toBe(savePromptKey("b"));
   });
 });

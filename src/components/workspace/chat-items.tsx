@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 import { billingConfig } from "@/billing/config";
 import { coveringPacks } from "@/billing/pricing";
 import type {
@@ -9,6 +9,14 @@ import type {
   ReportData,
 } from "@/assistant/part-schemas";
 import { AnswerCard } from "@/components/answer-cards/answer-card";
+import {
+  noticeOffersSignUp,
+  savePromptKey,
+  showSavePrompt,
+  SIGN_UP_LABEL,
+} from "@/components/auth/auth-copy";
+import { useAuthOpen } from "@/components/auth/auth-open-context";
+import { SavePromptCard } from "@/components/auth/save-prompt-card";
 import { AnsweredBubble } from "@/components/answer-cards/answered-bubble";
 import { PrefillCard } from "@/components/answer-cards/prefill-card";
 import { ConfirmCard } from "@/components/credits/confirm-card";
@@ -71,6 +79,10 @@ export function ChatItem({
   editing,
   toolNames,
 }: ChatItemProps) {
+  // Guests get a Sign up action on their limit notices and short balance card (spec
+  // 0009, AC-1); null outside a chat frame, where no prompt can open the dialog.
+  const auth = useAuthOpen();
+  const signUp = auth === null ? undefined : () => auth.openAuth("sign-up");
   switch (item.kind) {
     case "question": {
       const { data } = item;
@@ -154,6 +166,19 @@ export function ChatItem({
       const { data } = item;
       const copy = chatErrorCopy[data.kind];
       const runId = data.runId;
+      if (signUp && noticeOffersSignUp(data.kind, guest))
+        return (
+          <ErrorCard
+            kind="spend_cap"
+            title={copy.title}
+            message={copy.message}
+            action={{ label: SIGN_UP_LABEL, onAction: signUp }}
+            secondaryAction={{
+              label: copy.actionLabel,
+              onAction: () => actions.dismiss(item.id),
+            }}
+          />
+        );
       return (
         <ErrorCard
           kind={limitKinds.has(data.kind) ? "spend_cap" : "ai_error"}
@@ -208,6 +233,7 @@ export function ChatItem({
           shortfall={item.shortfall}
           guest={guest}
           packs={coveringPacks(billingConfig.packs, item.shortfall)}
+          onSignUp={signUp}
         />
       );
     default: {
@@ -254,4 +280,63 @@ export function OpenReportOnArrival({
     workspace?.openReport();
   }, [runId, workspace]);
   return null;
+}
+
+/** Fired when a save prompt is dismissed, so every reader of the flag updates. */
+const SAVE_PROMPT_EVENT = "beamx:save-prompt-dismissed";
+
+const subscribeDismissed = (onChange: () => void) => {
+  window.addEventListener(SAVE_PROMPT_EVENT, onChange);
+  return () => window.removeEventListener(SAVE_PROMPT_EVENT, onChange);
+};
+
+// `sessionStorage` can throw (storage off, a private window); then nothing was dismissed.
+const readDismissed = (key: string): boolean => {
+  try {
+    return window.sessionStorage.getItem(key) === "1";
+  } catch {
+    return false;
+  }
+};
+
+const writeDismissed = (key: string): void => {
+  try {
+    window.sessionStorage.setItem(key, "1");
+  } catch {
+    // Not remembered past this render; the event below still hides it now.
+  }
+  window.dispatchEvent(new Event(SAVE_PROMPT_EVENT));
+};
+
+/**
+ * The save prompt under a guest's ready report (spec 0009, AC-1). Not now hides it for
+ * this chat in this tab (`sessionStorage`). On the server it counts as dismissed, so it
+ * never flashes in before hydration.
+ */
+export function SavePrompt({
+  conversationId,
+  guest,
+  reportReady,
+}: {
+  readonly conversationId: string;
+  readonly guest: boolean;
+  readonly reportReady: boolean;
+}) {
+  const auth = useAuthOpen();
+  const key = savePromptKey(conversationId);
+  const dismissed = useSyncExternalStore(
+    subscribeDismissed,
+    () => readDismissed(key),
+    () => true,
+  );
+  if (auth === null || !showSavePrompt({ guest, reportReady, dismissed }))
+    return null;
+  return (
+    <div className="mt-3">
+      <SavePromptCard
+        onSignUp={() => auth.openAuth("sign-up")}
+        onDismiss={() => writeDismissed(key)}
+      />
+    </div>
+  );
 }

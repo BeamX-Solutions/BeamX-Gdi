@@ -10,7 +10,7 @@
  */
 import { createHash } from "node:crypto";
 import { Redis } from "@upstash/redis";
-import { env } from "@/lib/env";
+import { env, fakeAiEnabled } from "@/lib/env";
 import { logEvent } from "@/lib/log";
 
 export type RateRule = { readonly window: number; readonly max: number };
@@ -170,9 +170,15 @@ export const allowSetPassword = async (
 /** The body every rate limited auth request answers with (`429`). */
 export const RATE_LIMITED_BODY = { code: "rate_limited" } as const;
 
-/** The limiter for this deploy: open when Upstash is not configured (dev, CI). */
+/**
+ * The limiter for this deploy: open when Upstash is not configured (dev, CI), and under
+ * the e2e test server (`fakeAiEnabled`, refused on production), whose parallel browsers
+ * share one loopback IP, like the spec 0008 limits `playwright.config.ts` lifts.
+ */
 export const authRateLimiter: RateLimiter = rateLimiter(
-  env.UPSTASH_REDIS_REST_URL && env.UPSTASH_REDIS_REST_TOKEN
+  env.UPSTASH_REDIS_REST_URL &&
+    env.UPSTASH_REDIS_REST_TOKEN &&
+    !fakeAiEnabled(env)
     ? redisRateScript(
         new Redis({
           url: env.UPSTASH_REDIS_REST_URL,

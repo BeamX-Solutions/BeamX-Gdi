@@ -16,6 +16,7 @@ import {
 import { LiveCreditSummary } from "@/components/credits/credit-chip";
 import { useNotice } from "@/components/workspace/notice-context";
 import { AuthDialog } from "./auth-dialog";
+import { useAuthOpen, type AuthOpenState } from "./auth-open-context";
 
 /**
  * The header's account control (spec 0009, AC-1, AC-12): a Sign in button for guests (and
@@ -35,7 +36,21 @@ export function AccountControl({
   const router = useRouter();
   const { show } = useNotice();
   const live = useContext(LiveCreditSummary);
-  const [open, setOpen] = useState(false);
+  // The chat frame's shared state, so prompts in the thread open this same dialog
+  // (AC-1); local state where no frame provides it.
+  const shared = useAuthOpen();
+  const [local, setLocal] = useState<AuthOpenState>({
+    open: false,
+    screen: "sign-up",
+  });
+  const { open, screen } = shared ?? local;
+  const setOpen =
+    shared?.setOpen ??
+    ((next: boolean) => setLocal((s) => ({ ...s, open: next })));
+  const openFromHeader = () =>
+    shared
+      ? shared.openAuth("sign-up")
+      : setLocal({ open: true, screen: "sign-up" });
 
   if (session.isPending) return null;
   const user = session.data?.user;
@@ -43,10 +58,13 @@ export function AccountControl({
   if (user === undefined || user.isAnonymous === true)
     return (
       <>
-        <Button variant="outline" onClick={() => setOpen(true)}>
+        <Button variant="outline" onClick={openFromHeader}>
           Sign in
         </Button>
         <AuthDialog
+          // A new screen asked for starts the dialog fresh on it.
+          key={screen}
+          initialStep={screen}
           open={open}
           onOpenChange={setOpen}
           guestHasCredits={(live?.available ?? availableCredits) > 0}

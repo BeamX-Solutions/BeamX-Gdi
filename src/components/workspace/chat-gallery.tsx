@@ -6,6 +6,8 @@ import { coveringPacks } from "@/billing/pricing";
 import { PrefillCard } from "@/components/answer-cards/prefill-card";
 import { ConfirmCard } from "@/components/credits/confirm-card";
 import { CreditChip } from "@/components/credits/credit-chip";
+import { SIGN_UP_LABEL } from "@/components/auth/auth-copy";
+import { SavePromptCard } from "@/components/auth/save-prompt-card";
 import { ShortBalanceCard } from "@/components/credits/short-balance-card";
 import { StopCard } from "@/components/credits/stop-card";
 import { ErrorCard } from "@/components/feedback/error-card";
@@ -297,6 +299,38 @@ export function ChatGallery() {
             <LimitNotice key={kind} id={kind} {...chatErrorCopy[kind]} />
           ))}
           <LimitNotice id="guest_limit" {...failureCopy.guest_limit} />
+        </div>
+      </Block>
+
+      <Block title="Sign up prompts">
+        <p className="text-sm text-muted-foreground">
+          Guests only (spec 0009, AC-1): the save prompt under a ready report, a
+          limit notice with Sign up beside Got it, and the guest short balance
+          card. Each opens the auth dialog on sign up.
+        </p>
+        <div className="grid gap-4 md:grid-cols-2">
+          <div data-testid="save-prompt-demo">
+            <SavePromptCard
+              onSignUp={() => undefined}
+              onDismiss={() => undefined}
+            />
+          </div>
+          <ErrorCard
+            kind="spend_cap"
+            title={chatErrorCopy.runs_daily.title}
+            message={chatErrorCopy.runs_daily.message}
+            action={{ label: SIGN_UP_LABEL, onAction: () => undefined }}
+            secondaryAction={{
+              label: chatErrorCopy.runs_daily.actionLabel,
+              onAction: () => undefined,
+            }}
+          />
+          <ShortBalanceCard
+            shortfall={30}
+            guest
+            packs={[]}
+            onSignUp={() => undefined}
+          />
         </div>
       </Block>
 

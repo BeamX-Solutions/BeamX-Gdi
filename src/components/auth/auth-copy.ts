@@ -97,3 +97,39 @@ export const authErrorMessage = (code: string | undefined): string => {
 /** A code the dialog should answer by asking for a new code (AC-3). */
 export const needsNewCode = (code: string | undefined): boolean =>
   code === "OTP_EXPIRED" || code === "TOO_MANY_ATTEMPTS";
+
+/** The prompts that open the dialog on sign up (AC-1). */
+export const SIGN_UP_LABEL = "Sign up";
+export const SAVE_PROMPT_TITLE = "Save your report";
+export const SAVE_PROMPT_TEXT =
+  "Sign up free to keep this chat and report and come back to them anytime.";
+export const SAVE_PROMPT_DISMISS = "Not now";
+
+/**
+ * The guest notices that carry a Sign up action: spec 0008's limits (AC-1), and spec
+ * 0004's guest out of free messages notice, whose copy points to an account too.
+ */
+const SIGN_UP_NOTICES: ReadonlySet<string> = new Set([
+  "runs_daily",
+  "chat_daily",
+  "chats_daily",
+  "chat_credits_guest",
+]);
+
+/** True when a notice of `kind` offers Sign up: only to guests (AC-1). */
+export const noticeOffersSignUp = (kind: string, guest: boolean): boolean =>
+  guest && SIGN_UP_NOTICES.has(kind);
+
+/**
+ * The save prompt shows to a guest once a report in the chat is ready, until they
+ * dismiss it for this chat (AC-1, "Value sourcing").
+ */
+export const showSavePrompt = (state: {
+  readonly guest: boolean;
+  readonly reportReady: boolean;
+  readonly dismissed: boolean;
+}): boolean => state.guest && state.reportReady && !state.dismissed;
+
+/** The `sessionStorage` key that remembers a dismissed save prompt, per chat. */
+export const savePromptKey = (conversationId: string): string =>
+  `beamx:save-prompt-dismissed:${conversationId}`;

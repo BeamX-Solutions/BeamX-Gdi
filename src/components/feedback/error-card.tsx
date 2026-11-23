@@ -20,6 +20,11 @@ type ErrorCardProps = {
   readonly message: string;
   /** Exactly one primary action. */
   readonly action: ErrorAction;
+  /** An optional second, outlined action (Got it beside a guest's Sign up, spec 0009). */
+  readonly secondaryAction?: {
+    readonly label: string;
+    readonly onAction: () => void;
+  };
 };
 
 const kindIcon: Readonly<Record<ErrorKind, LucideIcon>> = {
@@ -31,11 +36,18 @@ const kindIcon: Readonly<Record<ErrorKind, LucideIcon>> = {
 
 /**
  * Every expected failure, shown inline in the thread or the report panel. Neutral surface,
- * destructive accents (never verdict colors), a short message, and one action. It is not a
+ * destructive accents (never verdict colors), a short message, one action (and at most
+ * one outlined second action). It is not a
  * live region: the Thread owns the one live region, so the caller sets the thread status
  * when a failure should be spoken.
  */
-export function ErrorCard({ kind, title, message, action }: ErrorCardProps) {
+export function ErrorCard({
+  kind,
+  title,
+  message,
+  action,
+  secondaryAction,
+}: ErrorCardProps) {
   const Icon = kindIcon[kind];
   return (
     <section
@@ -52,15 +64,20 @@ export function ErrorCard({ kind, title, message, action }: ErrorCardProps) {
           </p>
         </div>
       </div>
-      {"href" in action ? (
-        <Button asChild className="self-start">
-          <Link href={action.href}>{action.label}</Link>
-        </Button>
-      ) : (
-        <Button className="self-start" onClick={action.onAction}>
-          {action.label}
-        </Button>
-      )}
+      <div className="flex flex-wrap gap-2">
+        {"href" in action ? (
+          <Button asChild>
+            <Link href={action.href}>{action.label}</Link>
+          </Button>
+        ) : (
+          <Button onClick={action.onAction}>{action.label}</Button>
+        )}
+        {secondaryAction ? (
+          <Button variant="outline" onClick={secondaryAction.onAction}>
+            {secondaryAction.label}
+          </Button>
+        ) : null}
+      </div>
     </section>
   );
 }
