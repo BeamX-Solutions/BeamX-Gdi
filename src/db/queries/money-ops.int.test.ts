@@ -101,6 +101,19 @@ describe("claimPendingGrants (AC-11)", () => {
     expect(await credits.getSummary(u)).toMatchObject({ balance: 80 });
   });
 
+  it("a new email hash for a user who already got the sign up grant adds nothing, books still balance", async () => {
+    // A rotated BILLING_HASH_SECRET (or an email change) gives a hash that is new to
+    // signup_grant_claim while `signup:<userId>` is already in the ledger.
+    const email = freshEmail();
+    const u = await account(email);
+    expect(await claim(u)).toMatchObject({ signup: 50 });
+    const rotated = "rotated-integration-hash-secret-987654";
+    hashes.push(signupEmailHash(email, rotated));
+    expect(await claim(u, rotated)).toMatchObject({ signup: 0 });
+    expect(await credits.getSummary(u)).toMatchObject({ balance: 80 });
+    expect(await booksBalance(u)).toBe(true);
+  });
+
   it("the same email signing up again after deletion gets no second sign up grant", async () => {
     const email = freshEmail();
     const first = await account(email);
