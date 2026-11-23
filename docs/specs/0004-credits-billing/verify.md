@@ -80,3 +80,43 @@ Built so far: milestone 1 tasks 1 to 3 (billing core: config, pricing, migration
 - AC-10 · manual paid, error, Stop and sweep steps · chat-api, chat-billing and credits integration tests (Stop gap above)
 - AC-11 (IP cap) · manual four guests step · chat-billing tests
 - AC-21 · short balance notices in e2e and chat-view tests
+
+## Milestone 4: accounts and money operations · updated 2026-11-23
+
+Built: tasks 15 to 18, and task 19's expiry job, drift check and chip warning dot. The `/credits` expiry banner and the `/credits` page claim call wait for the `/credits` page (milestone 3, task 14).
+
+### Commands
+
+- [ ] `pnpm test` → `money-ops.test.ts` (email hash, Luna CSV, adjust arguments), `summary.test.ts` (warning dot), `cron.test.ts` (expiry and drift jobs), `chat-billing.test.ts` (a signed in user claims grants), `account-verified.test.ts` (claim failure logged, never thrown), `env.test.ts` (`BILLING_HASH_SECRET`) pass → AC-11, AC-15, AC-16, AC-17, AC-20
+- [ ] `pnpm test:integration` on a throwaway Neon branch (CI) → `money-ops.int.test.ts` and `link.int.test.ts` pass (the FK coverage test sees `luna_credit_import` as excluded) → AC-11, AC-12, AC-15, AC-16, AC-17, AC-19, AC-20
+- [x] Migrated dev: tables `signup_grant_claim` (2 columns) and `luna_credit_import` (7 columns), with `luna_credit_import_claim_time`, `_email_normalized`, `_credits_positive`, `_luna_positive`, the email unique key, and the user FK `ON DELETE SET NULL` → AC-16, AC-19
+- [x] `pnpm db:generate` → "No schema changes"
+- [x] `pnpm credits:adjust a@b.co 5 --actor s@b.co` → "--reason is required", exit 2; an unknown email → `user_not_found`, exit 1 → AC-17
+- [x] `pnpm credits:import-luna <csv with a bad line>` → "Nothing imported" with the line number; a good file answered `n` → "Cancelled, nothing imported" → AC-16
+- [ ] `pnpm credits:adjust <dev email> 10 --reason "verify" --actor <staff email>` → shows the change, asks, writes one `adjustment` row with that reason and actor; `-<more than available>` → `would_go_below_held`, nothing written → AC-17
+- [ ] `GET /api/cron/billing` with the bearer token → body has `expiry: { enforced: false, due, expired: 0, credits }` and `drift: { drifted: 0 }`; logs `credit_expiry` → AC-15, AC-20
+
+### UI / manual (preview with `BILLING_HASH_SECRET` set)
+
+- [ ] As a guest, approve a Stellar run (30 held), then sign up with a new email → the chip shows 30 + 50 available (held 30 moves with the run); `/c/<id>` still finishes the run and charges it → AC-11, AC-12
+- [ ] Sign up with a brand new email, never a guest → chip shows 80 after the first paid action, or ledger shows `starter_grant` 30 + `signup_grant` 50 right after sign up → AC-11
+- [ ] Delete that account, sign up again with the same email → only the 30 starter grant, no second `signup_grant` → AC-11, AC-19
+- [ ] Import a CSV with a test email at 3 Luna credits, then sign up with it → one `luna_import` of 30; signing in again adds nothing → AC-16
+- [ ] Set a test account's `last_activity_at` back 11 months 5 days (SQL on the preview branch) → reload, the chip shows the warning dot, read out as "Your credits expire soon"; at 10 months, no dot → AC-15
+
+### Value sourcing checks
+
+- [ ] Sign up grant: `billingConfig.grants.signup` (50) only when the `signup_grant_claim` insert is new; email hash is HMAC SHA256 of the lowercased, trimmed email (`" Ada@X.co "` and `"ada@x.co"` claim once between them) → AC-11
+- [ ] Luna credits: `luna_credit_import.credits` (= `luna_credits × 10`), matched on the lowercased email, only when `user.emailVerified` (an unverified user claims nothing) → AC-16
+- [ ] Expiry date: Lagos date of `last_activity_at` + 12 calendar months (a 31 Jan activity expires on 28 or 29 Feb a year on); grants and adjustments don't move `last_activity_at`, a Luna claim does → AC-15
+- [ ] Warning: on from expiry − 30 days on the Lagos date (23:30 UTC already counts as the next day) and only with a balance above 0 → AC-15
+- [ ] Adjust actor and reason: from the required `--actor` and `--reason` flags, stored on the row → AC-17
+
+### Acceptance criteria coverage (milestone 4)
+- AC-11 (sign up grant, once per email ever) · `money-ops.int.test.ts` claim tests · manual sign up steps
+- AC-12 (link after the hook's grants) · "guest link after the sign up grant" integration test · manual guest sign up step
+- AC-15 · expiry integration tests, `summary.test.ts`, `cron.test.ts` · warning dot step (banner owed with `/credits`)
+- AC-16 · Luna integration tests, `parseLunaCsv` tests · import script steps
+- AC-17 · adjust integration tests, `parseAdjustArgs` tests · adjust script steps
+- AC-19 · deletion keeps `signup_grant_claim` and a claimed import stays claimed (integration) · `payment` rows come with milestone 3
+- AC-20 · `findDrift` integration test, `runDriftCheck` unit test · cron step
