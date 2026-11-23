@@ -13,9 +13,9 @@ _Steps derived from spec 0010 acceptance criteria and its Value sourcing table. 
 - [ ] In "What we found" → critical findings marked high with "CRITICAL:" removed, the weakest category's findings first → AC-9
 - [ ] Bar colors and header verdict → 70% and up good, 50% and up caution, below 50% risk; Scale-Ready and Stable Foundation good, Building Blocks caution, Survival Mode and Red Alert risk → AC-10
 - [x] Reload the chat → the ready report is still there behind View report → AC-12
-- [ ] Signed in with the name "Ada", run Beacon on a real model → the advisory uses "Ada" a few times; as a guest it uses "you" only → AC-7
-- [ ] Real model run → headings, bold leads, labels, every number and the booking link match the rule advisory; the wording reads warmer → AC-8
-- [ ] Force the polish to fail (for example a tiny `timeoutMs` locally) → the standard retry card; the third failure returns the 50 credits → AC-12
+- [ ] (skipped) Signed in with the name "Ada", run Beacon on a real model → the advisory uses "Ada" a few times; as a guest it uses "you" only → AC-7
+- [ ] (skipped) Real model run → headings, bold leads, labels, every number and the booking link match the rule advisory; the wording reads warmer → AC-8
+- [ ] (skipped) Force the polish to fail (for example a tiny `timeoutMs` locally) → the standard retry card; the third failure returns the 50 credits → AC-12
 - [x] `/design`, "Ready, Beacon" panel → every rich part kind shows; `<script>alert(1)</script>` shows as text → AC-11
 
 ## Commands
@@ -37,6 +37,14 @@ _Steps derived from spec 0010 acceptance criteria and its Value sourcing table. 
 - [x] `report.content` → `{ advisory }` with the rewritten text
 - [ ] Resources → title and URL from the advisory's link part, description "Book a free 30-minute strategy call"
 - [x] Usage rows → `report:<runId>:<attempt>:advisory:1` (and `:2` after a repair), model from the `report` role
+
+## Skipped (2026-11-24)
+
+The three steps marked `(skipped)` were not run: the Anthropic API account had no credit, so real model calls were refused. The feature was marked `done` by the engineer with these owed. Run them with `/check verify beacon health check in chat` once credits are back.
+
+- AC-7 and AC-8 in the app: not run. One real run through the report runner during `/develop` (2026-11-23) passed the check on the first try, used the first name in every section, and needed no repair call.
+- AC-12 failure path for Beacon: not run. The generic retry and credit return path is covered by spec 0005's tests.
+- `runs.ownerOf` integration tests (AC-7): passed in CI on PR #28, not run locally.
 
 ## Acceptance criteria coverage
 
