@@ -155,6 +155,13 @@
       "skillPath": "skills/playwright-cli/SKILL.md",
       "computedHash": "d3c50339092b670cdda1ba2bed0bdee1c34247cdf70df475e8b7d83983a39e79"
     },
+    "react-email": {
+      "source": "resend/resend-skills",
+      "commit": "063246e39987faebc2608f968ca13a02d994a0d4",
+      "sourceType": "github",
+      "skillPath": "skills/react-email/SKILL.md",
+      "computedHash": "51cb2479b8c98641bfd1e69e2260f53f5fad251ed2d8e7a0c3138e8899b3d4b3"
+    },
     "resend": {
       "source": "resend/resend-skills",
       "commit": "063246e39987faebc2608f968ca13a02d994a0d4",

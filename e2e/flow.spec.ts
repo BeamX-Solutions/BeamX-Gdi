@@ -34,6 +34,16 @@ const emailedCode = async (email: string): Promise<string> => {
 const wcagTags = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
 
 const scan = async (page: Page) => {
+  // Let open animations (a dialog's fade in) finish, or axe measures half faded text.
+  // Endless ones, like the shimmer, never finish, so they are skipped.
+  await page.evaluate(() =>
+    Promise.all(
+      document
+        .getAnimations()
+        .filter((a) => a.effect?.getComputedTiming().endTime !== Infinity)
+        .map((a) => a.finished.catch(() => undefined)),
+    ),
+  );
   const results = await new AxeBuilder({ page }).withTags(wcagTags).analyze();
   expect(results.violations).toEqual([]);
 };

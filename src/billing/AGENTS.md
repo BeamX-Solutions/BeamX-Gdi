@@ -6,12 +6,12 @@ Credits and billing (spec 0004): the typed billing config and the pure billing m
 
 ## Key files
 
-| Path              | Owns                                                                                                                                                                             |
-| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `config.ts`       | `billingConfig`, Zod checked: credit value, grants, packs, chat allowance and metering, hold timeouts, expiry, the Luna rate                                                     |
-| `pricing.ts`      | Pure functions: `available`, `shortfall`, `coveringPacks`, `priceStillValid`, `chatCharge`, `chatChargeOnStop`, `localDate`, expiry helpers                                      |
-| `chat-billing.ts` | Paid chat and the guest starter grant cap: `planChat`, `chatSettleAmount`, the `freeChat` allowance counter, `accountOpener`; shared by the chat route and the assistant's tools |
-| `cron.ts`         | The daily billing job behind `GET /api/cron/billing`: `cronAuthorized` (bearer check in constant time) and `runBillingCron` (the hold sweeps)                                    |
+| Path              | Owns                                                                                                                                                                                                                                      |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `config.ts`       | `billingConfig`, Zod checked: credit value, grants, packs, chat allowance and metering, hold timeouts, expiry, the Luna rate                                                                                                              |
+| `pricing.ts`      | Pure functions: `available`, `shortfall`, `coveringPacks`, `priceStillValid`, `chatCharge`, `chatChargeOnStop`, `localDate`, expiry helpers                                                                                               |
+| `chat-billing.ts` | Paid chat and the guest starter grant cap: `planChat`, `chatSettleAmount`, the `freeChat` allowance counter, `accountOpener`; shared by the chat route and the assistant's tools                                                          |
+| `cron.ts`         | The daily billing job behind `GET /api/cron/billing`: `cronAuthorized` (bearer check in constant time), `runBillingSweeps` (the hold sweeps), and `runDailyJobs` (runs each daily job on its own: the sweeps and spec 0009's guest purge) |
 
 ## Commands
 
@@ -29,7 +29,7 @@ pnpm test:integration   # credits.int.test.ts covers the money writes (needs a N
 - Money writes use idempotency keys (`starter:<userId>`, `charge:<holdId>`, `forfeit:<guestUserId>`), so a retry or replay never moves credits twice.
 - The allowance day and expiry dates use the Lagos day (`chat.dayTimeZone`), not UTC.
 - Billing Redis keys (`billing:free-chat:*`, `billing:free-notice:*`, `billing:guest-grant:*`) come only from `billingKeys` and go through the shared `LimitStore` from `src/lib/limits.ts`, which never throws.
-- The daily job runs from Vercel Cron (`crons` in `vercel.json`, 02:00 UTC). The route only passes the `Authorization` header to `runBillingCron`; it needs `CRON_SECRET` (at least 16 characters, required in production), and without it every call gets `401`. New sweeps (payments, expiry, drift) join `runBillingCron`, not new routes.
+- The daily job runs from Vercel Cron (`crons` in `vercel.json`, 02:00 UTC). The route only wires the jobs and passes the `Authorization` header to `runDailyJobs`; it needs `CRON_SECRET` (at least 16 characters, required in production), and without it every call gets `401`. New sweeps (payments, expiry, drift) join `runBillingSweeps`, and other daily jobs join `runDailyJobs`, not new routes. One job throwing is logged and never stops the others.
 
 ## Agent skills
 
