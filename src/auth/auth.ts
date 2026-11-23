@@ -10,6 +10,7 @@ import { env } from "@/lib/env";
 import { afterUserWrite } from "./account-verified";
 import { linkGuestAccount } from "./link";
 import { AUTH_RATE_RULES, authRateLimiter } from "./rate-limit";
+import { dropStaleSessionCookie } from "./stale-session";
 
 const DAY_S = 60 * 60 * 24;
 
@@ -63,6 +64,9 @@ export const auth = betterAuth({
   },
   // A verified, non guest user was created or changed: the hook point for spec 0004's
   // grants (AC-16). `afterUserWrite` never throws.
+  // A revoked or expired session cookie would otherwise make the anonymous plugin expire
+  // the new session cookie on sign in, leaving the browser signed out.
+  hooks: { before: dropStaleSessionCookie },
   databaseHooks: {
     user: {
       create: { after: verifiedHook },
