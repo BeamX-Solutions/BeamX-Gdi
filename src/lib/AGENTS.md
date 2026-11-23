@@ -6,19 +6,20 @@ Shared server helpers every feature leans on: the Zod checked env module, rate l
 
 ## Key files
 
-| File            | Owns                                                                                                                                      |
-| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `env.ts`        | The only place env vars are read; Zod schema for every var                                                                                |
-| `ai-cost.ts`    | Price table used to turn AI `usage` tokens into dollars                                                                                   |
-| `result.ts`     | `Result<T, E>` with `ok()` / `err()` for expected failures                                                                                |
-| `log.ts`        | `logEvent(event, fields)`: one structured JSON log line                                                                                   |
-| `turn-lock.ts`  | The per chat turn lock on Upstash (`turn:<conversationId>`, 60 second expiry); `acquire` and `release` never throw                        |
-| `resumable.ts`  | Resumable chat streams (spec 0007): `resumable-stream` over Upstash, with the `chat:active:<conversationId>` pointer (5 minute expiry)    |
-| `bot-check.ts`  | `isBot()`: Vercel BotID for `POST /api/chat` and the anonymous sign in; off Vercel every request counts as human                          |
-| `fake-model.ts` | Scripted AI SDK mock models used when `E2E_FAKE_AI=true` (`pnpm e2e`); a production deploy refuses to boot with it on                     |
-| `limits.ts`     | The abuse limits (spec 0008): limit config from env, the Lagos day, Redis key names, the `LimitStore`, and the run, chat and guest guards |
-| `spend-cap.ts`  | The daily AI spend cap: `withSpend` wraps `usage.record`, `guestSpendCap` checks guests at chat and at Approve                            |
-| `client-ip.ts`  | `clientIp` / `requestIp`: the client IP from `x-forwarded-for` (then `x-real-ip`), or null                                                |
+| File            | Owns                                                                                                                                                   |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `env.ts`        | The only place env vars are read; Zod schema for every var                                                                                             |
+| `ai-cost.ts`    | Price table used to turn AI `usage` tokens into dollars                                                                                                |
+| `result.ts`     | `Result<T, E>` with `ok()` / `err()` for expected failures                                                                                             |
+| `log.ts`        | `logEvent(event, fields)`: one structured JSON log line                                                                                                |
+| `turn-lock.ts`  | The per chat turn lock on Upstash (`turn:<conversationId>`, 60 second expiry); `acquire` and `release` never throw                                     |
+| `resumable.ts`  | Resumable chat streams (spec 0007): `resumable-stream` over Upstash, with the `chat:active:<conversationId>` pointer (5 minute expiry)                 |
+| `bot-check.ts`  | `isBot()`: Vercel BotID for `POST /api/chat`, the anonymous sign in and the auth POSTs (`src/auth/paths.ts`); off Vercel every request counts as human |
+| `fake-model.ts` | Scripted AI SDK mock models used when `E2E_FAKE_AI=true` (`pnpm e2e`); a production deploy refuses to boot with it on                                  |
+| `limits.ts`     | The abuse limits (spec 0008): limit config from env, the Lagos day, Redis key names, the `LimitStore`, and the run, chat and guest guards              |
+| `spend-cap.ts`  | The daily AI spend cap: `withSpend` wraps `usage.record`, `guestSpendCap` checks guests at chat and at Approve                                         |
+| `client-ip.ts`  | `clientIp` / `requestIp`: the client IP from `x-forwarded-for` (then `x-real-ip`), or null                                                             |
+| `batches.ts`    | `runInBatches`: repeats a batch job until a short batch or a spent time budget (the daily guest purge)                                                 |
 
 ## Conventions
 
