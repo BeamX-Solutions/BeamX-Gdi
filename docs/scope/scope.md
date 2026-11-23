@@ -163,13 +163,13 @@ spec [0008](../specs/0008-abuse-cost-guards/index.md) · code in `src/lib` (`lim
 ### 8. Accounts & sign up to save · Beta · in-progress
 Sign up or sign in, and carry the guest's run into the new account so nothing is lost.
 **Done when:** a guest who finished a run signs up and finds that report in their account, signed in users only see their own data, and unclaimed guest data is deleted automatically after 30 days.
-spec [0009](../specs/0009-accounts-sign-up/index.md) · code in `src/auth`, `src/email`, `src/app/api/auth`, `src/app/api/account`, `src/components`, `src/db/queries/users.ts`
+spec [0009](../specs/0009-accounts-sign-up/index.md) · code in `src/auth`, `src/email`, `src/app/api/auth`, `src/app/api/account`, `src/app/api/cron/billing`, `src/billing/cron.ts`, `src/components`, `src/db/queries/users.ts`
 - [x] Design it (spec): `/architect accounts & sign up to save`
 - [ ] Build it: `/develop accounts & sign up to save`
   - [x] Thin thread: code emails, email sign up through the code with the guest linked and the password set, the header account menu and sign out (AC-1, AC-2, AC-3, AC-6, AC-8, AC-11, AC-12, AC-17)
   - [x] Sign in and forgot password (AC-5, AC-7, AC-10)
   - [x] Abuse guards, the verified account hook, and the sign up prompts on reports and notices (AC-1, AC-15, AC-16)
-  - [ ] Delete account and the daily guest purge (AC-13, AC-14, AC-18)
+  - [x] Delete account and the daily guest purge (AC-13, AC-14, AC-18); integration tests owe a green CI run
   - [ ] Later: Google sign in with account linking, once the Google OAuth client exists (AC-4, AC-9)
 - [ ] Verify it: `/check verify accounts & sign up to save`
 - [ ] Test it: `/test accounts & sign up to save`

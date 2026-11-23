@@ -40,3 +40,38 @@ _Steps derived from spec 0009 acceptance criteria. `/check verify` runs these; `
 
 ## Known local gap
 - Local e2e runs share one loopback IP with the real Upstash in `.env`, so spec 0004's guest starting credit cap per IP per day runs out after a few flow runs, and later guests get 0 credits ("Not enough credits"). CI has no Upstash, so it is unaffected. Lift `grants.guestPerIpPerDay` for e2e, or run with the Upstash vars unset.
+
+# Verify: delete account and the daily purge · spec 0009 · updated 2026-11-23
+_Build plan tasks 6 and 7 (AC-13, AC-14, AC-18). Google adds its steps when built._
+
+## UI / manual
+- [ ] Signed in, open the account menu → it shows Delete account under Sign out → AC-12, AC-13
+- [ ] Tap Delete account → a dialog (a bottom sheet at 360px) says it can't be undone and lists all your chats, all your reports, your unspent credits, then asks you to type your email → AC-13
+- [ ] Type a different email and tap Delete my account → "That email doesn't match your account." and nothing is deleted → AC-13
+- [ ] Type your email in other letter case → the account is deleted, you land on `/` with an empty chat, and the toast says "Your account was deleted." → AC-13
+- [ ] After that, press Back or open an old chat URL → `404`, nothing of the account shows; the next send makes a fresh guest → AC-13, AC-18
+- [ ] With a session older than a day (set `session.created_at` back 2 days on a test branch), try to delete → the dialog switches to "Sign in again first"; enter the password → back to the confirm step, and the delete works → AC-13
+- [ ] On that sign in again step, Sign out → you land on `/` signed out → AC-13
+- [ ] Start a report, delete the account while it is generating → the delete works, and the runtime logs show the report step stopping (`stale_attempt`) with no 500 → AC-13
+- [ ] Sign in as account A, copy a chat URL, sign in as account B in another browser, open it → `404` → AC-18
+- [ ] On a preview with Require Log In off, `curl -X POST` `/api/account/delete` with no BotID headers → `403 {"code":"bot"}` → AC-15
+- [ ] `curl -X POST /api/auth/delete-user` with a valid session cookie → `404` (only our route deletes) → AC-13
+
+## Commands
+- [ ] `pnpm vitest run src/auth/delete-account.test.ts src/components/auth/auth-copy.test.ts` → typed email check and delete copy pass → AC-13
+- [ ] `pnpm test:integration src/auth/delete-account.int.test.ts` (on a throwaway branch) → wrong email `403`, guest `401`, stale session `400 SESSION_EXPIRED`, fresh delete cascades chats, runs, credits and sessions, clears the cookie, late `markReady` is `stale_attempt`, late usage saves with null ids; another account's chat is `not_found` → AC-13, AC-18
+- [ ] `pnpm vitest run src/lib/batches.test.ts src/billing/cron.test.ts` → batches stop on a short batch or a spent budget; a throwing job still lets the other run and answers 200 → AC-14
+- [ ] `pnpm test:integration src/db/queries/purge.int.test.ts` → a guest idle 31 days goes with its chats, runs and credits; idle 29 days, an active hold, a recent session, and a verified account all stay; a spent budget deletes nothing → AC-14
+- [ ] `curl -H "Authorization: Bearer $CRON_SECRET" <preview>/api/cron/billing` → `200 {"billing":{...},"purge":{"deleted":..,"forfeitedCredits":..,"batches":..,"complete":true}}`, and the logs have one `guests_purged` line with counts only → AC-14
+- [ ] Same call without the header → `401` and nothing runs → AC-14
+
+## Value sourcing checks
+- [ ] AC-13 "fresh session": a session 23 hours old deletes; one 25 hours old gets `SESSION_EXPIRED` (counted from `session.created_at`, not `updated_at`)
+- [ ] AC-14 "guest last activity": a guest whose user row and chats are 31 days old but who has a session updated today stays; one with only a run updated 10 days ago stays
+- [ ] AC-14 "in flight work": a stale guest with an active `credit_hold` stays; once the hold is released, the next purge deletes it
+- [ ] AC-14 "credits forfeited": a stale guest with 100 credits adds 100 to `forfeitedCredits` in the log line
+
+## Acceptance-criteria coverage
+- AC-13: menu, dialog copy, mismatch, case insensitive match, sign in again, late work, BotID, blocked `/delete-user` (UI 1 to 8, 10, 11; commands 1, 2; value check 1)
+- AC-14: purge batches, budget, keeps and deletes, cron wiring and auth (commands 3 to 6; value checks 2 to 4)
+- AC-18: cross account `404` (UI 9; command 2)

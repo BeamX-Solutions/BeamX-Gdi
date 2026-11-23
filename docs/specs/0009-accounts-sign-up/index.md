@@ -189,8 +189,8 @@ Tracer Bullet: one real sign up path end to end first (email check, code, accoun
 3. [x] Sign in and recovery: sign in form with the forfeit note, forgot password by code with sessions revoked then a sign in; tests, satisfies **AC-5**, **AC-7**, **AC-10**
 4. [x] Abuse guards and hook: BotID on every auth POST in the route and in `src/instrumentation-client.ts`; Better Auth `rateLimit` with the Upstash `consume` storage and `customRules` (anonymous sign in off); the per email limit on the email check; `onAccountVerified` from the user create and update hooks; tests, satisfies **AC-15**, **AC-16**
 5. [x] More prompts: the save prompt card after a guest's ready report, and a Sign up action on `runs_daily`, `chat_daily`, `chats_daily` notices and the guest short balance card; `/design` showcase entries; e2e of sign up from the save prompt with axe clean, satisfies **AC-1**
-6. [ ] Delete account: menu item, dialog with typed email, `/api/account/delete` with the email check and Better Auth's fresh session rule; in flight writes drop cleanly for a missing user; integration test of the cascade, satisfies **AC-13**, **AC-18**
-7. [ ] Daily purge: `purgeUsers` (stale guests by last activity, skipping holds and generating reports, batches of 50, 120 second budget, forfeited credits logged) in `src/db/queries/users.ts`; `runDailyJobs` beside the billing sweeps in the cron route; integration test on a Neon branch, satisfies **AC-14**
+6. [x] Delete account: menu item, dialog with typed email, `/api/account/delete` with the email check and Better Auth's fresh session rule; in flight writes drop cleanly for a missing user; integration test of the cascade, satisfies **AC-13**, **AC-18**
+7. [x] Daily purge: `purgeUsers` (stale guests by last activity, skipping holds and generating reports, batches of 50, 120 second budget, forfeited credits logged) in `src/db/queries/users.ts`; `runDailyJobs` beside the billing sweeps in the cron route; integration test on a Neon branch, satisfies **AC-14**
 
 **Later milestone: Google sign in** (start once the Google OAuth client exists; until then the Google button is never rendered)
 
