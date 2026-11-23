@@ -45,6 +45,7 @@ pnpm test:integration   # *.int.test.ts against a real Neon branch
 
 ## Gotchas
 
+- A CHECK that ties a column with an `ON DELETE SET NULL` user FK to another column must still hold after the null, or deleting the user aborts (that is why `luna_credit_import` checks `claimed_by_user_id IS NULL OR claimed_at IS NOT NULL`, not "both or neither").
 - `drizzle-kit check` never compares the schema to the migrations. CI catches drift with a separate step: `pnpm db:generate`, then fail if `src/db/migrations` changed.
 
 ## Agent skills
