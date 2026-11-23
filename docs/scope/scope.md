@@ -24,7 +24,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 21 | Abuse & AI cost guards | Slice 1 | done |
 | 8 | Accounts & sign up to save | Slice 2 | in-progress |
 | 9 | Shared business profile | Slice 2 | planned |
-| 10 | Beacon health check in chat | Slice 3 | planned |
+| 10 | Beacon health check in chat | Slice 3 | in-progress |
 | 11 | Beacon Pro in chat | Slice 3 | planned |
 | 12 | Luna marketing plan in chat | Slice 3 | planned |
 | 13 | Ask about your results | Slice 4 | planned |
@@ -181,10 +181,17 @@ One profile (name, industry, size, location, goals, and so on) built from answer
 
 ## Slice 3: The other tools
 
-### 10. Beacon health check in chat
+### 10. Beacon health check in chat · in-progress
 Run the Beacon business health check through chat, using the same thread as Stellar. Beacon and Beacon Pro share one questionnaire (22 questions) and one scoring engine, so this builds the shared Beacon module; its advice is the rule based advisory, polished by Claude (the standalone used OpenAI).
 **Done when:** a client gets a Beacon score with category breakdown and advice in the report panel, matching what the standalone Beacon gives for the same answers (scores, grades, flags, and rule based advice; the AI wording is not compared).
+spec [0010](../specs/0010-beacon-health-check/index.md)
+- [x] Design it (spec): `/architect beacon health check in chat`
 - [ ] Build it: `/develop beacon health check in chat`
+  - [x] Questions, scoring and the typed rule advisory with both parity tests (AC-2, AC-3, AC-4, AC-5, AC-6)
+  - [ ] Contract additions (first name, phase check) in the runner, then the Beacon report phase, view and registry line (AC-1, AC-7, AC-8, AC-9, AC-10)
+  - [ ] The `rich_section` block on `/design` with axe (AC-11)
+  - [ ] Thread end to end: Playwright flow, a real model run, and the assistant eval results (AC-12, AC-13)
+- [ ] Verify it: `/check verify beacon health check in chat`
 
 ### 11. Beacon Pro in chat
 Run the deeper Beacon Pro assessment, with its report streaming in live. It is a second report style on the Beacon module (Claude writes the full advisory), so a client who already finished Beacon answers no new questions. The assistant suggests Pro when a client wants more depth than Beacon.
