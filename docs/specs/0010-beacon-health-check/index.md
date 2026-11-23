@@ -245,7 +245,7 @@ Tracer Bullet: the thinnest real Beacon thread first (score, polish with the moc
 3. [x] Contract and runner: `client` in the phase context, the owner lookup's `firstName` (with a DB integration test for a guest and an account), optional `check` and the runner's repair path for its issues, with runner tests on the mock model, satisfies **AC-7**, **AC-8**
 4. [x] Report and view: `report.ts` (instructions, prompt, output schema, `check`), `view.ts` (band lines, AC-9 order, AC-10 verdicts), `index.ts` and the registry line, satisfies **AC-1**, **AC-7**, **AC-8**, **AC-9**, **AC-10**
 5. [x] `rich_section` block: contract type, renderer part, a `/design` Beacon ready fixture, axe, satisfies **AC-11**
-6. [ ] Thread end to end: Playwright flow with the fake model (approve, 23 cards, ready report, refresh), then one real model run; `pnpm eval:assistant` and commit the results file, satisfies **AC-12**, **AC-13**
+6. [x] Thread end to end: Playwright flow with the fake model (approve, 23 cards, ready report, refresh), then one real model run; `pnpm eval:assistant` and commit the results file, satisfies **AC-12**, **AC-13**
 
 ## Consequences
 
