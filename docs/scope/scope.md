@@ -180,11 +180,11 @@ One profile (name, industry, size, location, goals, and so on) built from answer
 Design note (spec 0012): "skips" means the known facts arrive on the prefill card for a one tap confirm, and a fact crosses tools only when it maps exactly onto the new question's options.
 spec [0012](../specs/0012-business-profile/index.md) (recommended picks, written while the engineer was away; review before building)
 - [x] Design it (spec): `/architect shared business profile`
-- [ ] Build it: `/develop shared business profile`
-  - [ ] Profile table, writes at run completion, guest merge (AC-5, AC-10, AC-11)
-  - [ ] Fact catalog, question mappings and round trip test (AC-1 to AC-4, AC-12)
-  - [ ] Profile facts on the prefill card (AC-6, AC-7)
-  - [ ] `/profile` page with edit and remove, and the end to end flow (AC-8, AC-9)
+- [x] Build it: `/develop shared business profile` · code in `src/tools/_kit/facts.ts`, `src/db/queries/profile.ts`, `src/assistant/prefill.ts`, `src/app/profile`, `src/components/profile`
+  - [x] Profile table, writes at run completion, guest merge (AC-5, AC-10, AC-11)
+  - [x] Fact catalog, question mappings and round trip test (AC-1 to AC-4, AC-12)
+  - [x] Profile facts on the prefill card (AC-6, AC-7)
+  - [x] `/profile` page with edit and remove, and the end to end flow (AC-8, AC-9)
 - [ ] Verify it: `/check verify shared business profile`
 
 ## Slice 3: The other tools

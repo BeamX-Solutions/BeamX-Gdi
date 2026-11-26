@@ -98,11 +98,11 @@ Reasoning and options: see [rationale.md](rationale.md).
 
 Tracer Bullet: one fact end to end first (business name from Beacon to a second Beacon), then the catalog, mappings, page and merge.
 
-1. Migration for `business_profile`; `profile.get` and `profile.writeStatements`; add the statements to `runs.complete`; add the merge to `users.linkGuest`; integration tests, satisfies **AC-5**, **AC-10**, **AC-11**
-2. `src/tools/_kit/facts.ts` with the keys, schemas, labels, formatters and the industry list; replace `factKey` with `fact` in the contract and Beacon; the round trip contract test, satisfies **AC-1**, **AC-2**, **AC-3**, **AC-4**, **AC-12**
-3. Prefill: merge profile facts into the `new` start path; per item source labels on the prefill card, satisfies **AC-6**, **AC-7**
-4. `/profile` page, edit and remove Server Actions, account menu link, `/design` states with axe, satisfies **AC-8**, **AC-9**
-5. End to end: Playwright (Beacon in one chat, a second Beacon in another, prefill from profile, edit on `/profile`), satisfies **AC-5** to **AC-9**
+1. [x] Migration for `business_profile`; `profile.get`, `profile.runFactsStatement`, `setFact`, `removeFact`; add the statements to `runs.complete`; add the merge to `users.linkGuest`; integration tests, satisfies **AC-5**, **AC-10**, **AC-11**
+2. [x] `src/tools/_kit/facts.ts` with the keys, schemas, labels, formatters and the industry list; replace `factKey` with `fact` in the contract and Beacon; the round trip contract test, satisfies **AC-1**, **AC-2**, **AC-3**, **AC-4**, **AC-12**
+3. [x] Prefill: merge profile facts into the `new` start path; per item source labels on the prefill card, satisfies **AC-6**, **AC-7**
+4. [x] `/profile` page, edit and remove Server Actions, account menu link, `/design` states with axe, satisfies **AC-8**, **AC-9**
+5. [x] End to end: Playwright (Beacon in one chat, a second Beacon in another, prefill from profile, edit on `/profile`), satisfies **AC-5** to **AC-9**
 
 ## Consequences
 
