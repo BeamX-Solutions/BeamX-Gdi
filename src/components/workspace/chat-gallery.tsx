@@ -348,6 +348,25 @@ export function ChatGallery() {
             onAcceptAll={() => undefined}
             onEdit={() => undefined}
           />
+          <PrefillCard
+            title="What I already know"
+            items={[
+              {
+                questionId: "business_name",
+                prompt: "What is your business called?",
+                label: "Ada Foods",
+                source: "profile",
+              },
+              {
+                questionId: "industry",
+                prompt: "Which industry is your business in?",
+                label: "Food & Beverage",
+                source: "chat",
+              },
+            ]}
+            onAcceptAll={() => undefined}
+            onEdit={() => undefined}
+          />
           <div className="flex items-start">
             <CreditChip initial={{ available: 30, held: 0 }} />
           </div>

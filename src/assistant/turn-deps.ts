@@ -5,6 +5,7 @@
 import * as conversations from "@/db/queries/conversations";
 import * as credits from "@/db/queries/credits";
 import * as messages from "@/db/queries/messages";
+import * as profile from "@/db/queries/profile";
 import * as runs from "@/db/queries/runs";
 import * as usage from "@/db/queries/usage";
 import { openCreditAccount } from "./billing-deps";
@@ -115,6 +116,7 @@ const aiTurnDeps: AiTurnDeps = {
   limits: { guestSpendCap, takeRun, giveBackRun },
   helperModel: () => resolveModel("helper"),
   recordUsage: withSpend(usage.record),
+  profileFacts: profile.get,
   oldAnswers: async (ownerId, runId) => {
     const read = await runs.get(ownerId, runId);
     return read.ok

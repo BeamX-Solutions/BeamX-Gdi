@@ -171,6 +171,7 @@ export const evalDeps = (
     model: () => models.chat,
     helperModel: () => models.helper,
     recordUsage: async () => ({ status: "recorded", id: "eval" }),
+    profileFacts: async () => [],
     oldAnswers: async () => ok([]),
     newId: () => `eval-${++n.id}`,
     now: () => Date.now(),

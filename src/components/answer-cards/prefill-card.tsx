@@ -3,16 +3,19 @@
 import { MessageSquareQuoteIcon } from "lucide-react";
 import { useId } from "react";
 import { Button } from "@/components/ui/button";
+import { prefillOrigins } from "./prefill-origin";
 
 export type PrefillItem = {
   readonly questionId: string;
   readonly prompt: string;
   /** The answer as the client reads it (`formatAnswer`, written by the server). */
   readonly label: string;
+  /** Where it came from; labelled per item when a card mixes sources (spec 0012). */
+  readonly source?: "client" | "chat" | "profile" | "file";
 };
 
 type PrefillCardProps = {
-  /** "From our chat" or "From your last run" (spec 0006, AC-5, AC-5b). */
+  /** "From our chat", "From your profile", "What I already know" or "From your last run". */
   readonly title: string;
   readonly items: readonly PrefillItem[];
   /** Accept every item. */
@@ -34,6 +37,7 @@ export function PrefillCard({
   disabled = false,
 }: PrefillCardProps) {
   const titleId = useId();
+  const origins = prefillOrigins(items);
   return (
     <section
       aria-labelledby={titleId}
@@ -50,7 +54,7 @@ export function PrefillCard({
         {title}
       </p>
       <ul className="flex flex-col divide-y">
-        {items.map((item) => (
+        {items.map((item, index) => (
           <li
             key={item.questionId}
             className="flex min-w-0 items-center gap-3 py-2"
@@ -60,6 +64,11 @@ export function PrefillCard({
                 {item.prompt}
               </p>
               <p className="font-medium wrap-anywhere">{item.label}</p>
+              {origins[index] ? (
+                <p className="text-xs text-muted-foreground">
+                  {origins[index]}
+                </p>
+              ) : null}
             </div>
             <Button
               variant="ghost"
