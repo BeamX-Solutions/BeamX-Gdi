@@ -99,3 +99,45 @@ describe("reportScript", () => {
     expect(phase.check?.(output, ctx)).toEqual([]);
   });
 });
+
+describe("the fake model and Beacon Pro (spec 0011)", () => {
+  it("proposes Beacon Pro when the client wants something deeper", () => {
+    expect(
+      chatScript([user("I want something deeper"), note])[0],
+    ).toMatchObject({
+      type: "tool-call",
+      toolName: "startRun",
+      input: JSON.stringify({ toolId: "beacon_pro" }),
+    });
+  });
+
+  it("writes a Pro advisory that passes the phase check, with and without flags", () => {
+    const pro = getTool("beacon_pro");
+    if (!pro.ok) throw new Error("beacon_pro is not registered");
+    const phase = pro.value.phases[0];
+    if (!phase) throw new Error("no phase");
+    const answerSets = [0, 1, 2, 3].map((pick) =>
+      Object.fromEntries(
+        pro.value.questions.map((q) => [
+          q.id,
+          q.kind === "single"
+            ? (q.options[Math.min(pick, q.options.length - 1)]?.value ?? "")
+            : "Ada Foods",
+        ]),
+      ),
+    );
+    for (const answers of answerSets) {
+      const scored = pro.value.score(answers);
+      if (!scored.ok) throw new Error("incomplete");
+      const ctx = {
+        answers,
+        scores: scored.value,
+        earlier: {},
+        client: { firstName: null },
+      };
+      const output = reportScript([user(phase.buildPrompt(ctx).prompt)]);
+      expect(phase.output.safeParse(output).success).toBe(true);
+      expect(phase.check?.(output, ctx)).toEqual([]);
+    }
+  });
+});

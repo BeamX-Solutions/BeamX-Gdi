@@ -86,9 +86,9 @@ export const answerEveryCard = async (
 
 /**
  * Fills the sign up dialog that `opener` opens, enters the emailed code, and waits for
- * the account menu. Checks each dialog step with axe.
+ * the account menu. Checks each dialog step with axe. Returns the new account's email.
  */
-export const signUp = async (page: Page, opener: Locator) => {
+export const signUp = async (page: Page, opener: Locator): Promise<string> => {
   await opener.click();
   const details = page.getByRole("dialog", { name: "Create your account" });
   await expect(details).toBeVisible();
@@ -111,4 +111,5 @@ export const signUp = async (page: Page, opener: Locator) => {
     timeout: TURN_MS,
   });
   await expect(page.getByRole("dialog")).toBeHidden();
+  return email;
 };
