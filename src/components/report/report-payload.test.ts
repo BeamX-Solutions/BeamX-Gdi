@@ -9,6 +9,7 @@ const fits = (payload: ReportStatusPayload): ReportPayload => ({
   ...payload,
   phases: [...payload.phases],
   view: payload.view ? [...payload.view] : undefined,
+  preview: payload.preview ? [...payload.preview] : undefined,
 });
 
 describe("reportPayloadSchema", () => {

@@ -246,6 +246,14 @@ export function ReportGallery() {
             view={panelView({ kind: "loaded", payload: panelPayloads.ready })}
           />
           <PanelDemo
+            testId="panel-generating-pro"
+            title="Generating, Beacon Pro with its score preview"
+            view={panelView({
+              kind: "loaded",
+              payload: panelPayloads.proGenerating,
+            })}
+          />
+          <PanelDemo
             testId="panel-ready-beacon"
             title="Ready, Beacon"
             view={panelView({

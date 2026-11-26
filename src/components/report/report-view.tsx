@@ -101,11 +101,14 @@ function Block({ block }: { readonly block: ReportBlock }) {
  */
 export function ReportView({
   blocks,
+  testId = "report-view",
 }: {
   readonly blocks: readonly ReportBlock[];
+  /** `report-preview` for the blocks shown before the report is ready (spec 0011). */
+  readonly testId?: string;
 }) {
   return (
-    <div className="flex min-w-0 flex-col gap-8" data-testid="report-view">
+    <div className="flex min-w-0 flex-col gap-8" data-testid={testId}>
       {blocks.map((block, index) => (
         <Block key={`${index}-${block.kind}`} block={block} />
       ))}

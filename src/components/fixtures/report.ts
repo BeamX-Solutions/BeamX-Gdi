@@ -303,6 +303,58 @@ const phases = (
 ): ReportPayload["phases"] =>
   list.map((p, index) => ({ label: p.label, done: index < done }));
 
+/** The blocks a Beacon Pro report shows while its advisory is written (spec 0011). */
+export const beaconProPreviewView: readonly ReportBlock[] = [
+  {
+    kind: "score_header",
+    title: "Beacon Pro",
+    score: 47.5,
+    max: 100,
+    verdict: "risk",
+    summary:
+      "Survival Mode. Serious gaps are holding the business back. Focus on the essentials.",
+  },
+  {
+    kind: "category_bars",
+    title: "Your five areas",
+    items: [
+      { label: "Financial Health (D)", score: 7, max: 20, verdict: "risk" },
+      { label: "Customer Strength (B)", score: 14.7, max: 20, verdict: "good" },
+      {
+        label: "Operational Maturity (D)",
+        score: 9.3,
+        max: 20,
+        verdict: "risk",
+      },
+      {
+        label: "Financial Intelligence (C+)",
+        score: 12.7,
+        max: 20,
+        verdict: "caution",
+      },
+      {
+        label: "Growth & Resilience (D)",
+        score: 3.8,
+        max: 20,
+        verdict: "risk",
+      },
+    ],
+  },
+  {
+    kind: "bullets",
+    title: "Critical flags",
+    items: ["Cash crisis", "No clear view of profit", "Founder burnout risk"],
+  },
+  {
+    kind: "bullets",
+    title: "Opportunities",
+    items: [
+      "Pricing power",
+      "Organic growth through referrals and repeat business",
+    ],
+  },
+];
+
 const reportError = (kind: ReportErrorViewKind) => ({
   kind,
   ...reportErrorCopy[kind],
@@ -337,6 +389,14 @@ export const panelPayloads = {
     canRetry: false,
     stale: false,
     view: [...allBlocksView],
+  },
+  proGenerating: {
+    status: "generating",
+    phases: [{ label: "Writing your advisory", done: false }],
+    error: null,
+    canRetry: false,
+    stale: false,
+    preview: [...beaconProPreviewView],
   },
   beaconReady: {
     status: "ready",

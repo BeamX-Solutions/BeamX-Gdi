@@ -17,11 +17,20 @@ type ReportStatusViewProps = {
  * one step per phase, an error card with Retry, an error card with Start again, or the
  * report. Renders from props only, so `/design` shows every state on fixtures.
  */
-export function ReportStatusView({
-  view,
-  onRetry,
-  onStartAgain,
-}: ReportStatusViewProps) {
+export function ReportStatusView(props: ReportStatusViewProps) {
+  const { view } = props;
+  const preview = view.kind === "ready" ? undefined : view.preview;
+  if (!preview || preview.length === 0) return <StatusBody {...props} />;
+  // The scores a tool can show before its report is ready, above the steps (spec 0011).
+  return (
+    <div className="flex min-w-0 flex-col gap-8">
+      <ReportView blocks={preview} testId="report-preview" />
+      <StatusBody {...props} />
+    </div>
+  );
+}
+
+function StatusBody({ view, onRetry, onStartAgain }: ReportStatusViewProps) {
   switch (view.kind) {
     case "generating":
       return <ReportSkeleton steps={view.steps} />;

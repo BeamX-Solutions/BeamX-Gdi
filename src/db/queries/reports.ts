@@ -262,6 +262,7 @@ const statusRowSchema = z.object({
   phase_keys: z.array(z.string()),
   has_hold: z.boolean(),
   stale: z.boolean(),
+  scores: z.unknown(),
 });
 
 /** The light per poll read of a report (spec 0005): never the content itself. */
@@ -279,6 +280,8 @@ export type ReportStatus = {
   readonly hasHold: boolean;
   /** `generating` and not updated for `STALE_AFTER_MINUTES` (judged by the DB clock). */
   readonly stale: boolean;
+  /** The run's stored scores, unparsed, for a tool's preview (spec 0011). */
+  readonly scores: unknown;
 };
 
 export type StatusError = { readonly code: "not_found" };
@@ -292,7 +295,7 @@ export const status = async (
   runId: string,
 ): Promise<Result<ReportStatus, StatusError>> => {
   const rows = await db.execute(sql`
-    SELECT t.tool_id, t.tool_version, r.status, r.attempts, r.updated_at::text AS updated_at,
+    SELECT t.tool_id, t.tool_version, t.scores, r.status, r.attempts, r.updated_at::text AS updated_at,
       r.error,
       CASE WHEN jsonb_typeof(r.content) = 'object'
         THEN coalesce((SELECT jsonb_agg(k ORDER BY k) FROM jsonb_object_keys(r.content) AS k), '[]'::jsonb)
@@ -324,6 +327,7 @@ export const status = async (
     phaseKeys: row.phase_keys,
     hasHold: row.has_hold,
     stale: row.stale,
+    scores: row.scores ?? null,
   });
 };
 

@@ -106,6 +106,9 @@ describe("reports.status (AC-10)", () => {
       stale: false,
     });
     expect(typeof pending.updatedAt).toBe("string");
+    // The run's scores ride along for a tool's preview (spec 0011, AC-13).
+    expect(pending.scores).toEqual(expect.objectContaining({}));
+    expect(pending.scores).not.toBeNull();
 
     unwrap(await reports.claim(u, runId));
     unwrap(await reports.savePhase(runId, 1, "analysis", { long: "x" }));
