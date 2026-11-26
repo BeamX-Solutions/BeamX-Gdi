@@ -205,7 +205,8 @@ export const advisoryPhase: TypedPhase<BeaconScores, Advisory> = {
   key: "advisory",
   label: "Writing your advisory",
   modelRole: "report",
-  maxOutputTokens: 8_000,
+  // Real runs use about 3,000 tokens (thinking included); room for a 1,600 word report.
+  maxOutputTokens: 12_000,
   timeoutMs: 120_000,
   output: advisorySchema,
   buildPrompt: ({ answers, scores, client }) => {

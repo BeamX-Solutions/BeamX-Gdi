@@ -280,7 +280,7 @@ export type ReportStatus = {
   readonly hasHold: boolean;
   /** `generating` and not updated for `STALE_AFTER_MINUTES` (judged by the DB clock). */
   readonly stale: boolean;
-  /** The run's stored scores, unparsed, for a tool's preview (spec 0011). */
+  /** The run's stored scores, unparsed, for a tool's preview (spec 0011); null once ready. */
   readonly scores: unknown;
 };
 
@@ -295,7 +295,8 @@ export const status = async (
   runId: string,
 ): Promise<Result<ReportStatus, StatusError>> => {
   const rows = await db.execute(sql`
-    SELECT t.tool_id, t.tool_version, t.scores, r.status, r.attempts, r.updated_at::text AS updated_at,
+    SELECT t.tool_id, t.tool_version,
+      CASE WHEN r.status <> 'ready' THEN t.scores END AS scores, r.status, r.attempts, r.updated_at::text AS updated_at,
       r.error,
       CASE WHEN jsonb_typeof(r.content) = 'object'
         THEN coalesce((SELECT jsonb_agg(k ORDER BY k) FROM jsonb_object_keys(r.content) AS k), '[]'::jsonb)

@@ -99,7 +99,7 @@ const filler = (words: number) => ({
  */
 export const fakeBeaconAdvisory = (prompt: string) => ({
   executive_summary: [filler(300)],
-  critical_priorities: /Critical flags: none/.test(prompt)
+  critical_priorities: /^Critical flags: none$/m.test(prompt)
     ? null
     : [
         { kind: "subheading", text: "Week 1" },
@@ -110,7 +110,7 @@ export const fakeBeaconAdvisory = (prompt: string) => ({
         filler(150),
       ],
   strategic_recommendations: [filler(300)],
-  growth_opportunities: /Opportunity flags: none/.test(prompt)
+  growth_opportunities: /^Opportunity flags: none$/m.test(prompt)
     ? null
     : [filler(150)],
   next_steps: [

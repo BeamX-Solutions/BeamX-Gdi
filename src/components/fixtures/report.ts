@@ -394,6 +394,18 @@ export const beaconAdvisoryView: readonly ReportBlock[] = [
   },
   {
     kind: "rich_section",
+    title: "Strategic Recommendations",
+    parts: [
+      { kind: "label", text: "Customer Strength" },
+      {
+        kind: "paragraph",
+        lead: "Keep them coming back:",
+        text: "Text your 20 best customers a thank you and an early offer each month.",
+      },
+    ],
+  },
+  {
+    kind: "rich_section",
     title: "Your Next Steps",
     parts: [
       {

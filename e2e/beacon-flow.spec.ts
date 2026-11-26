@@ -7,12 +7,18 @@ import { answerEveryCard, grant, scan, signUp, TURN_MS } from "./flow-helpers";
 // cards, and sees the score and the advisory sections, which a reload keeps. Runs
 // against a production build with the scripted fake model (`E2E_FAKE_AI=true`).
 
-/** A report's budget: the fake model is instant, a real advisory takes a minute or two. */
+/** A report's budget: the fake model is instant, a real advisory takes about 30 seconds. */
 const REPORT_MS = 240_000;
 
-/** The ready report, wherever it shows: the side panel on desktop, the sheet on phones. */
+/**
+ * The ready report, wherever it shows: the side panel on desktop, the sheet on phones.
+ * The score preview also shows "Your five areas" while the advisory is written, so the
+ * ready report is the one with an advisory section.
+ */
 const readyReport = (page: Page) =>
-  page.getByRole("region", { name: "Your five areas" });
+  page
+    .getByTestId("report-view")
+    .getByRole("region", { name: "Executive Summary" });
 
 const availableIn = (chip: string): number =>
   Number(/Available:\s*(\d+)/.exec(chip)?.[1] ?? Number.NaN);
