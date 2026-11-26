@@ -254,6 +254,22 @@ export function ReportGallery() {
             })}
           />
           <PanelDemo
+            testId="panel-partial-luna"
+            title="Luna, two of five phases written"
+            view={panelView({
+              kind: "loaded",
+              payload: panelPayloads.lunaPartial,
+            })}
+          />
+          <PanelDemo
+            testId="panel-ready-luna"
+            title="Ready, Luna"
+            view={panelView({
+              kind: "loaded",
+              payload: panelPayloads.lunaReady,
+            })}
+          />
+          <PanelDemo
             testId="panel-ready-beacon-advisory"
             title="Ready, Beacon"
             view={panelView({

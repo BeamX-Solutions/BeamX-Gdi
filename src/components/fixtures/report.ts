@@ -11,6 +11,8 @@ import {
   type ReportErrorViewKind,
 } from "@/components/feedback/error-copy";
 import type { ReportPayload } from "@/components/report/report-payload";
+import { getReader } from "@/tools/registry";
+import examplePlan from "../../../fixtures/parity/luna/example-plan.json";
 
 export type ReportFixture = {
   readonly verdict: Verdict;
@@ -420,6 +422,47 @@ export const beaconAdvisoryView: readonly ReportBlock[] = [
   },
 ];
 
+/** A ready Luna plan (spec 0013, AC-11), drawn from the standalone's example plan. */
+export const lunaReadyView: readonly ReportBlock[] = (() => {
+  const reader = getReader("luna", "1");
+  if (!reader.ok) return [];
+  const plan = examplePlan.plan;
+  return reader.value.toView({
+    scores: { answered: 50 },
+    content: {
+      analysis: {
+        businessModelAssessment: "-",
+        marketOpportunity: "-",
+        competitivePositioning: "-",
+        customerAvatarRefinement: "-",
+        strategicRecommendations: ["-"],
+        riskFactors: ["-"],
+        growthPotential: "-",
+      },
+      core: {
+        customerJourney: plan.customerJourney,
+        strategicInsights: plan.strategicInsights,
+        risksPositioning: plan.risksPositioning,
+      },
+      overview: {
+        executiveSummary: plan.executiveSummary,
+        implementation: plan.implementation,
+      },
+      operations: { resources: plan.resources, kpis: plan.kpis },
+      assets: { templates: plan.templates, investmentRoi: plan.investmentRoi },
+    },
+    answers: {},
+  });
+})();
+
+const lunaPhases = [
+  { label: "Studying your business" },
+  { label: "Mapping your customer journey" },
+  { label: "Writing your summary and roadmap" },
+  { label: "Planning your budget and KPIs" },
+  { label: "Preparing your templates and ROI" },
+] as const;
+
 const reportError = (kind: ReportErrorViewKind) => ({
   kind,
   ...reportErrorCopy[kind],
@@ -462,6 +505,21 @@ export const panelPayloads = {
     canRetry: false,
     stale: false,
     preview: [...beaconPreviewView],
+  },
+  lunaPartial: {
+    status: "partial",
+    phases: phases(lunaPhases, 2),
+    error: null,
+    canRetry: false,
+    stale: false,
+  },
+  lunaReady: {
+    status: "ready",
+    phases: phases(lunaPhases, 5),
+    error: null,
+    canRetry: false,
+    stale: false,
+    view: [...lunaReadyView],
   },
   beaconAdvisoryReady: {
     status: "ready",
