@@ -1,9 +1,12 @@
 /**
- * Beacon, the business health check (spec 0010). The business name plus 22 questions,
- * fixed scoring and a rule based advisory, and one AI phase that polishes its wording.
- * Beacon Pro (#11) adds a second module here on the same questions and scores.
+ * Beacon, the business health check (spec 0010), and Beacon Pro (spec 0011). Both use
+ * the business name plus 22 questions and the same fixed scoring. Beacon polishes a
+ * rule based advisory; Pro has Claude write a full advisory, reuses answers from an
+ * earlier Beacon or Pro run, and shows the scores while the advisory is written.
  */
 import { defineTool } from "../_contract";
+import { proAdvisoryPhase, proContentSchema } from "./pro-report";
+import { beaconProPreview, beaconProView } from "./pro-view";
 import { beaconQuestions } from "./questions";
 import { advisoryPhase, beaconContentSchema } from "./report";
 import { beaconScoresSchema, scoreBeacon } from "./scoring";
@@ -24,4 +27,23 @@ export const beacon = defineTool({
   score: scoreBeacon,
   phases: [advisoryPhase],
   toView: beaconView,
+});
+
+export const beaconPro = defineTool({
+  id: "beacon_pro",
+  version: "1",
+  name: "Beacon Pro",
+  summary:
+    "A deeper business health check: the same score, plus a full personal advisory written for your business.",
+  whenToUse:
+    "The client wants more depth than Beacon: a deeper plan, a personal advisory, or more detail on their business health. Same questions and scores as Beacon, plus a full advisory written for them; answers from an earlier Beacon or Beacon Pro run are reused, so they answer nothing again.",
+  creditPrice: 150,
+  questions: beaconQuestions,
+  scoresSchema: beaconScoresSchema,
+  contentSchema: proContentSchema,
+  score: scoreBeacon,
+  phases: [proAdvisoryPhase],
+  toView: beaconProView,
+  toPreview: beaconProPreview,
+  reuseFrom: ["beacon", "beacon_pro"],
 });

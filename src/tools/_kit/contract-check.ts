@@ -85,4 +85,11 @@ export const contractViolations = (
     (id) => `the tool id "${id}" is registered more than once`,
   ),
   ...tools.flatMap(moduleViolations),
+  ...tools.flatMap((t) =>
+    (t.reuseFrom ?? [])
+      .filter((id) => !tools.some((other) => other.id === id))
+      .map(
+        (id) => `${t.id} reuses answers from "${id}", which is not registered`,
+      ),
+  ),
 ];
