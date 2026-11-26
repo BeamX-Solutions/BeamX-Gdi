@@ -25,7 +25,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 8 | Accounts & sign up to save | Slice 2 | in-progress |
 | 9 | Shared business profile | Slice 2 | planned |
 | 10 | Beacon health check in chat | Slice 3 | done |
-| 11 | Beacon Pro in chat | Slice 3 | planned |
+| 11 | Beacon Pro in chat | Slice 3 | in-progress |
 | 12 | Luna marketing plan in chat | Slice 3 | planned |
 | 13 | Ask about your results | Slice 4 | planned |
 | 14 | Chat & report history | Slice 4 | planned |
@@ -193,10 +193,18 @@ spec [0010](../specs/0010-beacon-health-check/index.md)
   - [x] Thread end to end: Playwright flow, a real model run, and the assistant eval results (AC-12, AC-13)
 - [x] Verify it: `/check verify beacon health check in chat` · core flow verified 2026-11-24; real model steps (AC-7, AC-8) and the report failure path (AC-12) skipped, Anthropic API out of credit; see verify.md
 
-### 11. Beacon Pro in chat
+### 11. Beacon Pro in chat · in-progress
 Run the deeper Beacon Pro assessment, with its report streaming in live. It is a second report style on the Beacon module (Claude writes the full advisory), so a client who already finished Beacon answers no new questions. The assistant suggests Pro when a client wants more depth than Beacon.
 **Done when:** a client gets a Beacon Pro report that streams into the panel, a client who already ran Beacon gets Pro without answering again, and the assistant can explain how Pro differs from Beacon.
+Design note (spec 0011): "streams in live" means the score shows at once and the advisory lands whole when Claude finishes; no word by word typing.
+spec [0011](../specs/0011-beacon-pro/index.md)
+- [x] Design it (spec): `/architect beacon pro in chat`
 - [ ] Build it: `/develop beacon pro in chat`
+  - [ ] Pro module: prompt, check, view, registry line, parity (AC-1, AC-2, AC-9, AC-10, AC-11, AC-12)
+  - [ ] Score preview in the contract, status route and panel (AC-13)
+  - [ ] Answer reuse: queries and `startRun` with the reuse line on the card (AC-3 to AC-8)
+  - [ ] Assistant suggestions, eval, and the end to end thread (AC-14, AC-15, AC-16)
+- [ ] Verify it: `/check verify beacon pro in chat`
 
 ### 12. Luna marketing plan in chat · needs a decision
 Run Luna's long questionnaire (50 questions: 12 about the business, 38 across 9 marketing areas) in chat without wearing the client out. Progress is shown, the client can stop and resume, and the plan is generated at the end. Luna has no scoring: the plan is written by Claude in five phases in a row, which won't fit in one request, so each finished phase is saved and a failure resumes from the phase that broke.
