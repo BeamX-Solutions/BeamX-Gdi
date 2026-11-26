@@ -1,4 +1,5 @@
 import { and, asc, eq, sql } from "drizzle-orm";
+import { z } from "zod";
 import { db } from "../client";
 import { isUniqueViolation } from "../errors";
 import { newId } from "../id";
@@ -540,3 +541,124 @@ export const getActive = async (userId: string, conversationId: string) => {
   );
   return toActive(live, answers);
 };
+
+/** A run whose answers another tool may reuse (spec 0011, AC-3). */
+export type ReuseSource = {
+  readonly runId: string;
+  readonly toolId: string;
+  readonly status: "in_progress" | "completed";
+  /** The latest answer's raw timestamp, as stored. */
+  readonly lastAnswerAt: string;
+};
+
+const reuseRowSchema = z.object({
+  id: z.string(),
+  tool_id: z.string(),
+  status: z.enum(["in_progress", "completed"]),
+  last_answer_at: z.string(),
+});
+
+/**
+ * The run whose answers a tool with `reuseFrom` takes (spec 0011, AC-3): first the
+ * chat's `in_progress` run of one of `toolIds`, else the user's latest `completed` run
+ * of one of them, from any chat. Only runs with at least one answer count. One
+ * statement, owner scoped; null when there is none.
+ */
+export const reuseSource = async (
+  userId: string,
+  conversationId: string,
+  toolIds: readonly string[],
+): Promise<ReuseSource | null> => {
+  if (toolIds.length === 0) return null;
+  const rows = await db.execute(sql`
+    SELECT r.id, r.tool_id, r.status,
+      (SELECT max(a.updated_at)::text FROM tool_run_answer a WHERE a.run_id = r.id) AS last_answer_at
+    FROM tool_run r
+    WHERE r.user_id = ${userId}::uuid
+      AND r.tool_id IN (${sql.join(
+        toolIds.map((id) => sql`${id}`),
+        sql`, `,
+      )})
+      AND (r.status = 'completed'
+        OR (r.status = 'in_progress' AND r.conversation_id = ${conversationId}::uuid))
+      AND EXISTS (SELECT 1 FROM tool_run_answer a WHERE a.run_id = r.id)
+    ORDER BY (r.status = 'in_progress') DESC, r.completed_at DESC NULLS LAST, r.id DESC
+    LIMIT 1
+  `);
+  const first = rows.rows[0];
+  if (!first) return null;
+  const row = reuseRowSchema.parse(first);
+  return {
+    runId: row.id,
+    toolId: row.tool_id,
+    status: row.status,
+    lastAnswerAt: row.last_answer_at,
+  };
+};
+
+/** An answer to copy into a new run, already checked by the new tool's questions. */
+export type CopiedAnswer = {
+  readonly questionId: string;
+  readonly value: unknown;
+  readonly source: AnswerSource;
+};
+
+/**
+ * The write statements that start a run of one tool from another tool's answers
+ * (spec 0011, AC-6), in batch order: abandon the source when it is the chat's
+ * `in_progress` run and release its hold, pause any other active run, insert the new
+ * run with `based_on_run_id`, and copy the checked answers. Exported so
+ * `credits.startFromOtherWithHold` adds the new hold to the same batch.
+ */
+export const startFromOtherStatements = (
+  userId: string,
+  conversationId: string,
+  sourceRunId: string,
+  runId: string,
+  toolId: string,
+  toolVersion: string,
+  answers: readonly CopiedAnswer[],
+) =>
+  [
+    db.execute(sql`
+      UPDATE tool_run SET status = 'abandoned', updated_at = now()
+      WHERE id = ${sourceRunId}::uuid AND user_id = ${userId}::uuid
+        AND conversation_id = ${conversationId}::uuid AND status = 'in_progress'
+    `),
+    releaseRunHolds(
+      sql`SELECT id FROM tool_run WHERE id = ${sourceRunId}::uuid AND user_id = ${userId}::uuid AND status = 'abandoned'`,
+      "abandoned",
+    ),
+    db
+      .update(toolRun)
+      .set({ status: "paused" })
+      .where(
+        and(
+          eq(toolRun.conversationId, conversationId),
+          eq(toolRun.userId, userId),
+          eq(toolRun.status, "in_progress"),
+        ),
+      )
+      .returning({ id: toolRun.id }),
+    db.execute(sql`
+      INSERT INTO tool_run (id, user_id, conversation_id, tool_id, tool_version, based_on_run_id)
+      SELECT ${runId}::uuid, c.user_id, c.id, ${toolId}, ${toolVersion}, s.id
+      FROM conversation c
+      JOIN tool_run s ON s.id = ${sourceRunId}::uuid AND s.user_id = c.user_id
+      WHERE c.id = ${conversationId}::uuid AND c.user_id = ${userId}::uuid
+    `),
+    answers.length === 0
+      ? db.execute(sql`SELECT 1`)
+      : db.execute(sql`
+          INSERT INTO tool_run_answer (id, run_id, question_id, value, source)
+          SELECT v.id, ${runId}::uuid, v.question_id, v.value, v.source
+          FROM (VALUES ${sql.join(
+            answers.map(
+              (a) =>
+                sql`(${newId()}::uuid, ${a.questionId}, ${JSON.stringify(a.value)}::jsonb, ${a.source}::answer_source)`,
+            ),
+            sql`, `,
+          )}) AS v(id, question_id, value, source)
+          WHERE EXISTS (SELECT 1 FROM tool_run WHERE id = ${runId}::uuid)
+        `),
+  ] as const;

@@ -17,7 +17,12 @@ import {
   sumUsage,
   type AiTurnDeps,
 } from "./ai-turn";
-import type { RunQuote, StartFromHoldError } from "@/db/queries/credits";
+import type {
+  HoldError,
+  RunQuote,
+  StartFromHoldError,
+} from "@/db/queries/credits";
+import type { ReuseSource } from "@/db/queries/runs";
 import type { UsageInput } from "@/db/queries/usage";
 import type { OldAnswer } from "./ai-turn";
 import type { SavedMessage } from "./parts";
@@ -138,6 +143,17 @@ type World = {
   oldAnswers: OldAnswer[];
   /** What `startFromWithHold` returns when set (otherwise a copied run). */
   startFromError: StartFromHoldError | null;
+  /** What `reuseSource` returns (spec 0011). */
+  reuse: ReuseSource | null;
+  /** Calls to `startFromOtherWithHold`. */
+  reused: {
+    sourceRunId: string;
+    toolId: string;
+    price: number;
+    answers: number;
+  }[];
+  /** What `startFromOtherWithHold` returns when set (otherwise a new run). */
+  reuseError: HoldError | null;
 };
 
 const makeWorld = (over: Partial<World> = {}): World => ({
@@ -154,6 +170,9 @@ const makeWorld = (over: Partial<World> = {}): World => ({
   usage: [],
   oldAnswers: [],
   startFromError: null,
+  reuse: null,
+  reused: [],
+  reuseError: null,
   ...over,
 });
 
@@ -243,6 +262,21 @@ const fakeDeps = (
     if (world.startFromError) return err(world.startFromError);
     world.restarted.push({ previousRunId, version, price });
     world.answers = [row("stage", "idea"), row("channels", ["market"], 2)];
+    return ok({ runId: RUN });
+  },
+  reuseSource: async () => world.reuse,
+  startFromOtherWithHold: async (
+    _o,
+    _c,
+    sourceRunId,
+    toolId,
+    _v,
+    price,
+    answers,
+  ) => {
+    world.reused.push({ sourceRunId, toolId, price, answers: answers.length });
+    if (world.reuseError) return err(world.reuseError);
+    world.answers = answers.map((a, i) => row(a.questionId, a.value, i + 1));
     return ok({ runId: RUN });
   },
   abandonRun: async (_o, runId) => {
@@ -1784,5 +1818,154 @@ describe("createAiTurn: usage", () => {
       openChat: async () => err({ code: "not_found" }),
     })(textTurn(world, "m1", "hello"));
     expect(await turn.usage).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Spec 0011: answers reused from another run
+// ---------------------------------------------------------------------------
+
+describe("startRun with reused answers (spec 0011)", () => {
+  const reusing: ToolModule = { ...sampleTool, reuseFrom: ["sample"] };
+  const getTool = (id: string) =>
+    id === "sample" ? ok(reusing) : registry.getTool(id);
+  const source = {
+    runId: OLD,
+    toolId: "sample",
+    status: "completed" as const,
+    lastAnswerAt: "2026-11-24 10:00:00.123456+00",
+  };
+  const propose = {
+    calls: [{ toolName: "startRun", input: { toolId: "sample" } }],
+  };
+  const all = [
+    { questionId: "stage", value: "idea", source: "client" as const },
+    { questionId: "channels", value: ["market"], source: "client" as const },
+    { questionId: "confidence", value: 3, source: "profile" as const },
+    { questionId: "team_size", value: 2, source: "client" as const },
+  ];
+
+  it("names the reused answers on the card, written by the server (AC-4)", async () => {
+    const world = makeWorld({ reuse: source });
+    const { proposed } = await proposeAndTap(world, [propose], null, {
+      getTool,
+    });
+    expect(inputOf(proposed, "startRun")[0]).toEqual({
+      toolId: "sample",
+      shownPrice: 5,
+      availableBalance: 30,
+      reuse: { runId: OLD, toolName: "Sample", answeredOn: "24 Nov" },
+    });
+  });
+
+  it("looks nothing up when the client asked to answer again (AC-5)", async () => {
+    const world = makeWorld({ reuse: source });
+    const fresh = {
+      calls: [
+        {
+          toolName: "startRun",
+          input: { toolId: "sample", freshAnswers: true },
+        },
+      ],
+    };
+    const { proposed } = await proposeAndTap(world, [fresh], null, {
+      getTool,
+    });
+    expect(inputOf(proposed, "startRun")[0]).toEqual({
+      toolId: "sample",
+      freshAnswers: true,
+      shownPrice: 5,
+      availableBalance: 30,
+    });
+  });
+
+  it("has no note for a tool without reuseFrom", async () => {
+    const world = makeWorld({ reuse: source });
+    const { proposed } = await proposeAndTap(world, [propose], null);
+    expect(inputOf(proposed, "startRun")[0]).not.toHaveProperty("reuse");
+  });
+
+  it("copies complete answers on Approve and goes straight to the report (AC-6, AC-7)", async () => {
+    const world = makeWorld({ reuse: source, oldAnswers: all });
+    const { chunks } = await proposeAndTap(
+      world,
+      [propose],
+      [{ text: "Using your earlier answers." }],
+      { getTool },
+    );
+    expect(world.reused).toEqual([
+      { sourceRunId: OLD, toolId: "sample", price: 5, answers: 4 },
+    ]);
+    expect(world.started).toEqual([]);
+    expect(world.completed).toEqual([RUN]);
+    expect(dataOf(chunks)).toEqual([
+      {
+        type: "data-report",
+        data: { runId: RUN, toolId: "sample", toolName: "Sample" },
+      },
+    ]);
+  });
+
+  it("drops a copied answer that no longer fits and asks it (AC-6)", async () => {
+    const world = makeWorld({
+      reuse: source,
+      oldAnswers: [
+        ...all.filter((a) => a.questionId !== "team_size"),
+        { questionId: "team_size", value: 13, source: "client" },
+        { questionId: "gone_question", value: "x", source: "client" },
+      ],
+    });
+    const { chunks } = await proposeAndTap(
+      world,
+      [propose],
+      [{ text: "One more." }],
+      { getTool },
+    );
+    expect(world.reused[0]?.answers).toBe(3);
+    expect(world.completed).toEqual([]);
+    expect(dataOf(chunks)).toEqual([
+      expect.objectContaining({
+        type: "data-question",
+        data: expect.objectContaining({ questionId: "team_size" }),
+      }),
+    ]);
+  });
+
+  it("starts fresh at the same price when the source is gone (AC-8)", async () => {
+    const world = makeWorld({
+      reuse: source,
+      oldAnswers: all,
+      reuseError: { code: "not_found" },
+    });
+    const { chunks, calls } = await proposeAndTap(
+      world,
+      [propose],
+      [{ text: "Let's go through the questions." }],
+      { getTool },
+    );
+    expect(world.started).toEqual([{ toolId: "sample", price: 5 }]);
+    expect(seen(calls)).toContain('"freshStart":true');
+    expect(dataOf(chunks)).toEqual([
+      expect.objectContaining({
+        data: expect.objectContaining({ questionId: "stage" }),
+      }),
+    ]);
+  });
+
+  it("refuses with the short balance card when credits ran out (AC-6)", async () => {
+    const world = makeWorld({
+      reuse: source,
+      oldAnswers: all,
+      reuseError: { code: "insufficient_credits", available: 2 },
+    });
+    const { chunks } = await proposeAndTap(
+      world,
+      [propose],
+      [{ text: "Not enough credits." }],
+      { getTool },
+    );
+    expect(world.started).toEqual([]);
+    expect(world.completed).toEqual([]);
+    expect(dataOf(chunks)).toEqual([]);
   });
 });

@@ -6,6 +6,7 @@ import {
   balanceLine,
   confirmTitle,
   priceLine,
+  reuseLine,
   type ConfirmTool,
 } from "./credit-copy";
 
@@ -17,6 +18,11 @@ type ConfirmCardProps = {
   readonly price: number;
   /** `availableBalance`, written by the server; null when absent. */
   readonly available: number | null;
+  /** Earlier answers the run reuses, written by the server (spec 0011). */
+  readonly reuse?: {
+    readonly toolName: string;
+    readonly answeredOn: string;
+  } | null;
   readonly state: ApprovalCardState;
   readonly onApprove: () => void;
   readonly onDecline: () => void;
@@ -32,6 +38,7 @@ export function ConfirmCard({
   toolName,
   price,
   available,
+  reuse = null,
   ...rest
 }: ConfirmCardProps) {
   const balance = balanceLine(available);
@@ -49,6 +56,11 @@ export function ConfirmCard({
           <CoinsIcon className="size-4 shrink-0 text-primary" aria-hidden />
           {priceLine(price)}
         </p>
+        {reuse ? (
+          <p className="text-sm">
+            {reuseLine(reuse.toolName, reuse.answeredOn)}
+          </p>
+        ) : null}
         {balance ? (
           <p className="text-sm text-muted-foreground">{balance}</p>
         ) : null}

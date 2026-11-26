@@ -9,7 +9,12 @@ import type {
   RunQuote,
   StartFromHoldError,
 } from "@/db/queries/credits";
-import type { AbandonError, ResumeError } from "@/db/queries/runs";
+import type {
+  AbandonError,
+  CopiedAnswer,
+  ResumeError,
+  ReuseSource,
+} from "@/db/queries/runs";
 import type { CreditSummary } from "@/billing/summary";
 import type { RunLimitError, RunTicket } from "@/lib/limits";
 import type { Result } from "@/lib/result";
@@ -78,6 +83,27 @@ export type AssistantToolDeps = Pick<StepDeps, "ownerOf"> & {
     toolVersion: string,
     price: number,
   ) => Promise<Result<{ readonly runId: string }, StartFromHoldError>>;
+  /** `runs.reuseSource`: the run whose answers a `reuseFrom` tool takes (spec 0011). */
+  readonly reuseSource: (
+    ownerId: string,
+    conversationId: string,
+    toolIds: readonly string[],
+  ) => Promise<ReuseSource | null>;
+  /** A run's saved answers with their sources (reuse, and the version change offer). */
+  readonly oldAnswers: (
+    ownerId: string,
+    runId: string,
+  ) => Promise<Result<readonly CopiedAnswer[], NotFound>>;
+  /** `credits.startFromOtherWithHold`: a run of one tool from another run's answers. */
+  readonly startFromOtherWithHold: (
+    ownerId: string,
+    conversationId: string,
+    sourceRunId: string,
+    toolId: string,
+    toolVersion: string,
+    price: number,
+    answers: readonly CopiedAnswer[],
+  ) => Promise<Result<{ readonly runId: string }, HoldError>>;
   /** `runs.abandon` (releases any hold in the same batch). */
   readonly abandonRun: (
     ownerId: string,
@@ -103,6 +129,8 @@ export type AssistantToolDeps = Pick<StepDeps, "ownerOf"> & {
 export type StartedFrom =
   | { readonly kind: "new" }
   | { readonly kind: "copy" }
+  /** Answers reused from another run (spec 0011): the next open card, or completion. */
+  | { readonly kind: "reuse" }
   | { readonly kind: "offer"; readonly previousRunId: string };
 
 /** What a tool did this turn, read after the stream (spec 0006, "AI turn"). */

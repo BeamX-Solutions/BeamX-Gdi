@@ -191,9 +191,27 @@ describe("threadItems: money cards (AC-3, AC-10)", () => {
         toolId: "stellar",
         price: 30,
         available: 30,
+        reuse: null,
         state: "pending",
       }),
     ]);
+  });
+
+  it("a confirm card carries the reused answers note (spec 0011, AC-4)", () => {
+    const part = {
+      ...confirmPart(),
+      input: {
+        toolId: "beacon_pro",
+        shownPrice: 150,
+        availableBalance: 200,
+        reuse: { runId: "r1", toolName: "Beacon", answeredOn: "24 Nov" },
+      },
+    };
+    expect(threadItems([assistant("a1", part)], null)[0]).toMatchObject({
+      kind: "confirm",
+      price: 150,
+      reuse: { toolName: "Beacon", answeredOn: "24 Nov" },
+    });
   });
 
   it("an approval tap or a later tool result settles the card", () => {

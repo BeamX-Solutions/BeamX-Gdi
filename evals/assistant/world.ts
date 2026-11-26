@@ -160,6 +160,8 @@ export const evalDeps = (
     resumeRun: async (_o, runId) => ok({ runId }),
     resumeRunWithHold: async (_o, runId) => ok({ runId }),
     startFromWithHold: async () => ok({ runId: RUN_IDS.active }),
+    reuseSource: async () => null,
+    startFromOtherWithHold: async () => ok({ runId: RUN_IDS.active }),
     abandonRun: async () => ok({}),
     limits: {
       guestSpendCap: async () => ok(undefined),

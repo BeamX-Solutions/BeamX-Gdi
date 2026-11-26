@@ -218,6 +218,7 @@ export function ChatItem({
           }
           price={item.price}
           available={item.available}
+          reuse={item.reuse}
           state={item.state === "expired" ? "declined" : item.state}
           disabled={busy}
           onApprove={() => actions.approve(item.approvalId, true)}
