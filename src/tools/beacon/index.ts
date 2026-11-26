@@ -36,7 +36,7 @@ export const beaconPro = defineTool({
   summary:
     "A deeper business health check: the same score, plus a full personal advisory written for your business.",
   whenToUse:
-    "The client wants more depth than Beacon: a deeper plan, a personal advisory, or more detail on their business health. Same questions and scores as Beacon, plus a full advisory written for them; answers from an earlier Beacon or Beacon Pro run are reused, so they answer nothing again.",
+    "The client wants more depth than Beacon: a deeper plan, a personal advisory, or more detail on their business health. It has the same questions and scores as Beacon, plus a full advisory written for their business, and it reuses their earlier Beacon answers so they answer nothing again. For a plain health check, Beacon is the right tool. Once a Beacon report is ready, you may mention Beacon Pro once in that chat, in one line, without calling startRun; do not mention it again unless the client asks.",
   creditPrice: 150,
   questions: beaconQuestions,
   scoresSchema: beaconScoresSchema,

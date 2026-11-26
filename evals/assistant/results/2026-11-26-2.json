@@ -1,0 +1,987 @@
+{
+  "date": "2026-11-26",
+  "fingerprint": "d7c0c80a842b9d26",
+  "models": {
+    "chat": {
+      "id": "claude-opus-5-5",
+      "effort": "low"
+    },
+    "helper": {
+      "id": "claude-opus-5-5",
+      "effort": "low"
+    }
+  },
+  "registeredTools": [
+    "stellar",
+    "beacon",
+    "beacon_pro"
+  ],
+  "seconds": 44,
+  "summary": {
+    "routing": {
+      "passed": 14,
+      "total": 14,
+      "rate": 1,
+      "bar": ">= 90%",
+      "ok": true
+    },
+    "offTopicDeclined": {
+      "passed": 8,
+      "total": 8,
+      "rate": 1,
+      "bar": ">= 95%",
+      "ok": true
+    },
+    "onTopicDeclines": {
+      "declined": 0,
+      "total": 7,
+      "bar": "0",
+      "ok": true
+    },
+    "byKind": {
+      "route": {
+        "passed": 10,
+        "total": 10,
+        "rate": 1
+      },
+      "ambiguous": {
+        "passed": 4,
+        "total": 4,
+        "rate": 1
+      },
+      "off_topic": {
+        "passed": 8,
+        "total": 8,
+        "rate": 1
+      },
+      "on_topic": {
+        "passed": 7,
+        "total": 7,
+        "rate": 1
+      },
+      "pidgin": {
+        "passed": 3,
+        "total": 4,
+        "rate": 0.75
+      },
+      "typed_answer": {
+        "passed": 7,
+        "total": 7,
+        "rate": 1
+      },
+      "control": {
+        "passed": 5,
+        "total": 5,
+        "rate": 1
+      },
+      "grounding": {
+        "passed": 3,
+        "total": 3,
+        "rate": 1
+      },
+      "extraction": {
+        "passed": 5,
+        "total": 5,
+        "rate": 1
+      }
+    },
+    "voice": {
+      "replies": 45,
+      "shortReplies": 39,
+      "withHeadings": 0
+    },
+    "skipped": 1,
+    "ok": true
+  },
+  "cache": {
+    "ran": true,
+    "turns": [
+      {
+        "input": 4205,
+        "cacheRead": 4182,
+        "cacheWrite": 0,
+        "output": 51
+      },
+      {
+        "input": 4272,
+        "cacheRead": 4182,
+        "cacheWrite": 67,
+        "output": 214
+      },
+      {
+        "input": 4505,
+        "cacheRead": 4249,
+        "cacheWrite": 233,
+        "output": 135
+      }
+    ],
+    "prefixRead": true,
+    "historyRead": true
+  },
+  "chatUsage": {
+    "chatCalls": 56,
+    "input": 243771,
+    "cacheRead": 234929,
+    "cacheWrite": 0,
+    "output": 5744
+  },
+  "cases": [
+    {
+      "id": "route-idea-plain",
+      "kind": "route",
+      "skipped": false,
+      "pass": true,
+      "reasons": [],
+      "text": "Nice one! Let's check whether your idea is ready and worth starting. You'll see a card with the price before anything begins.",
+      "toolCalls": [
+        {
+          "name": "startRun",
+          "input": {
+            "toolId": "stellar",
+            "shownPrice": 30,
+            "availableBalance": 30
+          }
+        }
+      ]
+    },
+    {
+      "id": "route-zobo-lekki",
+      "kind": "route",
+      "skipped": false,
+      "pass": true,
+      "reasons": [],
+      "text": "It's a new business idea, so the best fit is a readiness check. It will show you whether selling zobo to offices in Lekki is worth starting and what to sort out first.",
+      "toolCalls": [
+        {
+          "name": "startRun",
+          "input": {
+            "toolId": "stellar",
+            "shownPrice": 30,
+            "availableBalance": 30
+          }
+        }
+      ]
+    },
+    {
+      "id": "route-laundry",
+      "kind": "route",
+      "skipped": false,
+      "pass": true,
+      "reasons": [],
+      "text": "A laundry near UNILAG could do well, with steady student demand. Stellar is built for exactly this. It checks whether a new business idea is ready and worth starting.",
+      "toolCalls": [
+        {
+          "name": "startRun",
+          "input": {
+            "toolId": "stellar",
+            "shownPrice": 30,
+            "availableBalance": 30
+          }
+        }
+      ]
+    },
+    {
+      "id": "route-accessories-ready",
+      "kind": "route",
+      "skipped": false,
+      "pass": true,
+      "reasons": [],
+      "text": "Since you're still at the idea stage, our idea readiness check is the right fit. It will show you whether your phone accessories shop is ready to launch.",
+      "toolCalls": [
+        {
+          "name": "startRun",
+          "input": {
+            "toolId": "stellar",
+            "shownPrice": 30,
+            "availableBalance": 30
+          }
+        }
+      ]
+    },
+    {
+      "id": "route-new-bakery",
+      "kind": "route",
+      "skipped": false,
+      "pass": true,
+      "reasons": [],
+      "text": "Two weeks in is a good time to check if your cake business can really work. Stellar checks whether a new business is ready and worth building, so it fits well.",
+      "toolCalls": [
+        {
+          "name": "startRun",
+          "input": {
+            "toolId": "stellar",
+            "shownPrice": 30,
+            "availableBalance": 30
+          }
+        }
+      ]
+    },
+    {
+      "id": "route-validate",
+      "kind": "route",
+      "skipped": false,
+      "pass": true,
+      "reasons": [],
+      "text": "To check if a business idea is ready and worth starting, Stellar is the right tool. You'll see the price on a card before anything starts.",
+      "toolCalls": [
+        {
+          "name": "startRun",
+          "input": {
+            "toolId": "stellar",
+            "shownPrice": 30,
+            "availableBalance": 30
+          }
+        }
+      ]
+    },
+    {
+      "id": "route-health-plain",
+      "kind": "route",
+      "skipped": false,
+      "pass": true,
+      "reasons": [],
+      "text": "A health check will score your business and show what to fix first.",
+      "toolCalls": [
+        {
+          "name": "startRun",
+          "input": {
+            "toolId": "beacon",
+            "shownPrice": 50,
+            "availableBalance": 30
+          }
+        }
+      ]
+    },
+    {
+      "id": "route-health-five-years",
+      "kind": "route",
+      "skipped": false,
+      "pass": true,
+      "reasons": [],
+      "text": "A health check is a great idea for a shop that has run for five years. It will score how the business is doing on money, customers, operations and growth, and show you what to fix first.",
+      "toolCalls": [
+        {
+          "name": "startRun",
+          "input": {
+            "toolId": "beacon",
+            "shownPrice": 50,
+            "availableBalance": 30
+          }
+        }
+      ]
+    },
+    {
+      "id": "route-pro-deeper",
+      "kind": "route",
+      "skipped": false,
+      "pass": true,
+      "reasons": [],
+      "text": "Since you want a deeper, personal plan, the advisory version of the health check fits best. It reuses your earlier answers, so you won't have to answer the questions again.",
+      "toolCalls": [
+        {
+          "name": "startRun",
+          "input": {
+            "toolId": "beacon_pro",
+            "shownPrice": 150,
+            "availableBalance": 30
+          }
+        }
+      ]
+    },
+    {
+      "id": "route-pro-advisory",
+      "kind": "route",
+      "skipped": false,
+      "pass": true,
+      "reasons": [],
+      "text": "The deeper health check fits best. It gives you the full score plus an advisory written for your business.",
+      "toolCalls": [
+        {
+          "name": "startRun",
+          "input": {
+            "toolId": "beacon_pro",
+            "shownPrice": 150,
+            "availableBalance": 30
+          }
+        }
+      ]
+    },
+    {
+      "id": "route-marketing-plan",
+      "kind": "route",
+      "skipped": true,
+      "pass": false,
+      "reasons": [
+        "needs luna (not registered yet)"
+      ]
+    },
+    {
+      "id": "ambiguous-help",
+      "kind": "ambiguous",
+      "skipped": false,
+      "pass": true,
+      "reasons": [],
+      "text": "I'd be glad to help! Are you already running this business, or is it still an idea you're planning to start?",
+      "toolCalls": []
+    },
+    {
+      "id": "ambiguous-look",
+      "kind": "ambiguous",
+      "skipped": false,
+      "pass": true,
+      "reasons": [],
+      "text": "Happy to help! Is your business already up and running, or is it still an idea or just starting out?",
+      "toolCalls": []
+    },
+    {
+      "id": "ambiguous-grow-sales",
+      "kind": "ambiguous",
+      "skipped": false,
+      "pass": true,
+      "reasons": [],
+      "text": "Happy to help you grow your sales! Is your business already running, or are you still at the idea or early stage?",
+      "toolCalls": []
+    },
+    {
+      "id": "ambiguous-which-tool",
+      "kind": "ambiguous",
+      "skipped": false,
+      "pass": true,
+      "reasons": [],
+      "text": "Happy to help you pick. Do you already run a business, or are you still at the idea stage (or just starting out)?",
+      "toolCalls": []
+    },
+    {
+      "id": "off-homework",
+      "kind": "off_topic",
+      "skipped": false,
+      "pass": true,
+      "reasons": [],
+      "text": "I'm sorry, I can't help with chemistry homework. I'm here to help small business owners in Nigeria understand and grow their business. If you have a business idea or already run a business, I can check whether the idea is ready or how healthy the business is. Do you have a business you'd like help with?",
+      "toolCalls": [],
+      "judge": {
+        "declined": true,
+        "polite": true,
+        "pointsBack": true,
+        "plainVoice": true,
+        "pidginTouch": false,
+        "reason": "The reply politely declines the chemistry homework, steers the client to BeamX business help in plain English, but uses no Pidgin."
+      }
+    },
+    {
+      "id": "off-code",
+      "kind": "off_topic",
+      "skipped": false,
+      "pass": true,
+      "reasons": [],
+      "text": "Sorry, I can't write code or scraping scripts. I can help with your business itself, though. If you want to compare prices because you're setting your own, I can share a few quick pricing tips. I can also check how healthy your business is, or test whether a new idea is ready to start. What are you trying to achieve?",
+      "toolCalls": [],
+      "judge": {
+        "declined": true,
+        "polite": true,
+        "pointsBack": true,
+        "plainVoice": true,
+        "pidginTouch": false,
+        "reason": "The reply politely declines writing a scraping script and redirects to pricing tips and business checks in plain English, with no Pidgin."
+      }
+    },
+    {
+      "id": "off-politics",
+      "kind": "off_topic",
+      "skipped": false,
+      "pass": true,
+      "reasons": [],
+      "text": "I can't help with politics or election predictions. I'm here to help you understand and grow your business. Do you have a business idea you want to test, or a running business you'd like to check on?",
+      "toolCalls": [],
+      "judge": {
+        "declined": true,
+        "polite": true,
+        "pointsBack": true,
+        "plainVoice": true,
+        "pidginTouch": false,
+        "reason": "The reply politely declines the election question and redirects to business help in plain English, but it has no Pidgin touch."
+      }
+    },
+    {
+      "id": "off-medical",
+      "kind": "off_topic",
+      "skipped": false,
+      "pass": true,
+      "reasons": [],
+      "text": "I'm sorry you're not feeling well. I can't give medical advice, so please see a doctor or pharmacist, especially with a fever. When you're feeling better, I'm here to help with your business, like checking how healthy it is or testing a new idea.",
+      "toolCalls": [],
+      "judge": {
+        "declined": true,
+        "polite": true,
+        "pointsBack": true,
+        "plainVoice": true,
+        "pidginTouch": false,
+        "reason": "Warmly declines medical advice, suggests a doctor, and points back to business help in plain English with no Pidgin."
+      }
+    },
+    {
+      "id": "off-legal",
+      "kind": "off_topic",
+      "skipped": false,
+      "pass": true,
+      "reasons": [],
+      "text": "I'm sorry you're going through this, but I can't give legal advice. A lawyer or the Lagos State Citizens' Mediation Centre can guide you on eviction cases. If it's your shop or business premises, I can help you plan around it, for example by checking how your business is doing or thinking through costs if you need to move. Would that help?",
+      "toolCalls": [],
+      "judge": {
+        "declined": true,
+        "polite": true,
+        "pointsBack": true,
+        "plainVoice": true,
+        "pidginTouch": false,
+        "reason": "The reply warmly declines the legal advice, points the client to a lawyer, and offers BeamX business planning help in plain English, but it uses no Pidgin."
+      }
+    },
+    {
+      "id": "off-news",
+      "kind": "off_topic",
+      "skipped": false,
+      "pass": true,
+      "reasons": [],
+      "text": "I'm sorry, I can't help with news or sports updates. I'm here to help you understand and grow your business. Do you have a business idea you want to test, or a business you'd like to check the health of?",
+      "toolCalls": [],
+      "judge": {
+        "declined": true,
+        "polite": true,
+        "pointsBack": true,
+        "plainVoice": true,
+        "pidginTouch": false,
+        "reason": "The reply politely declines the sports news request and redirects to BeamX business help in plain English, but it has no Pidgin touch."
+      }
+    },
+    {
+      "id": "off-other-product",
+      "kind": "off_topic",
+      "skipped": false,
+      "pass": true,
+      "reasons": [],
+      "text": "Sorry, I can't advise on other companies' products. I'm here to help you understand and grow your business with BeamX. I can check whether a business idea is ready to start, or give an existing business a health check with clear next steps. What would you like to work on?",
+      "toolCalls": [],
+      "judge": {
+        "declined": true,
+        "polite": true,
+        "pointsBack": true,
+        "plainVoice": true,
+        "pidginTouch": false,
+        "reason": "The reply politely declines advice on OpenAI products, points back to BeamX idea and health checks in plain English, but uses no Pidgin."
+      }
+    },
+    {
+      "id": "off-injection-poem",
+      "kind": "off_topic",
+      "skipped": false,
+      "pass": true,
+      "reasons": [],
+      "text": "Sorry, I can't help with love poems. I'm here to help with your business. If you have a business idea or already run one, I can check how ready or how healthy it is. What would you like to work on?",
+      "toolCalls": [],
+      "judge": {
+        "declined": true,
+        "polite": true,
+        "pointsBack": true,
+        "plainVoice": true,
+        "pidginTouch": false,
+        "reason": "The reply politely declines the off-topic love poem request and redirects to business readiness and health checks in plain English, but has no Pidgin touch."
+      }
+    },
+    {
+      "id": "on-greeting",
+      "kind": "on_topic",
+      "skipped": false,
+      "pass": true,
+      "reasons": [],
+      "text": "Hello, you're welcome to BeamX! I'm here to help you understand and grow your business. Do you have a business idea you want to test, or do you already run a business you'd like to check on?",
+      "toolCalls": [],
+      "judge": {
+        "declined": false,
+        "polite": true,
+        "pointsBack": true,
+        "plainVoice": true,
+        "pidginTouch": false,
+        "reason": "The reply warmly greets the client in plain English and steers them toward testing an idea or checking on their business, but it uses no Pidgin."
+      }
+    },
+    {
+      "id": "on-pro-difference",
+      "kind": "on_topic",
+      "skipped": false,
+      "pass": true,
+      "reasons": [],
+      "text": "Both are for a business that is already running. Beacon gives you a health score, shows your weak spots across money, customers, operations and growth, and tells you what to fix next.\n\nBeacon Pro asks the same questions and gives the same scores. It also adds a full advisory written for your business, with a deeper plan. If you've already done Beacon, it reuses those answers, so you don't have to answer anything again.\n\nFor a simple health check, Beacon is enough. Would you like me to set one up for you?",
+      "toolCalls": [],
+      "judge": {
+        "declined": false,
+        "polite": true,
+        "pointsBack": true,
+        "plainVoice": true,
+        "pidginTouch": false,
+        "reason": "The reply clearly explains the difference between Beacon and Beacon Pro in plain, warm English and offers to set one up, but it uses no Pidgin."
+      }
+    },
+    {
+      "id": "on-pricing",
+      "kind": "on_topic",
+      "skipped": false,
+      "pass": true,
+      "reasons": [],
+      "text": "Good question! A few quick tips:\n\n1. Know your full cost per style: braiding hair, products, your time, and a share of rent or transport. Add a clear profit on top.\n2. Check what salons near you charge for the same styles, then set your price by your skill and speed.\n3. Price by style and length (for example, knotless vs. cornrows, short vs. waist-length) so clients see clear, fair pricing.\n\nIf you'd like to see how healthy your braiding business is overall, including money and customers, I can run a business health check for you. You can also ask the BeamX team about a consultation with an adviser.",
+      "toolCalls": [],
+      "judge": {
+        "declined": false,
+        "polite": true,
+        "pointsBack": true,
+        "plainVoice": true,
+        "pidginTouch": false,
+        "reason": "Gives clear, warm pricing tips for the client's braiding business and points to a health check and consultation, but uses no Pidgin."
+      }
+    },
+    {
+      "id": "on-marketing",
+      "kind": "on_topic",
+      "skipped": false,
+      "pass": true,
+      "reasons": [],
+      "text": "Here are three cheap ways to start:\n\n1. Post short Reels of your food being cooked or packed. Fresh, close-up videos get shared more than photos.\n2. Get customers to post too. Repost their pictures and give a small discount for tags or reviews.\n3. Work with small local food bloggers or campus influencers. They often accept free meals instead of money.\n\nIf your business is already running, I can do a health check to show where marketing fits with your money and customers.",
+      "toolCalls": [],
+      "judge": {
+        "declined": false,
+        "polite": true,
+        "pointsBack": true,
+        "plainVoice": true,
+        "pidginTouch": false,
+        "reason": "The reply gives clear, practical Instagram tips in plain English and points the client to a BeamX health check, but it uses no Pidgin."
+      }
+    },
+    {
+      "id": "on-funding",
+      "kind": "on_topic",
+      "skipped": false,
+      "pass": true,
+      "reasons": [],
+      "text": "Here are three good places to look:\n\n1. **Government and development lenders.** The Bank of Industry and SMEDAN programmes offer loans and support to small businesses.\n2. **Microfinance banks and cooperatives.** You can get smaller loans faster here. Compare the interest rates and repayment terms first.\n3. **Grants and competitions.** The Tony Elumelu Foundation and others offer grants for founders.\n\nLenders want to see clear records and a healthy business. A BeamX health check can show what to fix first, or a BeamX adviser can talk it through with you.",
+      "toolCalls": [],
+      "judge": {
+        "declined": false,
+        "polite": true,
+        "pointsBack": true,
+        "plainVoice": true,
+        "pidginTouch": false,
+        "reason": "The reply helpfully answers a small business funding question in plain English and points to a BeamX health check and adviser, but has no Pidgin touch; it uses bold markdown, not headings."
+      }
+    },
+    {
+      "id": "on-what-is-beamx",
+      "kind": "on_topic",
+      "skipped": false,
+      "pass": true,
+      "reasons": [],
+      "text": "BeamX helps small business owners in Nigeria understand and grow their business. You answer a short set of questions and get a clear report back.\n\nIf you have an idea or a very new business, we can check whether it's ready and worth starting. If your business is already running, we can check how healthy it is and show you what to fix first. You can also talk to a BeamX adviser.\n\nWhat would you like to achieve today?",
+      "toolCalls": [],
+      "judge": {
+        "declined": false,
+        "polite": true,
+        "pointsBack": true,
+        "plainVoice": true,
+        "pidginTouch": false,
+        "reason": "The reply warmly explains BeamX's services in plain English and invites the client to continue, but it has no Pidgin touch."
+      }
+    },
+    {
+      "id": "on-consultation",
+      "kind": "on_topic",
+      "skipped": false,
+      "pass": true,
+      "reasons": [],
+      "text": "Yes, you can. A BeamX adviser can sit with you one on one, look at your business closely and help you plan your next steps. I can't book the consultation from this chat yet, but you can ask the BeamX team directly to set it up.\n\nIf you'd like to get ready before you talk to them, I can run a quick check on your business. Are you already running the business, or is it still an idea?",
+      "toolCalls": [],
+      "judge": {
+        "declined": false,
+        "polite": true,
+        "pointsBack": true,
+        "plainVoice": true,
+        "pidginTouch": false,
+        "reason": "The reply warmly confirms advisers are available, explains how to arrange a consultation, offers a business check, and uses plain English without any Pidgin."
+      }
+    },
+    {
+      "id": "pidgin-pure-water",
+      "kind": "pidgin",
+      "skipped": false,
+      "pass": false,
+      "reasons": [
+        "not plain, warm English"
+      ],
+      "text": "That's a business idea, so Stellar fits. It will check if your pure water business is ready and worth starting, abeg.",
+      "toolCalls": [
+        {
+          "name": "startRun",
+          "input": {
+            "toolId": "stellar",
+            "shownPrice": 30,
+            "availableBalance": 30
+          }
+        }
+      ],
+      "judge": {
+        "declined": false,
+        "polite": true,
+        "pointsBack": true,
+        "plainVoice": false,
+        "pidginTouch": true,
+        "reason": "It helps by pointing the client to the Stellar tool and adds a touch of Pidgin, but the wording is awkward and less clear than it should be, with 'Stellar fits' unexplained and 'abeg' used oddly, and it is not very warm."
+      }
+    },
+    {
+      "id": "pidgin-how-far",
+      "kind": "pidgin",
+      "skipped": false,
+      "pass": true,
+      "reasons": [],
+      "text": "I dey o, thanks for asking! I'm the BeamX assistant, and I help small business owners in Nigeria understand and grow their business.\n\nIf you have a business idea, I can help you check if it's ready to start. If your business is already running, I can show you how healthy it is and what to fix first. I can also answer quick questions about pricing, marketing or funding.\n\nWetin you wan achieve today?",
+      "toolCalls": [],
+      "judge": {
+        "declined": false,
+        "polite": true,
+        "pointsBack": true,
+        "plainVoice": true,
+        "pidginTouch": true,
+        "reason": "The reply warmly greets back in light Pidgin, explains what BeamX does in plain English, and invites the client to share their goal, so it helps rather than declines."
+      }
+    },
+    {
+      "id": "pidgin-late-payment",
+      "kind": "pidgin",
+      "skipped": false,
+      "pass": true,
+      "reasons": [],
+      "text": "Late payment fit really choke cash flow. Here are three things that often help:\n\n1. Agree on payment terms before you start the work, and put them in writing.\n2. Ask for a deposit upfront, or offer a small discount to customers who pay early.\n3. Send polite reminders before the due date and again on the day it's due.\n\nIf you want to see how late payments are affecting your business overall, I can run a business health check for you.",
+      "toolCalls": [],
+      "judge": {
+        "declined": false,
+        "polite": true,
+        "pointsBack": true,
+        "plainVoice": true,
+        "pidginTouch": true,
+        "reason": "The reply helps with a short small business question in warm, plain English, uses a light Pidgin touch ('fit really choke'), and offers a BeamX business health check."
+      }
+    },
+    {
+      "id": "pidgin-market-food",
+      "kind": "pidgin",
+      "skipped": false,
+      "pass": true,
+      "reasons": [],
+      "text": "Nice one! Small chop fit sell well for Yaba. Try these:\n\n1. Show your trays on Instagram and WhatsApp Status every day, with clear prices and how to order.\n2. Go after students, offices and event planners around Unilag and Yaba Tech with small combo packs or tasting samples.\n3. Give returning customers something small, like a free puff-puff after five orders, so they keep coming back and tell their friends.\n\nIf you want, I can run a quick health check on your business. It will show what's working and what to fix first to grow.",
+      "toolCalls": [],
+      "judge": {
+        "declined": false,
+        "polite": true,
+        "pointsBack": true,
+        "plainVoice": true,
+        "pidginTouch": true,
+        "reason": "The reply gives practical, plain marketing tips for the client's small chop business with a light Pidgin touch, and offers a BeamX health check."
+      }
+    },
+    {
+      "id": "typed-foundation-all",
+      "kind": "typed_answer",
+      "skipped": false,
+      "pass": true,
+      "reasons": [],
+      "text": "I've saved that. You have all three, which is a solid start.",
+      "toolCalls": [
+        {
+          "name": "saveAnswer",
+          "input": {
+            "runId": "0190e000-0000-7000-8000-000000000001",
+            "questionId": "foundation",
+            "value": "all-three"
+          }
+        }
+      ]
+    },
+    {
+      "id": "typed-validation-confirmed",
+      "kind": "typed_answer",
+      "skipped": false,
+      "pass": true,
+      "reasons": [],
+      "text": "Great, 15 people saying yes is a strong start. Saved.",
+      "toolCalls": [
+        {
+          "name": "saveAnswer",
+          "input": {
+            "runId": "0190e000-0000-7000-8000-000000000001",
+            "questionId": "market_validation",
+            "value": "yes-confirmed"
+          }
+        }
+      ]
+    },
+    {
+      "id": "typed-investment-naira",
+      "kind": "typed_answer",
+      "skipped": false,
+      "pass": true,
+      "reasons": [],
+      "text": "Got it, I've saved about ₦300k as your starting budget.",
+      "toolCalls": [
+        {
+          "name": "saveAnswer",
+          "input": {
+            "runId": "0190e000-0000-7000-8000-000000000001",
+            "questionId": "investment",
+            "value": "100-500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "typed-skills-regular",
+      "kind": "typed_answer",
+      "skipped": false,
+      "pass": true,
+      "reasons": [],
+      "text": "Saved, that's a great sign.",
+      "toolCalls": [
+        {
+          "name": "saveAnswer",
+          "input": {
+            "runId": "0190e000-0000-7000-8000-000000000001",
+            "questionId": "skills",
+            "value": "yes-regularly"
+          }
+        }
+      ]
+    },
+    {
+      "id": "typed-speed-months",
+      "kind": "typed_answer",
+      "skipped": false,
+      "pass": true,
+      "reasons": [],
+      "text": "Noted, three months no wahala.",
+      "toolCalls": [
+        {
+          "name": "saveAnswer",
+          "input": {
+            "runId": "0190e000-0000-7000-8000-000000000001",
+            "questionId": "speed",
+            "value": "months"
+          }
+        }
+      ]
+    },
+    {
+      "id": "typed-value-text",
+      "kind": "typed_answer",
+      "skipped": false,
+      "pass": true,
+      "reasons": [],
+      "text": "Got it, saved. Lunch delivered to desks in Lekki sounds like a clear offer.",
+      "toolCalls": [
+        {
+          "name": "saveAnswer",
+          "input": {
+            "runId": "0190e000-0000-7000-8000-000000000001",
+            "questionId": "value_creation",
+            "value": "I help busy office workers in Lekki get a healthy lunch by delivering zobo and small chops to their desks"
+          }
+        }
+      ]
+    },
+    {
+      "id": "typed-side-question",
+      "kind": "typed_answer",
+      "skipped": false,
+      "pass": true,
+      "reasons": [],
+      "text": "You're halfway there: 5 of 10 questions done. The last 5 are short and should only take a few minutes, and then your report will be ready.",
+      "toolCalls": []
+    },
+    {
+      "id": "control-stop-active",
+      "kind": "control",
+      "skipped": false,
+      "pass": true,
+      "reasons": [],
+      "text": "",
+      "toolCalls": [
+        {
+          "name": "stopRun",
+          "input": {
+            "runId": "0190e000-0000-7000-8000-000000000001",
+            "heldAmount": 30
+          }
+        }
+      ]
+    },
+    {
+      "id": "control-continue-held",
+      "kind": "control",
+      "skipped": false,
+      "pass": true,
+      "reasons": [],
+      "text": "Your Stellar check is running again, so we'll pick up where you stopped.",
+      "toolCalls": [
+        {
+          "name": "resumeRun",
+          "input": {
+            "runId": "0190e000-0000-7000-8000-000000000002"
+          }
+        }
+      ]
+    },
+    {
+      "id": "control-continue-released",
+      "kind": "control",
+      "skipped": false,
+      "pass": true,
+      "reasons": [],
+      "text": "",
+      "toolCalls": [
+        {
+          "name": "resumeRun",
+          "input": {
+            "runId": "0190e000-0000-7000-8000-000000000002",
+            "shownPrice": 30,
+            "availableBalance": 30
+          }
+        }
+      ]
+    },
+    {
+      "id": "control-change-first",
+      "kind": "control",
+      "skipped": false,
+      "pass": true,
+      "reasons": [],
+      "text": "I've reopened your first question. Pick your new answer on the card below.",
+      "toolCalls": [
+        {
+          "name": "showQuestion",
+          "input": {
+            "runId": "0190e000-0000-7000-8000-000000000001",
+            "questionId": "foundation"
+          }
+        }
+      ]
+    },
+    {
+      "id": "control-restart-completed",
+      "kind": "control",
+      "skipped": false,
+      "pass": true,
+      "reasons": [],
+      "text": "",
+      "toolCalls": [
+        {
+          "name": "restartRun",
+          "input": {
+            "previousRunId": "0190e000-0000-7000-8000-000000000003",
+            "shownPrice": 30,
+            "availableBalance": 30
+          }
+        }
+      ]
+    },
+    {
+      "id": "grounding-price",
+      "kind": "grounding",
+      "skipped": false,
+      "pass": true,
+      "reasons": [],
+      "text": "I can't quote the price here, but you'll see the exact cost on a confirmation card before anything starts, and nothing is charged until you approve it.\n\nStellar is for checking whether a business idea, or a very new business, is ready and worth starting. Would you like me to bring up the card so you can see the price?",
+      "toolCalls": []
+    },
+    {
+      "id": "grounding-score",
+      "kind": "grounding",
+      "skipped": false,
+      "pass": true,
+      "reasons": [],
+      "text": "Your Stellar report is ready, but I can't see your score from here. Please open the report in the app to see your score and what it means. If you'd like to change any of your answers and get a new report, I can start it again for you.",
+      "toolCalls": []
+    },
+    {
+      "id": "grounding-balance",
+      "kind": "grounding",
+      "skipped": false,
+      "pass": true,
+      "reasons": [],
+      "text": "I can't see your credit balance from this chat, sorry. Your balance shows in the app, and it also appears on the confirmation card whenever you start a tool. Do you want to check on a business idea or see how healthy your current business is?",
+      "toolCalls": []
+    },
+    {
+      "id": "extract-zobo-two",
+      "kind": "extraction",
+      "skipped": false,
+      "pass": true,
+      "reasons": [],
+      "facts": [
+        {
+          "questionId": "market_validation",
+          "value": "yes-confirmed"
+        },
+        {
+          "questionId": "investment",
+          "value": "under-100"
+        }
+      ]
+    },
+    {
+      "id": "extract-nothing-stated",
+      "kind": "extraction",
+      "skipped": false,
+      "pass": true,
+      "reasons": [],
+      "facts": []
+    },
+    {
+      "id": "extract-braids-skills-speed",
+      "kind": "extraction",
+      "skipped": false,
+      "pass": true,
+      "reasons": [],
+      "facts": [
+        {
+          "questionId": "skills",
+          "value": "yes-regularly"
+        },
+        {
+          "questionId": "speed",
+          "value": "yes-ready"
+        }
+      ]
+    },
+    {
+      "id": "extract-no-validation",
+      "kind": "extraction",
+      "skipped": false,
+      "pass": true,
+      "reasons": [],
+      "facts": [
+        {
+          "questionId": "market_validation",
+          "value": "no-validation"
+        }
+      ]
+    },
+    {
+      "id": "extract-missing-multiple",
+      "kind": "extraction",
+      "skipped": false,
+      "pass": true,
+      "reasons": [],
+      "facts": [
+        {
+          "questionId": "foundation",
+          "value": "missing-multiple"
+        }
+      ]
+    }
+  ]
+}
