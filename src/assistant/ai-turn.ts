@@ -95,6 +95,11 @@ export type AiTurnDeps = StepDeps &
     /** The `helper` role, for known facts extraction (AC-5). */
     readonly helperModel: () => ResolvedModel;
     readonly recordUsage: (input: UsageInput) => Promise<unknown>;
+    /** A run's saved answers with their sources (the version change offer, AC-5b). */
+    readonly oldAnswers: (
+      ownerId: string,
+      runId: string,
+    ) => Promise<Result<readonly OldAnswer[], NotFound>>;
     readonly newId: () => string;
     readonly now: () => number;
   };
@@ -283,13 +288,6 @@ const startedParts = async (
       }));
       const card = prefillPart(tool, run.id, PREFILL_TITLES.lastRun, facts);
       return card === null ? firstCard() : [card];
-    }
-    case "reuse": {
-      // Answers came from another run (spec 0011, AC-7): ask what is missing, or finish.
-      const open = openQuestion(tool, answers, null);
-      return open === null
-        ? completeRun(deps, turn.conversationId, turn.owner, { run, tool })
-        : [questionPart(tool, run.id, answers, open)];
     }
     case "copy": {
       // The client restarted to change an answer: open that card if the model named it.

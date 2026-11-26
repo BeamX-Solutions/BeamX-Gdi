@@ -89,11 +89,6 @@ export type ThreadItem =
       readonly toolId: string | null;
       readonly price: number;
       readonly available: number | null;
-      /** Earlier answers the run reuses (spec 0011, AC-4); null when none. */
-      readonly reuse: {
-        readonly toolName: string;
-        readonly answeredOn: string;
-      } | null;
       readonly state: ApprovalState;
     }
   | {
@@ -148,7 +143,6 @@ const pricedInput = z.object({
   toolId: z.string().optional(),
   shownPrice: z.int().nonnegative(),
   availableBalance: z.int().optional(),
-  reuse: z.object({ toolName: z.string(), answeredOn: z.string() }).optional(),
 });
 
 const stopInput = z.object({ heldAmount: z.int().nonnegative() });
@@ -278,12 +272,6 @@ const toolItems = (
             toolId: input.toolId ?? null,
             price: input.shownPrice,
             available: input.availableBalance ?? null,
-            reuse: input.reuse
-              ? {
-                  toolName: input.reuse.toolName,
-                  answeredOn: input.reuse.answeredOn,
-                }
-              : null,
             state,
           },
         ];

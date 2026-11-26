@@ -111,27 +111,6 @@ const aiTurnDeps: AiTurnDeps = {
     );
     return started.ok ? ok({ runId: started.value.run.id }) : started;
   },
-  reuseSource: runs.reuseSource,
-  startFromOtherWithHold: async (
-    ownerId,
-    conversationId,
-    sourceRunId,
-    toolId,
-    version,
-    price,
-    answers,
-  ) => {
-    const started = await credits.startFromOtherWithHold(
-      ownerId,
-      conversationId,
-      sourceRunId,
-      toolId,
-      version,
-      price,
-      answers,
-    );
-    return started.ok ? ok({ runId: started.value.run.id }) : started;
-  },
   abandonRun: runs.abandon,
   limits: { guestSpendCap, takeRun, giveBackRun },
   helperModel: () => resolveModel("helper"),

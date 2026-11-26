@@ -293,16 +293,6 @@ export function ChatGallery() {
             onApprove={() => undefined}
             onDecline={() => undefined}
           />
-          <ConfirmCard
-            tool="startRun"
-            toolName="Beacon Pro"
-            price={150}
-            available={200}
-            reuse={{ toolName: "Beacon", answeredOn: "24 Nov" }}
-            state="pending"
-            onApprove={() => undefined}
-            onDecline={() => undefined}
-          />
           <StopCard
             heldAmount={30}
             state="pending"

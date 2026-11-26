@@ -11,7 +11,6 @@ import { priceStillValid } from "@/billing/pricing";
 import type { ToolModule } from "@/tools/registry";
 import { asOwner } from "../card-steps";
 import type { ToolEnv } from "./env";
-import { acceptedAnswers, reuseDay, type ReuseNote } from "./reuse";
 import {
   cardBalance,
   guardedStart,
@@ -30,29 +29,11 @@ export const startRunDescription = (tools: readonly ToolModule[]): string =>
     ...tools.map((t) => `- ${t.id} (${t.name}): ${t.whenToUse}`),
   ].join("\n");
 
-const reuseNote = z
-  .strictObject({
-    runId: z.string().max(100),
-    toolName: z.string().max(100),
-    answeredOn: z.string().max(40),
-  })
-  .optional()
-  .describe(
-    "Earlier answers this run reuses, shown on the approval card. Leave this out; the server fills it in.",
-  );
-
 export const startRunInput = (tools: readonly ToolModule[]) =>
   z.strictObject({
     toolId: z.enum(tools.map((t) => t.id)).describe("The tool to start."),
-    freshAnswers: z
-      .boolean()
-      .optional()
-      .describe(
-        "Set true only when the client asked to answer the questions again instead of reusing earlier answers.",
-      ),
     shownPrice: serverField("The price on the approval card."),
     availableBalance: serverField("The balance on the approval card."),
-    reuse: reuseNote,
   });
 
 export type StartRunInput = z.infer<ReturnType<typeof startRunInput>>;
@@ -67,63 +48,22 @@ export type StartRunInput = z.infer<ReturnType<typeof startRunInput>>;
 export const refineStartRun =
   (env: ToolEnv) =>
   async (input: StartRunInput): Promise<StartRunInput> => {
-    const bare = {
-      toolId: input.toolId,
-      ...(input.freshAnswers === true ? { freshAnswers: true } : {}),
-    };
+    const bare = { toolId: input.toolId };
     const found = env.deps.getTool(input.toolId);
     if (!found.ok) return bare;
     try {
-      const [availableBalance, reuse] = await Promise.all([
-        cardBalance(env),
-        input.freshAnswers === true
-          ? Promise.resolve(null)
-          : // A failed reuse read only drops the note: the run asks its questions.
-            findReuse(env, found.value).catch(() => null),
-      ]);
       return {
         ...bare,
         shownPrice: found.value.creditPrice,
-        availableBalance,
-        ...(reuse === null ? {} : { reuse }),
+        availableBalance: await cardBalance(env),
       };
     } catch {
       return bare;
     }
   };
 
-/**
- * The reuse note for a tool with `reuseFrom` (spec 0011, AC-3, AC-4): the chat's half
- * done run of one of those tools, else the owner's latest completed one.
- */
-const findReuse = async (
-  env: ToolEnv,
-  picked: ToolModule,
-): Promise<ReuseNote | null> => {
-  if (!picked.reuseFrom || picked.reuseFrom.length === 0) return null;
-  const source = await env.deps.reuseSource(
-    env.owner.current,
-    env.conversationId,
-    picked.reuseFrom,
-  );
-  if (source === null) return null;
-  const from = env.deps.getTool(source.toolId);
-  const answeredOn = reuseDay(
-    source.lastAnswerAt,
-    billingConfig.chat.dayTimeZone,
-  );
-  if (!from.ok || answeredOn === null) return null;
-  return { runId: source.runId, toolName: from.value.name, answeredOn };
-};
-
 export type StartRunOutput = WithSummary<
-  | {
-      readonly ok: true;
-      readonly runId: string;
-      readonly toolName: string;
-      /** The reused answers were gone at Approve, so every question is asked (AC-8). */
-      readonly freshStart?: true;
-    }
+  | { readonly ok: true; readonly runId: string; readonly toolName: string }
   | { readonly ok: false; readonly error: "unknown_tool" | "price_changed" }
   | HoldFailure
   | RunGuardFailure
@@ -133,12 +73,7 @@ export const startRunTool = (env: ToolEnv) =>
   tool({
     description: startRunDescription(env.deps.tools),
     inputSchema: startRunInput(env.deps.tools),
-    execute: async ({
-      toolId,
-      shownPrice,
-      freshAnswers,
-      reuse,
-    }): Promise<StartRunOutput> => {
+    execute: async ({ toolId, shownPrice }): Promise<StartRunOutput> => {
       const { deps, conversationId } = env;
       const done = (output: StartRunOutput) => {
         deps.log("assistant_tool", {
@@ -159,11 +94,6 @@ export const startRunTool = (env: ToolEnv) =>
       return done(
         await guardedStart(env, async (): Promise<StartRunOutput> => {
           await deps.ensureAccount(env.owner.current, env.isGuest, env.ip);
-          if (reuse !== undefined && freshAnswers !== true) {
-            const reused = await startReused(env, picked, reuse.runId, price);
-            if (reused !== "source_gone") return withSummary(env, reused);
-          }
-          const freshStart = reuse !== undefined && freshAnswers !== true;
           const { owner, result } = await asOwner(
             deps,
             conversationId,
@@ -189,7 +119,6 @@ export const startRunTool = (env: ToolEnv) =>
               ok: true,
               runId: result.value.runId,
               toolName: picked.name,
-              ...(freshStart ? { freshStart: true as const } : {}),
             });
           }
           return withSummary(env, holdFailure(result.error, price));
@@ -197,52 +126,6 @@ export const startRunTool = (env: ToolEnv) =>
       );
     },
   });
-
-/**
- * Starts a run from the reused run's answers with its hold (spec 0011, AC-6). Returns
- * `source_gone` when the source can no longer be read or copied, so the caller starts
- * a fresh run at the same price instead (AC-8).
- */
-const startReused = async (
-  env: ToolEnv,
-  picked: ToolModule,
-  sourceRunId: string,
-  price: number,
-): Promise<
-  Extract<StartRunOutput, { readonly ok: true }> | HoldFailure | "source_gone"
-> => {
-  const { deps, conversationId } = env;
-  const old = await deps.oldAnswers(env.owner.current, sourceRunId);
-  if (!old.ok) return "source_gone";
-  const answers = acceptedAnswers(picked, old.value);
-  const { owner, result } = await asOwner(
-    deps,
-    conversationId,
-    env.owner,
-    (id) =>
-      deps.startFromOtherWithHold(
-        id,
-        conversationId,
-        sourceRunId,
-        picked.id,
-        picked.version,
-        price,
-        answers,
-      ),
-  );
-  env.owner.current = owner.current;
-  if (!result.ok)
-    return result.error.code === "not_found"
-      ? "source_gone"
-      : holdFailure(result.error, price);
-  env.record({
-    kind: "started",
-    runId: result.value.runId,
-    toolId: picked.id,
-    from: { kind: "reuse" },
-  });
-  return { ok: true, runId: result.value.runId, toolName: picked.name };
-};
 
 /** The starter grant `ensureAccount` gives a new account (spec 0004). */
 export const STARTER_GRANT = billingConfig.grants.starter;

@@ -34,10 +34,6 @@ export const confirmTitle = (
 export const priceLine = (price: number): string =>
   `This uses ${credits(price)}.`;
 
-/** Spec 0011, AC-4: "Uses your Beacon answers from 24 Nov. Tell me if anything has changed." */
-export const reuseLine = (toolName: string, answeredOn: string): string =>
-  `Uses your ${toolName} answers from ${answeredOn}. Tell me if anything has changed.`;
-
 /** "You have 30 credits available.", or null when the card has no balance. */
 export const balanceLine = (available: number | null): string | null =>
   available === null ? null : `You have ${credits(available)} available.`;

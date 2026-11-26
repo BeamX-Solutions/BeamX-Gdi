@@ -13,12 +13,10 @@ import { releaseRunHoldCtes } from "./credit-holds";
 import {
   resumeStatements,
   selectRun,
-  startFromOtherStatements,
   startFromSource,
   startFromStatements,
   startStatements,
   withActiveRetry,
-  type CopiedAnswer,
 } from "./runs";
 import { err, ok, type Result } from "@/lib/result";
 
@@ -334,68 +332,6 @@ export const startFromWithHold = async (
     const { run, hold, pausedRunId } = outcome.value;
     if (!run || !hold) return err({ code: "not_found" });
     return ok({ run, hold, pausedRunId });
-  } catch (e) {
-    return err(await mapHoldFailure(e, userId));
-  }
-};
-
-/**
- * Starts a run of one tool from another run's answers, with its hold, all or nothing
- * (spec 0011, AC-6). `answers` are already checked by the new tool's questions. When
- * the source is this chat's `in_progress` run, it is abandoned and its hold released in
- * the same batch, before the new hold is taken. `not_found` when the source or the chat
- * is gone or not the user's. Call `ensureAccount` first.
- */
-export const startFromOtherWithHold = async (
-  userId: string,
-  conversationId: string,
-  sourceRunId: string,
-  toolId: string,
-  toolVersion: string,
-  price: number,
-  answers: readonly CopiedAnswer[],
-): Promise<
-  Result<
-    {
-      run: RunRow;
-      hold: HoldRow;
-      pausedRunId: string | null;
-      abandonedRunId: string | null;
-    },
-    HoldError
-  >
-> => {
-  const runId = newId();
-  const holdId = newId();
-  try {
-    const outcome = await withActiveRetry(async () => {
-      const [abandoned, , paused, , , , , , created, hold] = await db.batch([
-        ...startFromOtherStatements(
-          userId,
-          conversationId,
-          sourceRunId,
-          runId,
-          toolId,
-          toolVersion,
-          answers,
-        ),
-        holdForRunStatement(userId, runId, holdId, price),
-        assertRunExists(userId, runId),
-        assertHoldPlaced(holdId),
-        selectRun(userId, runId),
-        selectHold(holdId),
-      ]);
-      return {
-        run: created[0],
-        hold: hold[0],
-        pausedRunId: paused[0]?.id ?? null,
-        abandonedRunId: (abandoned.rowCount ?? 0) > 0 ? sourceRunId : null,
-      };
-    });
-    if (outcome.conflict) return err({ code: "run_in_progress" });
-    const { run, hold, pausedRunId, abandonedRunId } = outcome.value;
-    if (!run || !hold) return err({ code: "not_found" });
-    return ok({ run, hold, pausedRunId, abandonedRunId });
   } catch (e) {
     return err(await mapHoldFailure(e, userId));
   }
