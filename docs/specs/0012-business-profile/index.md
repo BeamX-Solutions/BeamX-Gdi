@@ -1,7 +1,7 @@
 # 0012. Shared business profile
 
 **Date**: 2026-11-26
-**Status**: Proposed
+**Status**: In Progress
 
 ## Summary
 
@@ -17,10 +17,10 @@ Each client gets one business profile: a small set of facts about their business
 - As a guest who signs up, I want my profile to come with me.
 
 **Acceptance criteria**:
-- **AC-1**: A pure catalog in `src/profile/catalog.ts` lists the profile keys, each with a Zod value schema and a plain label: `business_name` (text, up to 100), `business_website` (https URL, up to 200), `industry` (one canonical industry), `years_in_business` (a range `{ min, max | null }` in years), `team_size` (a range `{ min, max | null }` in people), `business_model` (`b2b`, `b2c`, `b2b2c`, `marketplace`), `geographic_scope` (`local`, `regional`, `national`, `international`).
+- **AC-1**: A pure catalog in `src/tools/_kit/facts.ts` (the kit, because tool folders may import only `_contract` and `_kit`) lists the profile keys, each with a Zod value schema and a plain label: `business_name` (text, up to 100), `business_website` (https URL, up to 200), `industry` (one canonical industry), `years_in_business` (a range `{ min, max | null }` in years), `team_size` (a range `{ min, max | null }` in people), `business_model` (`b2b`, `b2c`, `b2b2c`, `marketplace`), `geographic_scope` (`local`, `regional`, `national`, `international`).
 - **AC-2**: A question links to a fact with `fact: { key, toFact, fromFact }` (replacing the bare `factKey`). `toFact(answer)` turns an answer into a fact value or null; `fromFact(fact)` turns a fact into exactly one valid answer for this question, or null when no single option covers it. Both are pure. A contract test checks, for every option of every linked question, that `fromFact(toFact(option))` returns that option.
 - **AC-3**: Ranges reuse only when they fit one option (Luna's "Pre-launch" is stored as `{0, 0}`, which Beacon reads as "Less than 1 year"): a stored range is read by a bucketed question only if exactly one bucket contains it. Example: Beacon's "1-3 years" (`{1,3}`) is not read by Luna, whose buckets are "1-2 years" and "3-5 years", so Luna asks; Luna's "3-5 years" (`{3,5}`) is read by Beacon as "3-5 years".
-- **AC-4**: Industries use a canonical list (appendix) in which some values are narrower than others. A question reads a stored industry only when exactly one of its options covers it: Luna's "restaurants" is read by Beacon as "Food & Beverage", but Beacon's "Food & Beverage" is not read by Luna (it could be restaurants or retail), so Luna asks. "Other" is never stored.
+- **AC-4**: Industries use a canonical list (appendix) in which some values are narrower than others. A question reads a stored industry from the option that maps to that exact value; failing that, from the one option that maps to its parent, if exactly one does: Luna's "restaurants" is read by Beacon as "Food & Beverage", but Beacon's "Food & Beverage" is not read by Luna (it could be restaurants or retail), so Luna asks. "Other" is never stored.
 - **AC-5**: When a run completes, every visible answer whose question has a `fact` and a non null `toFact` is written to the profile in the same batch as the completion (the assistant layer maps the answers with the pure `toFact` and passes the entries into `runs.complete`), with `sourceRunId` and `updatedAt`. An answer whose `source` is `profile` writes nothing (it came from the profile). For each key, the newer `updatedAt` wins.
 - **AC-6**: When a new run starts (the `new` path of spec 0006), the prefill card offers profile facts and known chat facts together. A profile fact is offered only when `fromFact` returns a value and the question is visible; a chat fact for the same question wins over the profile. Accepted profile items save with `source = 'profile'`. A run whose every question is covered still shows the card first.
 - **AC-7**: The prefill card labels profile items "From your profile" and chat items "From our chat", in one card: each item carries its `source` (already in the card data), and the card draws a small label per item instead of one title for all.
@@ -46,7 +46,7 @@ Reasoning and options: see [rationale.md](rationale.md).
 
 **Data model sketch** (the table spec 0002 reserved; one migration):
 - `business_profile`: `id` uuid PK; `user_id` uuid not null unique, FK `user` ON DELETE CASCADE; `facts` jsonb not null default `'{}'`, shaped `Record<ProfileKey, { value, sourceRunId: uuid | null, updatedAt: ISO string }>`; `created_at`, `updated_at`. `sourceRunId` null means the client edited it.
-- `facts` is validated against the catalog on every read and write in `src/profile/`; an unknown key or a value that fails its schema is dropped on read (logged `profile_fact_invalid`), never shown.
+- `facts` is validated against the catalog (`tools/_kit/facts.ts`) on every read and write; an unknown key or a value that fails its schema is dropped on read (logged `profile_fact_invalid`), never shown.
 - Added to `users.linkGuest` (merge step) and to `link.int.test.ts`.
 
 **State transitions**: a fact is absent → set (run completion or edit) → replaced (newer write) → removed (edit page). No other states.
@@ -99,7 +99,7 @@ Reasoning and options: see [rationale.md](rationale.md).
 Tracer Bullet: one fact end to end first (business name from Beacon to a second Beacon), then the catalog, mappings, page and merge.
 
 1. Migration for `business_profile`; `profile.get` and `profile.writeStatements`; add the statements to `runs.complete`; add the merge to `users.linkGuest`; integration tests, satisfies **AC-5**, **AC-10**, **AC-11**
-2. `src/profile/catalog.ts` with the keys, schemas, labels, formatters and the industry list; replace `factKey` with `fact` in the contract and Beacon; the round trip contract test, satisfies **AC-1**, **AC-2**, **AC-3**, **AC-4**, **AC-12**
+2. `src/tools/_kit/facts.ts` with the keys, schemas, labels, formatters and the industry list; replace `factKey` with `fact` in the contract and Beacon; the round trip contract test, satisfies **AC-1**, **AC-2**, **AC-3**, **AC-4**, **AC-12**
 3. Prefill: merge profile facts into the `new` start path; per item source labels on the prefill card, satisfies **AC-6**, **AC-7**
 4. `/profile` page, edit and remove Server Actions, account menu link, `/design` states with axe, satisfies **AC-8**, **AC-9**
 5. End to end: Playwright (Beacon in one chat, a second Beacon in another, prefill from profile, edit on `/profile`), satisfies **AC-5** to **AC-9**
@@ -126,7 +126,7 @@ Tracer Bullet: one fact end to end first (business name from Beacon to a second 
 
 ## Appendix: canonical industries
 
-Narrower values sit under a broader one. A question option covers a value when it maps to that value or to its parent.
+Narrower values sit under a broader one. An option that maps to the value itself wins; otherwise an option that maps to its parent reads it, when exactly one does.
 
 | Canonical value | Parent | Beacon option | Luna option |
 |---|---|---|---|

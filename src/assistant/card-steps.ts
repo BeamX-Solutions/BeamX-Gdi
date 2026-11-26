@@ -5,7 +5,12 @@
  */
 import type { CompleteError } from "@/db/queries/runs";
 import type { Result } from "@/lib/result";
-import { scoreRun, type StoredAnswer, type ToolModule } from "@/tools/registry";
+import {
+  scoreRun,
+  type RunFact,
+  type StoredAnswer,
+  type ToolModule,
+} from "@/tools/registry";
 import {
   afterSave,
   answersFromRows,
@@ -49,6 +54,8 @@ export type StepDeps = {
     scores: unknown,
     answerCount: number,
     lastAnswerAt: string | null,
+    /** The run's profile facts, written in the completion batch (spec 0012). */
+    facts?: readonly RunFact[],
   ) => Promise<Result<unknown, CompleteError>>;
   readonly log: LogFn;
 };
@@ -133,6 +140,7 @@ export const completeRun = async (
       scored.value.scores,
       scored.value.answerCount,
       scored.value.lastAnswerAt,
+      scored.value.facts,
     ),
   );
   if (result.ok) return [report];

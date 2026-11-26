@@ -4,6 +4,7 @@ import { isUniqueViolation } from "../errors";
 import { newId } from "../id";
 import { report, toolRun, toolRunAnswer, user } from "../schema";
 import { releaseRunHolds } from "./credit-holds";
+import { runFactsStatement, type RunFactEntry } from "./profile";
 import { err, ok, type Result } from "@/lib/result";
 
 type RunRow = typeof toolRun.$inferSelect;
@@ -329,8 +330,9 @@ export const complete = async (
   scores: unknown,
   answerCount: number,
   lastAnswerAt: string | null,
+  facts: readonly RunFactEntry[] = [],
 ): Promise<Result<RunRow, CompleteError>> => {
-  const [, , , runRows] = await db.batch([
+  const [, , , , runRows] = await db.batch([
     // Lock first: a concurrent saveAnswer holds FOR SHARE. The fingerprint check below
     // must run in a snapshot taken after that answer committed, which a plain UPDATE
     // that merely waits on the row lock would not do (its subquery keeps the old snapshot).
@@ -353,6 +355,8 @@ export const complete = async (
       WHERE id = ${runId}::uuid AND user_id = ${userId}::uuid AND status = 'completed'
       ON CONFLICT (run_id) DO NOTHING
     `),
+    // Spec 0012, AC-5: the run's facts join the profile, only if it completed.
+    runFactsStatement(userId, runId, facts),
     db
       .select()
       .from(toolRun)

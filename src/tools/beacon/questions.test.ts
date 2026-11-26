@@ -1,6 +1,6 @@
 /**
  * Spec 0010, AC-2 and AC-3: 23 questions in order, frozen slugs that match the slug
- * rule over the standalone labels, three factKeys, and the business name limits.
+ * rule over the standalone labels, three profile facts, and the business name limits.
  */
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -94,10 +94,10 @@ describe("Beacon questions (AC-2, AC-3)", () => {
     ]);
   });
 
-  it("gives factKeys to the business name, industry and years only", () => {
+  it("links the business name, industry and years to profile facts only (spec 0012)", () => {
     expect(
       beaconQuestions.flatMap((q) =>
-        q.factKey === undefined ? [] : [[q.id, q.factKey]],
+        q.fact === undefined ? [] : [[q.id, q.fact.key]],
       ),
     ).toEqual([
       ["business_name", "business_name"],
