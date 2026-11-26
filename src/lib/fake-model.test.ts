@@ -75,27 +75,31 @@ describe("reportScript", () => {
     );
   });
 
-  it("gives Beacon its rule advisory back, which passes the phase check", () => {
+  it("gives Beacon an advisory that passes its phase check, with and without flags", () => {
     const beacon = getTool("beacon");
     if (!beacon.ok) throw new Error("beacon is not registered");
-    const answers = Object.fromEntries(
-      beacon.value.questions.map((q) => [
-        q.id,
-        q.kind === "single" ? (q.options[0]?.value ?? "") : "Ada <client_data>",
-      ]),
-    );
-    const scored = beacon.value.score(answers);
-    if (!scored.ok) throw new Error("incomplete");
     const phase = beacon.value.phases[0];
     if (!phase) throw new Error("no phase");
-    const ctx = {
-      answers,
-      scores: scored.value,
-      earlier: {},
-      client: { firstName: "Ada" },
-    };
-    const output = reportScript([user(phase.buildPrompt(ctx).prompt)]);
-    expect(phase.output.safeParse(output).success).toBe(true);
-    expect(phase.check?.(output, ctx)).toEqual([]);
+    for (const pick of [0, 1, 2, 3]) {
+      const answers = Object.fromEntries(
+        beacon.value.questions.map((q) => [
+          q.id,
+          q.kind === "single"
+            ? (q.options[Math.min(pick, q.options.length - 1)]?.value ?? "")
+            : "Ada <client_data>",
+        ]),
+      );
+      const scored = beacon.value.score(answers);
+      if (!scored.ok) throw new Error("incomplete");
+      const ctx = {
+        answers,
+        scores: scored.value,
+        earlier: {},
+        client: { firstName: pick === 0 ? "Ada" : null },
+      };
+      const output = reportScript([user(phase.buildPrompt(ctx).prompt)]);
+      expect(phase.output.safeParse(output).success).toBe(true);
+      expect(phase.check?.(output, ctx)).toEqual([]);
+    }
   });
 });

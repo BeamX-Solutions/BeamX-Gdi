@@ -1,6 +1,6 @@
 /**
- * Test only (spec 0005). The questions both pair modules share, the way Beacon and
- * Beacon Pro share theirs.
+ * Test only (spec 0005). The questions both pair modules share, the way two report
+ * styles of one tool could share one questionnaire.
  */
 import type { ToolQuestion } from "@/tools/_contract";
 

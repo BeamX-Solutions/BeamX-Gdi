@@ -18,6 +18,7 @@ const row = (over: Partial<ReportStatus> = {}): ReportStatus => ({
   phaseKeys: [],
   hasHold: true,
   stale: false,
+  scores: null,
   ...over,
 });
 
@@ -178,5 +179,50 @@ describe("buildView (AC-13)", () => {
       },
     };
     expect(buildView(throwing, stored).ok).toBe(false);
+  });
+});
+
+describe("buildStatus preview (spec 0011, AC-13)", () => {
+  const block = {
+    kind: "text",
+    title: "Score",
+    paragraphs: ["7"],
+  } as const;
+  const withPreview = {
+    ...threePhaseTool,
+    scoresSchema: z.object({ total: z.number() }),
+    toPreview: (scores: unknown) => [
+      { ...block, paragraphs: [String((scores as { total: number }).total)] },
+    ],
+  };
+
+  it("adds the preview while generating, pending or failed", () => {
+    for (const status of ["generating", "pending", "failed"] as const)
+      expect(
+        buildStatus(row({ status, scores: { total: 7 } }), withPreview).preview,
+      ).toEqual([block]);
+  });
+
+  it("leaves it out when ready, without toPreview, or for unreadable scores", () => {
+    expect(
+      buildStatus(row({ status: "ready", scores: { total: 7 } }), withPreview)
+        .preview,
+    ).toBeUndefined();
+    expect(
+      buildStatus(row({ scores: { total: 7 } }), threePhaseTool).preview,
+    ).toBeUndefined();
+    expect(
+      buildStatus(row({ scores: { total: "x" } }), withPreview).preview,
+    ).toBeUndefined();
+    expect(
+      buildStatus(row({ scores: null }), withPreview).preview,
+    ).toBeUndefined();
+  });
+
+  it("leaves it out for an old version", () => {
+    expect(
+      buildStatus(row({ toolVersion: "0", scores: { total: 7 } }), withPreview)
+        .preview,
+    ).toBeUndefined();
   });
 });

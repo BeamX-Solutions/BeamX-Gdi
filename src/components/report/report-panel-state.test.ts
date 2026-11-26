@@ -74,6 +74,23 @@ describe("panelView", () => {
     expect(loaded({ status: "pending" })).toMatchObject({ kind: "generating" });
   });
 
+  it("carries a preview above the skeleton and error cards (spec 0011)", () => {
+    const preview = [
+      { kind: "text" as const, title: "Score", paragraphs: ["7"] },
+    ];
+    expect(loaded({ preview })).toMatchObject({ kind: "generating", preview });
+    expect(
+      loaded({
+        status: "failed",
+        canRetry: true,
+        error: withError("timeout"),
+        preview,
+      }),
+    ).toMatchObject({ kind: "retry", preview });
+    expect(loaded({ preview: [] })).not.toHaveProperty("preview");
+    expect(loaded({})).not.toHaveProperty("preview");
+  });
+
   it("shows an empty skeleton while loading, never a blank", () => {
     expect(panelView({ kind: "loading" })).toEqual({
       kind: "generating",

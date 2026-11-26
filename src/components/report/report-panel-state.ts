@@ -35,12 +35,18 @@ type CardCopy = {
   readonly message: string;
 };
 
+/** Blocks a tool shows above the skeleton or error card before it is ready (spec 0011). */
+type WithPreview = { readonly preview?: readonly ReportBlock[] };
+
 export type PanelView =
-  | { readonly kind: "generating"; readonly steps: readonly SkeletonStep[] }
+  | ({
+      readonly kind: "generating";
+      readonly steps: readonly SkeletonStep[];
+    } & WithPreview)
   /** An error card with Retry. */
-  | ({ readonly kind: "retry" } & CardCopy)
+  | ({ readonly kind: "retry" } & CardCopy & WithPreview)
   /** An error card with no retry, only Start again. */
-  | ({ readonly kind: "final" } & CardCopy)
+  | ({ readonly kind: "final" } & CardCopy & WithPreview)
   | { readonly kind: "ready"; readonly blocks: readonly ReportBlock[] };
 
 export const pollDelayMs = (elapsedMs: number): number =>
@@ -71,15 +77,17 @@ const reportCard = (kind: ReportErrorViewKind): CardCopy => ({
   ...reportErrorCopy[kind],
 });
 
-const payloadView = (payload: ReportPayload): PanelView => {
-  if (payload.status === "ready") {
-    return payload.view
-      ? { kind: "ready", blocks: payload.view }
-      : {
-          kind: "final",
-          ...reportCard(payload.error?.kind ?? "stored_data_invalid"),
-        };
-  }
+const readyView = (payload: ReportPayload): PanelView =>
+  payload.view
+    ? { kind: "ready", blocks: payload.view }
+    : {
+        kind: "final",
+        ...reportCard(payload.error?.kind ?? "stored_data_invalid"),
+      };
+
+const notReadyView = (
+  payload: ReportPayload,
+): Exclude<PanelView, { readonly kind: "ready" }> => {
   // A stale report always offers Retry: the POST either reclaims it or, on the last
   // attempt, fails it and returns the credits (AC-15).
   if (payload.stale) {
@@ -97,6 +105,14 @@ const payloadView = (payload: ReportPayload): PanelView => {
       : { kind: "final", ...card };
   }
   return { kind: "generating", steps: skeletonSteps(payload.phases) };
+};
+
+const payloadView = (payload: ReportPayload): PanelView => {
+  if (payload.status === "ready") return readyView(payload);
+  const view = notReadyView(payload);
+  return payload.preview && payload.preview.length > 0
+    ? { ...view, preview: payload.preview }
+    : view;
 };
 
 export const panelView = (state: FetchState): PanelView => {

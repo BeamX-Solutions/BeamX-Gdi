@@ -50,6 +50,13 @@
     "requiresTools": ["beacon"]
   },
   {
+    "id": "route-health-advisory",
+    "kind": "route",
+    "message": "I want a proper personal plan for my business, not just a score. Where is it weak and what should I fix?",
+    "tool": "beacon",
+    "requiresTools": ["beacon"]
+  },
+  {
     "id": "route-marketing-plan",
     "kind": "route",
     "message": "I need a marketing plan for my restaurant",
@@ -61,19 +68,19 @@
     "id": "ambiguous-help",
     "kind": "ambiguous",
     "message": "I need help with my business",
-    "allowedTools": ["stellar", "beacon", "beacon-pro", "luna"]
+    "allowedTools": ["stellar", "beacon", "luna"]
   },
   {
     "id": "ambiguous-look",
     "kind": "ambiguous",
     "message": "Can you take a look at my business?",
-    "allowedTools": ["stellar", "beacon", "beacon-pro"]
+    "allowedTools": ["stellar", "beacon"]
   },
   {
     "id": "ambiguous-grow-sales",
     "kind": "ambiguous",
     "message": "I want to grow my sales",
-    "allowedTools": ["beacon", "beacon-pro", "luna"]
+    "allowedTools": ["beacon", "luna"]
   },
   {
     "id": "ambiguous-which-tool",

@@ -1,5 +1,5 @@
 /**
- * Beacon scoring (spec 0010), shared with Beacon Pro (#11). Ported from
+ * Beacon scoring (spec 0010, kept by v2 in spec 0011). Ported from
  * `calculate_beacon_score` and its insight generators in beamx-scorecard `main.py` at
  * the fixture's recorded commit. Rules compare stored option values (slugs), so a label
  * copy change never changes a score.
@@ -10,7 +10,6 @@ import { z } from "zod";
 import { err, ok, type Result } from "@/lib/result";
 import type { Answers, ScoreError } from "../_contract";
 import { missingAnswers, visibleAnswers } from "../_kit/flow";
-import { advisorySchema, buildAdvisory } from "./advisory";
 import { bands, type Band } from "./categories";
 import { beaconQuestions } from "./questions";
 
@@ -39,13 +38,12 @@ export const beaconScoresSchema = z.object({
     critical: z.array(z.string()),
     opportunities: z.array(z.string()),
   }),
-  advisory: advisorySchema,
 });
 
 export type BeaconScores = z.infer<typeof beaconScoresSchema>;
 
-/** The scores without the advisory: what the advisory builder reads. */
-export type CoreScores = Omit<BeaconScores, "advisory">;
+/** The scores before completeness is checked (same shape since v2, spec 0011). */
+export type CoreScores = BeaconScores;
 
 /** Points per answer, by question id and option value (the original's score maps). */
 const scoreMaps = {
@@ -613,7 +611,7 @@ export const calculateScore = (a: Answers): CoreScores => {
   };
 };
 
-/** Scores plus the rule based advisory, computed once at completion (spec 0010, AC-4). */
+/** The scores, computed once at completion (spec 0010, AC-4; no advisory since v2). */
 export const scoreBeacon = (
   answers: Answers,
 ): Result<BeaconScores, ScoreError> => {
@@ -621,6 +619,5 @@ export const scoreBeacon = (
   const missing = missingAnswers(tool, answers);
   if (missing.length > 0) return err({ code: "incomplete", missing });
   const visible = visibleAnswers(tool, answers);
-  const core = calculateScore(visible);
-  return ok({ ...core, advisory: buildAdvisory(core, visible) });
+  return ok(calculateScore(visible));
 };

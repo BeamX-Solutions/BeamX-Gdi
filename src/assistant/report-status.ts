@@ -35,6 +35,11 @@ export type ReportStatusPayload = {
   readonly stale: boolean;
   /** The tool's report blocks, only when ready and readable. */
   readonly view?: readonly ReportBlock[];
+  /**
+   * Blocks to show while the report is not ready (spec 0011, AC-13): only for a current
+   * module with `toPreview` whose stored scores parse.
+   */
+  readonly preview?: readonly ReportBlock[];
   /** The chip's credits on the status poll (spec 0007, AC-9); null with no account. */
   readonly summary?: CreditSummary | null;
 };
@@ -104,6 +109,24 @@ const errorKind = (
 };
 
 /**
+ * The preview blocks while a report is not ready (spec 0011, AC-13). Scores that fail
+ * the current schema, or a preview that throws, just leave it out.
+ */
+const previewOf = (
+  row: ReportStatus,
+  current: Pick<ToolModule, "scoresSchema" | "toPreview"> | null,
+): { readonly preview?: readonly ReportBlock[] } => {
+  if (row.status === "ready" || !current?.toPreview) return {};
+  const scores = current.scoresSchema.safeParse(row.scores);
+  if (!scores.success) return {};
+  try {
+    return { preview: current.toPreview(scores.data) };
+  } catch {
+    return {};
+  }
+};
+
+/**
  * Builds the status payload (AC-10). `current` is the registry's module for the run's
  * tool, or null when the tool is gone. `view` is passed only when the report is ready
  * and the run was loaded (GET); POST leaves it out and the client reads it with GET.
@@ -113,7 +136,10 @@ const errorKind = (
  */
 export const buildStatus = (
   row: ReportStatus,
-  current: Pick<ToolModule, "version" | "phases"> | null,
+  current: Pick<
+    ToolModule,
+    "version" | "phases" | "scoresSchema" | "toPreview"
+  > | null,
   view?: Result<readonly ReportBlock[], StoredDataInvalid>,
 ): ReportStatusPayload => {
   const versionCurrent =
@@ -137,5 +163,6 @@ export const buildStatus = (
     canRetry: retryable,
     stale: row.stale,
     ...(row.status === "ready" && view?.ok ? { view: view.value } : {}),
+    ...previewOf(row, versionCurrent ? current : null),
   };
 };

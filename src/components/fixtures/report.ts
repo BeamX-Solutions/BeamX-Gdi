@@ -187,8 +187,8 @@ export const allBlocksView: readonly ReportBlock[] = [
 ];
 
 /**
- * A ready Beacon report (spec 0010, AC-11): every rich section part kind, plus an HTML
- * string that must show as plain text.
+ * A ready Beacon v1 report (spec 0010, AC-11), as the frozen v1 reader still draws it:
+ * every rich section part kind, plus an HTML string that must show as plain text.
  */
 export const beaconReadyView: readonly ReportBlock[] = [
   {
@@ -303,6 +303,123 @@ const phases = (
 ): ReportPayload["phases"] =>
   list.map((p, index) => ({ label: p.label, done: index < done }));
 
+/** The blocks a Beacon report shows while its advisory is written (spec 0011). */
+export const beaconPreviewView: readonly ReportBlock[] = [
+  {
+    kind: "score_header",
+    title: "Beacon",
+    score: 47.5,
+    max: 100,
+    verdict: "risk",
+    summary:
+      "Survival Mode. Serious gaps are holding the business back. Focus on the essentials.",
+  },
+  {
+    kind: "category_bars",
+    title: "Your five areas",
+    items: [
+      { label: "Financial Health (D)", score: 7, max: 20, verdict: "risk" },
+      { label: "Customer Strength (B)", score: 14.7, max: 20, verdict: "good" },
+      {
+        label: "Operational Maturity (D)",
+        score: 9.3,
+        max: 20,
+        verdict: "risk",
+      },
+      {
+        label: "Financial Intelligence (C+)",
+        score: 12.7,
+        max: 20,
+        verdict: "caution",
+      },
+      {
+        label: "Growth & Resilience (D)",
+        score: 3.8,
+        max: 20,
+        verdict: "risk",
+      },
+    ],
+  },
+  {
+    kind: "bullets",
+    title: "Critical flags",
+    items: ["Cash crisis", "No clear view of profit", "Founder burnout risk"],
+  },
+  {
+    kind: "bullets",
+    title: "Opportunities",
+    items: [
+      "Pricing power",
+      "Organic growth through referrals and repeat business",
+    ],
+  },
+];
+
+/** A ready Beacon report (spec 0011): the preview, then the advisory sections. */
+export const beaconAdvisoryView: readonly ReportBlock[] = [
+  ...beaconPreviewView,
+  {
+    kind: "rich_section",
+    title: "Executive Summary",
+    parts: [
+      {
+        kind: "paragraph",
+        text: "Ada, your customers love you, but cash is leaking. Fix that first and the rest gets easier.",
+      },
+    ],
+  },
+  {
+    kind: "rich_section",
+    title: "Critical Priorities (Next 30 Days)",
+    parts: [
+      { kind: "subheading", text: "Cash crisis" },
+      {
+        kind: "bullets",
+        items: [
+          {
+            lead: "Week 1:",
+            text: "Write down every naira in and out, daily.",
+          },
+          {
+            lead: "Week 2 to 3:",
+            text: "Chase every invoice older than 15 days.",
+          },
+          {
+            lead: "Month 1:",
+            text: "Hold one month of costs in a separate account.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    kind: "rich_section",
+    title: "Strategic Recommendations",
+    parts: [
+      { kind: "label", text: "Customer Strength" },
+      {
+        kind: "paragraph",
+        lead: "Keep them coming back:",
+        text: "Text your 20 best customers a thank you and an early offer each month.",
+      },
+    ],
+  },
+  {
+    kind: "rich_section",
+    title: "Your Next Steps",
+    parts: [
+      {
+        kind: "numbered",
+        items: [
+          { text: "Start the cash tracker today." },
+          { text: "Book a free strategy call with BeamX." },
+        ],
+      },
+      { kind: "note", text: "Your 30 day focus: steady, visible cash." },
+    ],
+  },
+];
+
 const reportError = (kind: ReportErrorViewKind) => ({
   kind,
   ...reportErrorCopy[kind],
@@ -337,6 +454,22 @@ export const panelPayloads = {
     canRetry: false,
     stale: false,
     view: [...allBlocksView],
+  },
+  beaconGenerating: {
+    status: "generating",
+    phases: [{ label: "Writing your advisory", done: false }],
+    error: null,
+    canRetry: false,
+    stale: false,
+    preview: [...beaconPreviewView],
+  },
+  beaconAdvisoryReady: {
+    status: "ready",
+    phases: [{ label: "Writing your advisory", done: true }],
+    error: null,
+    canRetry: false,
+    stale: false,
+    view: [...beaconAdvisoryView],
   },
   beaconReady: {
     status: "ready",

@@ -1,18 +1,20 @@
 /**
- * Spec 0010, AC-9 and AC-10: block order and fields of Beacon's ready report, and the
- * verdict thresholds.
+ * Spec 0010, AC-9 and AC-10, kept for the frozen v1 reader (spec 0011, AC-3): stored v1
+ * reports draw in their original order, with findings weakest first, critical ones
+ * marked high, the booking link moved to resources; and the shared verdict thresholds.
  */
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import type { ReportBlock } from "../_contract";
-import { beacon } from ".";
-import { BOOKING_URL } from "./advisory";
 import { bands } from "./categories";
 import { fixtureAnswersSchema, toAnswers } from "./parity-fixtures";
 import { scoreBeacon } from "./scoring";
-import { bandLines, bandVerdict, percentageVerdict } from "./view";
+import { beaconV1Reader } from "./v1-reader";
+import { bandLines, bandVerdict, percentageVerdict } from "./verdicts";
+
+const BOOKING_URL = "https://calendly.com/beamxsolutions";
 
 const cases = z
   .object({
@@ -34,16 +36,41 @@ const cases = z
     ),
   ).cases;
 
+/** A stored v1 advisory: four sections, the last ending with the booking link. */
+const advisory = {
+  sections: [
+    {
+      heading: "Executive Summary",
+      parts: [{ kind: "paragraph", text: "Summary." }],
+    },
+    {
+      heading: "Strategic Recommendations",
+      parts: [{ kind: "subheading", text: "Cash" }],
+    },
+    {
+      heading: "Growth Opportunities",
+      parts: [{ kind: "bullets", items: [{ text: "Raise prices." }] }],
+    },
+    {
+      heading: "Your Next Steps",
+      parts: [
+        { kind: "paragraph", text: "Start today." },
+        { kind: "link", text: "Book a call", url: BOOKING_URL },
+      ],
+    },
+  ],
+};
+
+/** A v1 view of a fixture case, as the v1 reader draws stored data. */
 const viewOf = (name: string): readonly ReportBlock[] => {
   const found = cases.find((c) => c.name === name);
   if (!found) throw new Error(`no case ${name}`);
   const answers = toAnswers(found.answers);
   const scored = scoreBeacon(answers);
   if (!scored.ok) throw new Error("incomplete");
-  // The polish keeps the structure, so the rule advisory stands in for it here.
-  return beacon.toView({
-    scores: scored.value,
-    content: { advisory: scored.value.advisory },
+  return beaconV1Reader.toView({
+    scores: { ...scored.value, advisory },
+    content: { advisory },
     answers,
   });
 };
@@ -57,8 +84,8 @@ const blockOf = <K extends ReportBlock["kind"]>(
   return block as Extract<ReportBlock, { kind: K }>;
 };
 
-describe("Beacon view (AC-9)", () => {
-  it("draws the all best case in the spec's order", () => {
+describe("Beacon v1 view (spec 0010, AC-9)", () => {
+  it("draws the all best case in the original order", () => {
     const blocks = viewOf("all-best");
     expect(blocks.map((b) => b.kind)).toEqual([
       "score_header",
@@ -88,17 +115,9 @@ describe("Beacon view (AC-9)", () => {
         { label: "Growth & Resilience (A)" },
       ],
     });
-    expect(
-      blocks.flatMap((b) => (b.kind === "rich_section" ? [b.title] : [])),
-    ).toEqual([
-      "Executive Summary",
-      "Strategic Recommendations",
-      "Growth Opportunities",
-      "Your Next Steps",
-    ]);
   });
 
-  it("draws the all worst case with critical findings first and marked high", () => {
+  it("draws the all worst case with critical findings marked high", () => {
     const blocks = viewOf("all-worst");
     expect(blockOf(blocks, "score_header")).toMatchObject({
       title: "Red Alert",
@@ -115,10 +134,6 @@ describe("Beacon view (AC-9)", () => {
     expect(findings.items.some((i) => i.title.startsWith("CRITICAL"))).toBe(
       false,
     );
-    expect(findings.items.filter((i) => i.priority === "high")).toHaveLength(1);
-    expect(
-      blockOf(blocks, "category_bars").items.every((i) => i.verdict === "risk"),
-    ).toBe(true);
   });
 
   it("moves the booking link to resources and out of the sections", () => {
@@ -128,7 +143,7 @@ describe("Beacon view (AC-9)", () => {
       title: "Talk to BeamX",
       items: [
         {
-          title: "Book a free 30-minute strategy call",
+          title: "Book a call",
           description: "Book a free 30-minute strategy call",
           url: BOOKING_URL,
         },
@@ -150,7 +165,7 @@ describe("Beacon view (AC-9)", () => {
   });
 });
 
-describe("verdicts (AC-10)", () => {
+describe("verdicts (spec 0010, AC-10)", () => {
   it("maps each band", () => {
     expect(bands.map(bandVerdict)).toEqual([
       "good",

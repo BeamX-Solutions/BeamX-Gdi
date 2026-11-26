@@ -110,6 +110,8 @@ export const reportPayloadSchema = z.object({
   canRetry: z.boolean(),
   stale: z.boolean(),
   view: z.array(reportBlockSchema).optional(),
+  /** Blocks shown while the report is not ready yet (spec 0011). */
+  preview: z.array(reportBlockSchema).optional(),
   /** The header chip's credits, on the GET (spec 0007, AC-9); null with no account. */
   summary: creditSummarySchema.nullable().optional(),
 });

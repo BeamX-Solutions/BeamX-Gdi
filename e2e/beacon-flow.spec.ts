@@ -1,15 +1,24 @@
 import { expect, test, type Page } from "@playwright/test";
-import { answerEveryCard, scan, signUp, TURN_MS } from "./flow-helpers";
+import { answerEveryCard, grant, scan, signUp, TURN_MS } from "./flow-helpers";
 
-// Spec 0010, AC-12: a guest asks how healthy their business is, gets Beacon proposed at
-// 50 credits, signs up from the short balance card (a guest's starter credits never
-// cover Beacon; sign up adds 50), approves, answers the 23 cards, and sees the ready
-// report, which a reload keeps. Runs against a production build with the scripted fake
-// model (`E2E_FAKE_AI=true`), whose report model hands back the rule advisory.
+// Spec 0010, AC-12 and spec 0011, AC-16: a guest asks how healthy their business is,
+// gets Beacon proposed at 150 credits, signs up from the short balance card (a guest's
+// starter credits never cover Beacon), gets a staff top up, approves, answers the 23
+// cards, and sees the score and the advisory sections, which a reload keeps. Runs
+// against a production build with the scripted fake model (`E2E_FAKE_AI=true`).
 
-/** The ready report, wherever it shows: the side panel on desktop, the sheet on phones. */
+/** A report's budget: the fake model is instant, a real advisory takes about 30 seconds. */
+const REPORT_MS = 240_000;
+
+/**
+ * The ready report, wherever it shows: the side panel on desktop, the sheet on phones.
+ * The score preview also shows "Your five areas" while the advisory is written, so the
+ * ready report is the one with an advisory section.
+ */
 const readyReport = (page: Page) =>
-  page.getByRole("region", { name: "Your five areas" });
+  page
+    .getByTestId("report-view")
+    .getByRole("region", { name: "Executive Summary" });
 
 const availableIn = (chip: string): number =>
   Number(/Available:\s*(\d+)/.exec(chip)?.[1] ?? Number.NaN);
@@ -21,10 +30,10 @@ const send = async (page: Page, text: string) => {
   await page.getByRole("button", { name: "Send" }).click();
 };
 
-test.describe("health check in chat: the whole Beacon flow (spec 0010, AC-12)", () => {
+test.describe("health check in chat: the whole Beacon flow (spec 0010, AC-12; spec 0011, AC-16)", () => {
   test.describe.configure({ timeout: 600_000 });
 
-  test("ask, sign up for credits, approve, 23 cards, ready report, and a reload keeps it", async ({
+  test("ask, sign up, top up, approve, 23 cards, score then advisory, and a reload keeps it", async ({
     page,
   }) => {
     await page.goto("/");
@@ -32,11 +41,10 @@ test.describe("health check in chat: the whole Beacon flow (spec 0010, AC-12)", 
     await expect(page).toHaveURL(/\/c\/[0-9a-f-]{36}$/, { timeout: TURN_MS });
     const chatUrl = page.url();
 
-    // Beacon is proposed at 50 credits. A guest gets at most the 30 starter credits (none
-    // once the IP has had its starter grants for the day), so Approve leads to the short
-    // balance card, which offers sign up.
+    // Beacon is proposed at 150 credits. A guest gets at most the 30 starter credits, so
+    // Approve leads to the short balance card, which offers sign up.
     const proposal = page.getByRole("region", { name: "Start Beacon?" });
-    await expect(proposal.getByText("This uses 50 credits.")).toBeVisible({
+    await expect(proposal.getByText("This uses 150 credits.")).toBeVisible({
       timeout: TURN_MS,
     });
     await proposal.getByRole("button", { name: "Approve" }).click();
@@ -44,14 +52,20 @@ test.describe("health check in chat: the whole Beacon flow (spec 0010, AC-12)", 
     await expect(short).toBeVisible({ timeout: TURN_MS });
     await expect(short.getByText(/You need \d+ credits more/)).toBeVisible();
     await scan(page);
-    await signUp(page, short.getByRole("button", { name: "Sign up" }));
+    const email = await signUp(
+      page,
+      short.getByRole("button", { name: "Sign up" }),
+    );
     await expect(page).toHaveURL(chatUrl);
 
-    // Sign up adds 50, which covers Beacon whatever the starter grant was.
+    // Sign up adds 50; a staff top up of 100 then covers Beacon whatever the starter
+    // grant was.
+    grant(email, 100);
+    await page.reload();
     const chip = page.getByRole("link", { name: /^Available:/ }).filter({
       visible: true,
     });
-    await expect(chip).toHaveText(/Available:\s*(50|80) credits/, {
+    await expect(chip).toHaveText(/Available:\s*(150|180) credits/, {
       timeout: TURN_MS,
     });
     const before = availableIn(await chip.innerText());
@@ -67,11 +81,17 @@ test.describe("health check in chat: the whole Beacon flow (spec 0010, AC-12)", 
     // The business name plus Beacon's 22 questions.
     expect(await answerEveryCard(page, 30)).toBe(23);
 
-    // The report opens by itself and turns from the skeleton into the report, and the
-    // 50 credits are charged.
-    await expect(readyReport(page)).toBeVisible({ timeout: 60_000 });
-    for (const name of ["What we found", "Executive Summary", "Talk to BeamX"])
-      await expect(page.getByRole("region", { name })).toBeVisible();
+    // The report opens by itself, the score first, then the advisory, and the 150
+    // credits are charged.
+    await expect(readyReport(page)).toBeVisible({ timeout: REPORT_MS });
+    for (const name of [
+      "Executive Summary",
+      "Strategic Recommendations",
+      "Your Next Steps",
+    ])
+      await expect(page.getByRole("region", { name })).toBeVisible({
+        timeout: REPORT_MS,
+      });
     await scan(page);
     // On phones the report is a sheet over the header; close it to read the chip.
     const sheet = page.getByRole("dialog");
@@ -80,7 +100,7 @@ test.describe("health check in chat: the whole Beacon flow (spec 0010, AC-12)", 
       await expect(sheet).toBeHidden();
     }
     await expect(chip).toHaveText(
-      new RegExp(`Available:\\s*${before - 50} credits`),
+      new RegExp(`Available:\\s*${before - 150} credits`),
       { timeout: TURN_MS },
     );
     await scan(page);

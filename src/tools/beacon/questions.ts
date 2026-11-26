@@ -1,5 +1,5 @@
 /**
- * Beacon's questions (spec 0010), shared with Beacon Pro (#11). The business name, then
+ * Beacon's questions (spec 0010, kept by v2 in spec 0011). The business name, then
  * the standalone's 22 questions in its form order (fixtures/parity/beacon/questions.json).
  * Name and email are not asked: the account already holds them.
  *

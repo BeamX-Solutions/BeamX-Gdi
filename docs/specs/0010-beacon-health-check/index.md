@@ -1,7 +1,7 @@
 # 0010. Beacon health check in chat
 
 **Date**: 2026-11-23
-**Status**: Accepted
+**Status**: Superseded by [0011](../0011-beacon-advisory/index.md) for the report (questions and scoring carry over)
 
 ## Summary
 
