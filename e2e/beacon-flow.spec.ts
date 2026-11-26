@@ -1,9 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
-import { answerEveryCard, grant, scan, signUp, TURN_MS } from "./flow-helpers";
+import { answerEveryCard, scan, signUp, TURN_MS } from "./flow-helpers";
 
 // Spec 0010, AC-12 and spec 0011, AC-16: a guest asks how healthy their business is,
 // gets Beacon proposed at 150 credits, signs up from the short balance card (a guest's
-// starter credits never cover Beacon), gets a staff top up, approves, answers the 23
+// starter credits never cover Beacon; sign up adds 150), approves, answers the 23
 // cards, and sees the score and the advisory sections, which a reload keeps. Runs
 // against a production build with the scripted fake model (`E2E_FAKE_AI=true`).
 
@@ -33,7 +33,7 @@ const send = async (page: Page, text: string) => {
 test.describe("health check in chat: the whole Beacon flow (spec 0010, AC-12; spec 0011, AC-16)", () => {
   test.describe.configure({ timeout: 600_000 });
 
-  test("ask, sign up, top up, approve, 23 cards, score then advisory, and a reload keeps it", async ({
+  test("ask, sign up, approve, 23 cards, score then advisory, and a reload keeps it", async ({
     page,
   }) => {
     await page.goto("/");
@@ -52,15 +52,10 @@ test.describe("health check in chat: the whole Beacon flow (spec 0010, AC-12; sp
     await expect(short).toBeVisible({ timeout: TURN_MS });
     await expect(short.getByText(/You need \d+ credits more/)).toBeVisible();
     await scan(page);
-    const email = await signUp(
-      page,
-      short.getByRole("button", { name: "Sign up" }),
-    );
+    await signUp(page, short.getByRole("button", { name: "Sign up" }));
     await expect(page).toHaveURL(chatUrl);
 
-    // Sign up adds 50; a staff top up of 100 then covers Beacon whatever the starter
-    // grant was.
-    grant(email, 100);
+    // Sign up adds 150, which covers Beacon whatever the starter grant was (spec 0004).
     await page.reload();
     const chip = page.getByRole("link", { name: /^Available:/ }).filter({
       visible: true,

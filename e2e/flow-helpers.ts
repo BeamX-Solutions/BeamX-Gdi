@@ -2,7 +2,6 @@
  * Shared steps for the whole flow tests (spec 0007 Stellar, spec 0010 Beacon): reading
  * the emailed sign up code, the axe scan, answering every card, and signing up.
  */
-import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import AxeBuilder from "@axe-core/playwright";
 import { neon } from "@neondatabase/serverless";
@@ -113,33 +112,4 @@ export const signUp = async (page: Page, opener: Locator): Promise<string> => {
   });
   await expect(page.getByRole("dialog")).toBeHidden();
   return email;
-};
-
-/**
- * A staff grant through the real script (spec 0004, AC-17), so a test account can afford a run.
- * On Windows, Node can crash on exit after the script's work is done (a libuv
- * assertion), so success is read from the script's "Done." line, not its exit code.
- */
-export const grant = (email: string, amount: number) => {
-  const args = [
-    "node_modules/tsx/dist/cli.mjs",
-    "--env-file-if-exists=.env",
-    "scripts/credits/adjust.ts",
-    email,
-    String(amount),
-    "--reason",
-    "e2e top up",
-    "--actor",
-    "e2e@beamx.test",
-    "--yes",
-  ];
-  const output = (() => {
-    try {
-      return execFileSync(process.execPath, args, { encoding: "utf8" });
-    } catch (e) {
-      const stdout = (e as { stdout?: unknown }).stdout;
-      return typeof stdout === "string" ? stdout : "";
-    }
-  })();
-  expect(output).toContain("Done. Balance");
 };

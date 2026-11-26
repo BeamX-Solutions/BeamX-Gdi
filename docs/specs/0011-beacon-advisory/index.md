@@ -107,7 +107,7 @@ Reasoning and options: see [rationale.md](rationale.md).
 - `toPreview` is generic and available to other tools.
 
 **Negative / tradeoffs**:
-- Beacon costs three times what it did, and a guest's starter credits plus the sign up grant (30 + 50) no longer cover it: a new client must buy credits before their first Beacon.
+- Beacon costs three times what it did; the sign up grant was raised to 150 so a new account still gets a first Beacon free.
 - Each Beacon run calls Opus for about 1000 words, a higher AI cost per run than the old polish step.
 - The advisory does not type out word by word; the client waits about 30 seconds for it, with the score already visible.
 
@@ -117,5 +117,5 @@ Reasoning and options: see [rationale.md](rationale.md).
 
 ## Follow-up
 
-- [ ] Starter credits (30) plus the sign up grant (50) now cover only Stellar. Decide whether the sign up grant should cover a first Beacon (spec 0004), since a health check is often a client's first real report.
+- [x] Starter credits (30) plus the sign up grant (50) covered only Stellar. Decided 2026-11-26: the sign up grant is now 150, so a first Beacon is covered (spec 0004).
 - [ ] Spec 0010's follow up on `MAX_RUN_MS` (780000) versus the 300 second Hobby limit still stands; spec 0013 proposes the per call budget that fixes it.
