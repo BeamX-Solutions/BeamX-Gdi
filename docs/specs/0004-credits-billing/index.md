@@ -209,7 +209,7 @@ Idempotency keys: `starter:<userId>`, `signup:<userId>`, `luna:<importId>`, `pur
 | Luna export | luna_credits per email | Luna DB: sum of `creditsRemaining` on active, unexpired `CreditPurchase` rows per user email, taken at cutover |
 
 Billing config (`src/billing/config.ts`, Zod checked at module load, defaults agreed in design):
-`ngnPerCredit: 100` · `grants: { starter: 30, signup: 50, guestPerIpPerDay: 3 }` · `packs: [{ id: "p100", credits: 100, priceNgn: 10000 }, { id: "p300", credits: 300, priceNgn: 27000 }, { id: "p1000", credits: 1000, priceNgn: 85000 }]` (VAT inclusive) · `chat: { freePerDay: { account: 10, guest: 5 }, markup: 3, ceilingCredits: 3, usdToNgn: 1700, dayTimeZone: "Africa/Lagos" }` · `holdIdleDays: 30` · `expiry: { inactiveMonths: 12, warnDays: 30, enforce: false }` · `luna: { rate: 10 }`. Tool prices on the modules: Stellar 30, Beacon 50, Beacon Pro 150, Luna 500.
+`ngnPerCredit: 100` · `grants: { starter: 30, signup: 50, guestPerIpPerDay: 3 }` · `packs: [{ id: "p100", credits: 100, priceNgn: 10000 }, { id: "p300", credits: 300, priceNgn: 27000 }, { id: "p1000", credits: 1000, priceNgn: 85000 }]` (VAT inclusive) · `chat: { freePerDay: { account: 10, guest: 5 }, markup: 3, ceilingCredits: 3, usdToNgn: 1700, dayTimeZone: "Africa/Lagos" }` · `holdIdleDays: 30` · `expiry: { inactiveMonths: 12, warnDays: 30, enforce: false }` · `luna: { rate: 10 }`. Tool prices on the modules: Stellar 30, Beacon 150, Luna 500 (updated by [0011](../0011-beacon-advisory/index.md): Beacon is the Claude advisory, no separate Beacon Pro).
 
 **Key invariants**:
 - `balance >= 0` and `0 <= held <= balance` (DB CHECKs). Available = `balance - held`, never stored.

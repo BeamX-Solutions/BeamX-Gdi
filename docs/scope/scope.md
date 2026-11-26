@@ -1,6 +1,6 @@
 # Scope: BeamX Workspace (working name)
 
-One chat workspace where a business owner says what they want done, and an AI assistant runs the right BeamX tool for them (Beacon, Beacon Pro, Luna, Stellar), collects the answers in conversation, shows the report beside the chat, and then talks it through with them. It runs on credits, like an AI platform with tools: each client holds one credit balance, and each tool run (or longer chat) uses a set number of credits. New accounts get starter credits so they see a real report first, and top ups are paid in naira. Booking a BeamX consultation stays the main outcome, with credit sales alongside it. The four standalone tools keep running, and this workspace rebuilds their questions, scoring, and report logic inside one app (ported from their source, spec 0001), with room to plug in more tools later.
+One chat workspace where a business owner says what they want done, and an AI assistant runs the right BeamX tool for them (Stellar, Beacon, Luna), collects the answers in conversation, shows the report beside the chat, and then talks it through with them. It runs on credits, like an AI platform with tools: each client holds one credit balance, and each tool run (or longer chat) uses a set number of credits. New accounts get starter credits so they see a real report first, and top ups are paid in naira. Booking a BeamX consultation stays the main outcome, with credit sales alongside it. The standalone tools keep running, and this workspace rebuilds their questions, scoring, and report logic inside one app (ported from their source, spec 0001), with room to plug in more tools later.
 
 **Build approach:** Tracer Bullet (get one real thread working end to end through every layer first, then thicken it one strand at a time).
 **Workflow:** Alpha (after `/develop`, run `/check verify` on the real app). This is the default level of rigor for the project. `/architect` is the recommended first stop for any feature with a real decision, but you can skip it when you already know how to build the feature. Any feature can carry its own tag (for example `· Beta`) to get more or less rigor.
@@ -25,7 +25,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 8 | Accounts & sign up to save | Slice 2 | in-progress |
 | 9 | Shared business profile | Slice 2 | planned |
 | 10 | Beacon health check in chat | Slice 3 | done |
-| 11 | Beacon Pro in chat | Slice 3 | in-progress |
+| 11 | Beacon becomes the Claude advisory | Slice 3 | in-progress |
 | 12 | Luna marketing plan in chat | Slice 3 | planned |
 | 13 | Ask about your results | Slice 4 | planned |
 | 14 | Chat & report history | Slice 4 | planned |
@@ -93,7 +93,7 @@ code in `fixtures/parity`, `scripts/parity`
 - [x] Gather access and capture fixtures: `/develop tool source access & parity fixtures`
 
 ### 5. Tool module contract & registry · done
-The tools are rebuilt inside the workspace, ported from their source (spec 0001). This is the one typed contract every tool implements (its questions, a pure scoring function, its report prompt, its report view, its credit price) and the registry the assistant reaches tools through, so a new tool is added by adding one folder. The contract has to fit three real shapes found in the sources: fixed scoring plus one AI call (Stellar), one scoring engine with two report styles (Beacon and Beacon Pro), and a plan written by AI in phases with no scoring (Luna).
+The tools are rebuilt inside the workspace, ported from their source (spec 0001). This is the one typed contract every tool implements (its questions, a pure scoring function, its report prompt, its report view, its credit price) and the registry the assistant reaches tools through, so a new tool is added by adding one folder. The contract has to fit three real shapes found in the sources: fixed scoring plus one AI call (Stellar), one scoring engine whose report changed style between versions (Beacon, spec 0011), and a plan written by AI in phases with no scoring (Luna).
 **Done when:** a sample tool plugs in by adding one folder and one registry line, its scoring is tested against fixtures, and a failed report step shows a clear, retryable error.
 spec [0005](../specs/0005-tool-module-contract/index.md) · code in `src/tools`, `src/assistant`, `src/db/queries/reports.ts`, `src/components/report`
 - [x] Design it (spec): `/architect tool module contract & registry`
@@ -182,7 +182,7 @@ One profile (name, industry, size, location, goals, and so on) built from answer
 ## Slice 3: The other tools
 
 ### 10. Beacon health check in chat · done
-Run the Beacon business health check through chat, using the same thread as Stellar. Beacon and Beacon Pro share one questionnaire (22 questions) and one scoring engine, so this builds the shared Beacon module; its advice is the rule based advisory, polished by Claude (the standalone used OpenAI).
+Run the Beacon business health check through chat, using the same thread as Stellar. This builds the Beacon module (22 questions plus the business name, and one scoring engine); its advice was the rule based advisory, polished by Claude (the standalone used OpenAI). #11 replaced that advice with the full Claude advisory (Beacon v2); v1 reports still open.
 **Done when:** a client gets a Beacon score with category breakdown and advice in the report panel, matching what the standalone Beacon gives for the same answers (scores, grades, flags, and rule based advice; the AI wording is not compared).
 spec [0010](../specs/0010-beacon-health-check/index.md)
 - [x] Design it (spec): `/architect beacon health check in chat`
@@ -193,18 +193,16 @@ spec [0010](../specs/0010-beacon-health-check/index.md)
   - [x] Thread end to end: Playwright flow, a real model run, and the assistant eval results (AC-12, AC-13)
 - [x] Verify it: `/check verify beacon health check in chat` · core flow verified 2026-11-24; real model steps (AC-7, AC-8) and the report failure path (AC-12) skipped, Anthropic API out of credit; see verify.md
 
-### 11. Beacon Pro in chat · in-progress
-Run the deeper Beacon Pro assessment, with its report streaming in live. It is a second report style on the Beacon module (Claude writes the full advisory), so a client who already finished Beacon answers no new questions. The assistant suggests Pro when a client wants more depth than Beacon.
-**Done when:** a client gets a Beacon Pro report that streams into the panel, a client who already ran Beacon gets Pro without answering again, and the assistant can explain how Pro differs from Beacon.
-Design note (spec 0011): "streams in live" means the score shows at once and the advisory lands whole when Claude finishes; no word by word typing.
-spec [0011](../specs/0011-beacon-pro/index.md)
-- [x] Design it (spec): `/architect beacon pro in chat`
-- [x] Build it: `/develop beacon pro in chat` · code in `src/tools/beacon/` (`pro-*.ts`, `flags.ts`), `src/assistant/tools/start-run.ts`, `src/assistant/tools/reuse.ts`, `src/db/queries/runs.ts`, `src/db/queries/credits.ts`, `src/components/report`
-  - [x] Pro module: prompt, check, view, registry line, parity (AC-1, AC-2, AC-9, AC-10, AC-11, AC-12)
-  - [x] Score preview in the contract, status route and panel (AC-13)
-  - [x] Answer reuse: queries and `startRun` with the reuse line on the card (AC-3 to AC-8)
-  - [x] Assistant suggestions, eval, and the end to end thread (AC-14, AC-15, AC-16)
-- [ ] Verify it: `/check verify beacon pro in chat`
+### 11. Beacon becomes the Claude advisory · in-progress
+Decided 2026-11-26: there is one health check, and it is the premium one. The old rule based Beacon is scrapped and the standalone Beacon Pro's full Claude advisory ships under the name Beacon (v2), at 150 credits, so prices rise Stellar (30), Beacon (150), Luna (500). The score shows at once and the advisory lands when Claude finishes; older v1 reports keep opening.
+**Done when:** a client gets a Beacon score with its five areas and flags straight away, then the full advisory in the panel; older Beacon reports still open; Beacon costs 150 credits.
+spec [0011](../specs/0011-beacon-advisory/index.md)
+- [x] Design it (spec): `/architect beacon becomes the claude advisory`
+- [x] Build it: `/develop beacon becomes the claude advisory` · code in `src/tools/beacon/` (`report.ts`, `view.ts`, `flags.ts`, `verdicts.ts`, `v1-*.ts`), `src/assistant/report-status.ts`, `src/db/queries/reports.ts`, `src/components/report`
+  - [x] The advisory phase, check, view and score preview (AC-5 to AC-9)
+  - [x] Beacon v2 at 150, v1 reader, rule advisory removed (AC-1 to AC-4)
+  - [x] Assistant eval and the end to end thread (AC-10 to AC-12)
+- [ ] Verify it: `/check verify beacon becomes the claude advisory`
 
 ### 12. Luna marketing plan in chat · needs a decision
 Run Luna's long questionnaire (50 questions: 12 about the business, 38 across 9 marketing areas) in chat without wearing the client out. Progress is shown, the client can stop and resume, and the plan is generated at the end. Luna has no scoring: the plan is written by Claude in five phases in a row, which won't fit in one request, so each finished phase is saved and a failure resumes from the phase that broke.
