@@ -57,6 +57,8 @@ export const questionViewSchema: z.ZodType<QuestionView> = z.discriminatedUnion(
       maxLength: z.number().int().optional(),
       minValue: z.number().optional(),
       maxValue: z.number().optional(),
+      multiline: z.literal(true).optional(),
+      optional: z.literal(true).optional(),
     }),
   ],
 );

@@ -73,3 +73,19 @@ describe("multi choice rules (AC-8)", () => {
     expect(multiCanConfirm({ min: 2, max: 4 }, 5)).toBe(false);
   });
 });
+
+describe("optional text (spec 0013)", () => {
+  it("lets an optional question be empty and keeps the rule for the rest", () => {
+    const base = {
+      kind: "text",
+      id: "q",
+      prompt: "Q?",
+      input: "text",
+    } as const;
+    expect(validateTextAnswer({ ...base, optional: true }, "  ")).toEqual({
+      ok: true,
+      value: "",
+    });
+    expect(validateTextAnswer(base, "").ok).toBe(false);
+  });
+});

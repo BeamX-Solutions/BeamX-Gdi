@@ -17,7 +17,8 @@ export function validateTextAnswer(
   raw: string,
 ): Result<string | number, string> {
   const text = raw.trim();
-  if (text === "") return err("Enter an answer to continue.");
+  if (text === "")
+    return question.optional ? ok("") : err("Enter an answer to continue.");
 
   if (question.input === "text") {
     const max = question.maxLength ?? DEFAULT_TEXT_MAX;

@@ -47,7 +47,7 @@ export function formatAnswer(
           ? formatMoney(value)
           : formatNumber(value);
       }
-      return String(value);
+      return value === "" ? "Skipped" : String(value);
     }
     default: {
       const unreachable: never = question;

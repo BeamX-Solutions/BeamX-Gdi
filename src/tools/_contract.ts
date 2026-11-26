@@ -49,6 +49,10 @@ export type QuestionView =
       readonly input: "text" | "number" | "money";
       readonly placeholder?: string;
       readonly maxLength?: number;
+      /** A text answer that may run to several lines: drawn as a text area (spec 0013). */
+      readonly multiline?: true;
+      /** A text answer the client may skip: a Skip button saves "" (spec 0013). */
+      readonly optional?: true;
       readonly minValue?: number;
       readonly maxValue?: number;
     };

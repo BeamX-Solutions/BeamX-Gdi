@@ -115,3 +115,23 @@ describe("parseAnswer (AC-3)", () => {
     expect(parseAnswer(sampleTool, "team_size", 12).ok).toBe(true);
   });
 });
+
+describe("optional text answers (spec 0013)", () => {
+  const tool = {
+    questions: [
+      {
+        kind: "text",
+        id: "site",
+        prompt: "Website?",
+        input: "text",
+        optional: true,
+      },
+      { kind: "text", id: "name", prompt: "Name?", input: "text" },
+    ],
+  } as const;
+
+  it("accepts an empty answer only when the question is optional", () => {
+    expect(parseAnswer(tool, "site", "  ")).toEqual({ ok: true, value: "" });
+    expect(parseAnswer(tool, "name", "").ok).toBe(false);
+  });
+});
