@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ReportStatusPayload } from "@/assistant/report-status";
 import { panelPayloads } from "@/components/fixtures/report";
+import { fakeBeaconAdvisory } from "@/lib/fake-model";
 import { getTool } from "@/tools/registry";
 import { reportPayloadSchema, type ReportPayload } from "./report-payload";
 
@@ -109,12 +110,31 @@ describe("reportPayloadSchema and rich sections (spec 0010)", () => {
     );
     const scored = beacon.value.score(answers);
     if (!scored.ok) throw new Error("incomplete");
-    const scores = scored.value as { readonly advisory: unknown };
+    const phase = beacon.value.phases[0];
+    if (!phase) throw new Error("no phase");
+    const { prompt } = phase.buildPrompt({
+      answers,
+      scores: scored.value,
+      earlier: {},
+      client: { firstName: null },
+    });
     const view = beacon.value.toView({
       scores: scored.value,
-      content: { advisory: scores.advisory },
+      content: { advisory: fakeBeaconAdvisory(prompt) },
       answers,
     });
+    const preview = beacon.value.toPreview?.(scored.value) ?? [];
+    expect(preview.length).toBeGreaterThan(0);
+    expect(
+      reportPayloadSchema.safeParse({
+        status: "generating",
+        phases: [],
+        error: null,
+        canRetry: false,
+        stale: false,
+        preview,
+      }).success,
+    ).toBe(true);
     expect(
       reportPayloadSchema.safeParse({
         status: "ready",

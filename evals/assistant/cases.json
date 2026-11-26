@@ -50,18 +50,11 @@
     "requiresTools": ["beacon"]
   },
   {
-    "id": "route-pro-deeper",
+    "id": "route-health-advisory",
     "kind": "route",
-    "message": "I did the business health check before. I want something deeper now, a proper personal plan written for my business.",
-    "tool": "beacon_pro",
-    "requiresTools": ["beacon_pro"]
-  },
-  {
-    "id": "route-pro-advisory",
-    "kind": "route",
-    "message": "I want the premium health check with a full advisory report, not just the score.",
-    "tool": "beacon_pro",
-    "requiresTools": ["beacon_pro"]
+    "message": "I want a proper personal plan for my business, not just a score. Where is it weak and what should I fix?",
+    "tool": "beacon",
+    "requiresTools": ["beacon"]
   },
   {
     "id": "route-marketing-plan",
@@ -75,19 +68,19 @@
     "id": "ambiguous-help",
     "kind": "ambiguous",
     "message": "I need help with my business",
-    "allowedTools": ["stellar", "beacon", "beacon_pro", "luna"]
+    "allowedTools": ["stellar", "beacon", "luna"]
   },
   {
     "id": "ambiguous-look",
     "kind": "ambiguous",
     "message": "Can you take a look at my business?",
-    "allowedTools": ["stellar", "beacon", "beacon_pro"]
+    "allowedTools": ["stellar", "beacon"]
   },
   {
     "id": "ambiguous-grow-sales",
     "kind": "ambiguous",
     "message": "I want to grow my sales",
-    "allowedTools": ["beacon", "beacon_pro", "luna"]
+    "allowedTools": ["beacon", "luna"]
   },
   {
     "id": "ambiguous-which-tool",
@@ -138,12 +131,6 @@
   },
 
   { "id": "on-greeting", "kind": "on_topic", "message": "Hello" },
-  {
-    "id": "on-pro-difference",
-    "kind": "on_topic",
-    "message": "What is the difference between Beacon and Beacon Pro?",
-    "requiresTools": ["beacon", "beacon_pro"]
-  },
   {
     "id": "on-pricing",
     "kind": "on_topic",

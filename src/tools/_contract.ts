@@ -266,12 +266,6 @@ export type ToolModule = ToolReader & {
   /** Frozen read sides of older versions, by version. */
   readonly readers?: Readonly<Record<string, ToolReader>>;
   /**
-   * Tool ids whose answers this tool accepts, so a client who answered one of them is
-   * not asked again (spec 0011). Every copied answer is still parsed by this tool's
-   * own questions.
-   */
-  readonly reuseFrom?: readonly string[];
-  /**
    * Pure. Blocks shown while the report is not ready yet, from the scores alone
    * (spec 0011). They must equal the first blocks of `toView` for the same scores.
    * Receives scores already parsed by `scoresSchema`.
@@ -323,7 +317,6 @@ export type TypedTool<S, C> = TypedReader<S, C> & {
   readonly score: (answers: Answers) => Result<S, ScoreError>;
   readonly phases: readonly [TypedPhase<S>, ...TypedPhase<S>[]];
   readonly readers?: Readonly<Record<string, ToolReader>>;
-  readonly reuseFrom?: readonly string[];
   readonly toPreview?: (scores: S) => readonly ReportBlock[];
 };
 
@@ -394,7 +387,6 @@ export const defineTool = <S, C>(def: TypedTool<S, C>): ToolModule => ({
     };
   }),
   ...(def.readers ? { readers: def.readers } : {}),
-  ...(def.reuseFrom ? { reuseFrom: def.reuseFrom } : {}),
   ...(def.toPreview
     ? {
         toPreview: (scores: unknown) =>

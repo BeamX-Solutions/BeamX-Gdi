@@ -1,15 +1,24 @@
 /**
- * Spec 0010, AC-7 and AC-8: the advisory prompt and the check that holds the rewrite's
- * structure, links and numbers fixed.
+ * Spec 0011: Beacon's module, its v1 reader, the advisory prompt, check and view.
  */
 import { describe, expect, it } from "vitest";
 import type { Answers, PhaseContext } from "../_contract";
+import { contractViolations } from "../_kit/contract-check";
+import { getReader, tools } from "../registry";
 import { beacon } from ".";
-import type { Advisory, Part, Section } from "./advisory";
-import { advisoryPhase, checkAdvisory, MAX_ISSUES } from "./report";
+import { flagLabel } from "./flags";
+import {
+  checkAdvisory,
+  MAX_WORDS,
+  MIN_WORDS,
+  advisoryPhase,
+  advisorySchema,
+  type Advisory,
+  type Part,
+} from "./report";
+import { beaconPreview, beaconView } from "./view";
 import { scoreBeacon, type BeaconScores } from "./scoring";
 
-/** A complete, mid range answer set with critical flags and an industry insight. */
 const ANSWERS: Answers = {
   business_name: "Ada <b>Foods</b>",
   industry: "food-and-beverage",
@@ -36,35 +45,35 @@ const ANSWERS: Answers = {
   primary_pain_point: "managing-cash-flow-getting-paid",
 };
 
-const scored = scoreBeacon(ANSWERS);
-if (!scored.ok) throw new Error("fixture answers are incomplete");
-const scores: BeaconScores = scored.value;
-const rule = scores.advisory;
+const scoresOf = (answers: Answers): BeaconScores => {
+  const scored = scoreBeacon(answers);
+  if (!scored.ok) throw new Error("fixture answers are incomplete");
+  return scored.value;
+};
 
-/** A deep copy with one section's parts changed. */
-const editSection = (
-  index: number,
-  edit: (section: Section) => Section,
-): Advisory => ({
-  sections: rule.sections.map((s, i) => (i === index ? edit(s) : s)),
+const scores = scoresOf(ANSWERS);
+
+/** A paragraph of `n` plain words. */
+const words = (n: number): Part => ({
+  kind: "paragraph",
+  text: Array.from({ length: n }, () => "word").join(" "),
 });
 
-const editPart = (
-  sectionIndex: number,
-  partIndex: number,
-  edit: (part: Part) => Part,
-): Advisory =>
-  editSection(sectionIndex, (s) => ({
-    ...s,
-    parts: s.parts.map((p, j) => (j === partIndex ? edit(p) : p)),
-  }));
-
-/** The first section and part index whose part matches. */
-const find = (match: (p: Part) => boolean): readonly [number, number] => {
-  for (const [i, s] of rule.sections.entries())
-    for (const [j, p] of s.parts.entries()) if (match(p)) return [i, j];
-  throw new Error("no such part");
-};
+/** A valid advisory for `scores`: both conditional sections present, 1000 words. */
+const valid = (): Advisory => ({
+  executive_summary: [words(200)],
+  critical_priorities: [
+    { kind: "subheading", text: "Cash" },
+    { kind: "bullets", items: [{ lead: "Week 1", text: "call every debtor" }] },
+    words(195),
+  ],
+  strategic_recommendations: [words(200)],
+  growth_opportunities: [words(200)],
+  next_steps: [
+    { kind: "numbered", items: [{ text: "Book a call" }] },
+    words(200),
+  ],
+});
 
 const ctx = (firstName: string | null): PhaseContext => ({
   answers: ANSWERS,
@@ -73,196 +82,241 @@ const ctx = (firstName: string | null): PhaseContext => ({
   client: { firstName },
 });
 
-describe("advisory check (AC-8)", () => {
-  it("accepts an unchanged copy", () => {
-    expect(checkAdvisory(rule, structuredClone(rule))).toEqual([]);
-  });
-
-  it("accepts rewritten text that keeps the numbers", () => {
-    const out = {
-      sections: rule.sections.map((s) => ({
-        ...s,
-        parts: s.parts.map((p) =>
-          p.kind === "note" ? { ...p, text: `${p.text} (reworded)` } : p,
-        ),
-      })),
-    };
-    expect(checkAdvisory(rule, out)).toEqual([]);
-  });
-
-  it("rejects a changed heading", () => {
-    const out = editSection(0, (s) => ({ ...s, heading: "Summary" }));
-    expect(checkAdvisory(rule, out)).toEqual([
-      'Section 1 ("Executive Summary"): the heading changed',
-    ]);
-  });
-
-  it("rejects a dropped bullet", () => {
-    const [i, j] = find((p) => p.kind === "bullets" && p.items.length > 1);
-    const out = editPart(i, j, (p) =>
-      p.kind === "bullets" ? { ...p, items: p.items.slice(1) } : p,
-    );
-    expect(checkAdvisory(rule, out).join("\n")).toMatch(
-      /should have \d+ items/,
-    );
-  });
-
-  it("rejects a lead moved to another item", () => {
-    const [i, j] = find(
-      (p) =>
-        p.kind === "bullets" &&
-        p.items[0]?.lead === undefined &&
-        p.items[1]?.lead !== undefined,
-    );
-    const out = editPart(i, j, (p) => {
-      if (p.kind !== "bullets") return p;
-      const [first, second, ...rest] = p.items;
-      if (!first || !second) return p;
-      return {
-        ...p,
-        items: [
-          { lead: second.lead ?? "", text: first.text },
-          { text: second.text },
-          ...rest,
-        ],
-      };
+describe("the Beacon module (AC-1)", () => {
+  it("is Beacon v2 at 150 credits with one advisory phase", () => {
+    expect(tools.map((t) => t.id)).toEqual(["stellar", "beacon"]);
+    expect(beacon).toMatchObject({
+      id: "beacon",
+      version: "2",
+      name: "Beacon",
+      creditPrice: 150,
     });
-    const issues = checkAdvisory(rule, out);
-    expect(issues).toContain(
-      `Section ${i + 1} ("${rule.sections[i]?.heading}"), part ${j + 1}: item 1's bold lead changed`,
-    );
+    expect(beacon.phases.map((p) => p.key)).toEqual(["advisory"]);
+    expect(contractViolations(tools)).toEqual([]);
   });
 
-  it("rejects a changed link", () => {
-    const [i, j] = find((p) => p.kind === "link");
-    const out = editPart(i, j, (p) =>
-      p.kind === "link" ? { ...p, url: "https://evil.example/book" } : p,
-    );
-    expect(checkAdvisory(rule, out).join("\n")).toMatch(/the link changed/);
-    expect(checkAdvisory(rule, out).join("\n")).toMatch(
-      /Remove the web address https:\/\/evil\.example\/book/,
-    );
-  });
-
-  it("rejects a www address added to a paragraph", () => {
-    const [i, j] = find((p) => p.kind === "paragraph");
-    const out = editPart(i, j, (p) =>
-      p.kind === "paragraph" ? { ...p, text: `${p.text} See www.x.io` } : p,
-    );
-    expect(checkAdvisory(rule, out)).toEqual([
-      "Remove the web address www.x.io; add no links",
-    ]);
-  });
-
-  /** A one paragraph advisory, so each number appears exactly once. */
-  const single = (text: string, lead?: string): Advisory => ({
-    sections: [
-      {
-        heading: "Summary",
-        parts: [
-          lead === undefined
-            ? { kind: "paragraph", text }
-            : { kind: "paragraph", lead, text },
+  it("keeps a v1 reader, so a stored rule advisory report still opens", () => {
+    const v1 = getReader("beacon", "1");
+    if (!v1.ok) throw new Error("no v1 reader");
+    const stored = {
+      ...scores,
+      advisory: {
+        sections: [
+          {
+            heading: "Executive Summary",
+            parts: [{ kind: "paragraph", text: "Rule based summary." }],
+          },
         ],
       },
-    ],
-  });
-
-  it('rejects "30 days" rewritten as "a month"', () => {
-    expect(
-      checkAdvisory(
-        single("Act within 30 days."),
-        single("Act within a month."),
-      ),
-    ).toEqual([
-      'Section 1 ("Summary"): the number 30 is missing; keep every number as digits',
-    ]);
-  });
-
-  it("rejects 100.0 written as 100", () => {
-    expect(
-      checkAdvisory(
-        single("100.0/100", "Overall Score:"),
-        single("100/100", "Overall Score:"),
-      ),
-    ).toEqual([
-      'Section 1 ("Summary"): the number 100.0 is missing; keep every number as digits',
-    ]);
-  });
-
-  it("matches numbers across the whole section, not part by part", () => {
-    const rule = single("Within 30 days, then 30 more.");
-    expect(
-      checkAdvisory(rule, single("Within a month, then 30 more.")),
-    ).toEqual([]);
-  });
-
-  it("rejects a different number of sections", () => {
-    expect(checkAdvisory(rule, { sections: rule.sections.slice(1) })).toEqual([
-      `The advisory should have ${rule.sections.length} sections, not ${rule.sections.length - 1}`,
-    ]);
-  });
-
-  it(`caps the issues at ${MAX_ISSUES}`, () => {
-    const out = {
-      sections: rule.sections.map((s) => ({
-        ...s,
-        // Every part but a rule turns into a rule: one kind issue per part.
-        parts: s.parts.map((p): Part =>
-          p.kind === "rule" ? p : { kind: "rule" },
-        ),
-      })),
     };
-    expect(checkAdvisory(rule, out)).toHaveLength(MAX_ISSUES);
-  });
-
-  it("is what the phase runs, against the stored rule advisory", () => {
-    const phase = beacon.phases[0];
-    expect(phase?.check?.(structuredClone(rule), ctx(null))).toEqual([]);
-    const broken = editSection(0, (s) => ({ ...s, heading: "Summary" }));
-    expect(phase?.check?.(broken, ctx(null))).toHaveLength(1);
+    const content = {
+      advisory: {
+        sections: [
+          {
+            heading: "Executive Summary",
+            parts: [
+              { kind: "paragraph", text: "Rewritten summary." },
+              {
+                kind: "link",
+                text: "Book a call",
+                url: "https://calendly.com/beamxsolutions",
+              },
+            ],
+          },
+        ],
+      },
+    };
+    const blocks = v1.value.toView({
+      scores: v1.value.scoresSchema.parse(stored),
+      content: v1.value.contentSchema.parse(content),
+      answers: ANSWERS,
+    });
+    expect(blocks.map((b) => b.title)).toEqual([
+      "Building Blocks",
+      "Your five areas",
+      "What we found",
+      "Executive Summary",
+      "Talk to BeamX",
+    ]);
   });
 });
 
-describe("advisory prompt (AC-7)", () => {
-  const promptFor = (firstName: string | null) => {
-    const phase = beacon.phases[0];
-    if (!phase) throw new Error("no phase");
-    return phase.buildPrompt(ctx(firstName));
-  };
-
-  it("has the spec's phase settings", () => {
-    expect(advisoryPhase).toMatchObject({
-      key: "advisory",
-      label: "Writing your advice",
-      modelRole: "report",
-      timeoutMs: 90_000,
-    });
+describe("the advisory check (AC-10)", () => {
+  it("accepts a valid advisory", () => {
+    expect(checkAdvisory(valid(), scores)).toEqual([]);
   });
 
-  it("puts every client value inside the fenced data block, as labels", () => {
-    const { prompt, instructions } = promptFor("Ada");
-    const fenced = prompt.slice(
+  it("needs critical_priorities exactly when there are critical flags", () => {
+    expect(scores.flags.critical.length).toBeGreaterThan(0);
+    const missing = {
+      ...valid(),
+      critical_priorities: null,
+      executive_summary: [words(400)],
+    };
+    expect(checkAdvisory(missing, scores)).toEqual([
+      "critical_priorities is missing; there are critical flags, so write it",
+    ]);
+    const none = { ...scores.flags, critical: [] };
+    expect(checkAdvisory(valid(), { flags: none })).toContain(
+      "critical_priorities must be null; there are no critical flags",
+    );
+  });
+
+  it("needs growth_opportunities exactly when there are opportunity flags", () => {
+    const missing = {
+      ...valid(),
+      growth_opportunities: null,
+      executive_summary: [words(400)],
+    };
+    expect(checkAdvisory(missing, scores)).toEqual([
+      "growth_opportunities is missing; there are opportunity flags, so write it",
+    ]);
+    const none = { ...scores.flags, opportunities: [] };
+    expect(checkAdvisory(valid(), { flags: none })).toContain(
+      "growth_opportunities must be null; there are no opportunity flags",
+    );
+  });
+
+  it("rejects em dashes, en dashes and web addresses anywhere", () => {
+    const dashed = (dash: string): Advisory => ({
+      ...valid(),
+      next_steps: [
+        words(199),
+        { kind: "bullets", items: [{ lead: `Now ${dash} act`, text: "go" }] },
+      ],
+    });
+    for (const dash of ["—", "–"])
+      expect(checkAdvisory(dashed(dash), scores)).toEqual([
+        "Remove every em dash and en dash; use a comma, a colon, or a new sentence",
+      ]);
+    const linked = {
+      ...valid(),
+      next_steps: [
+        words(199),
+        { kind: "note" as const, text: "see www.example.com" },
+      ],
+    };
+    expect(checkAdvisory(linked, scores)).toEqual([
+      "Remove every web address; add no links",
+    ]);
+  });
+
+  it("keeps the length between the limits", () => {
+    const short = {
+      ...valid(),
+      executive_summary: [words(10)],
+      strategic_recommendations: [words(10)],
+    };
+    expect(checkAdvisory(short, scores)[0]).toMatch(
+      new RegExp(`write at least ${MIN_WORDS}$`),
+    );
+    const long = { ...valid(), executive_summary: [words(1500)] };
+    expect(checkAdvisory(long, scores)[0]).toMatch(
+      new RegExp(`keep it under ${MAX_WORDS}$`),
+    );
+  });
+
+  it("is the phase's check, run on parsed output", () => {
+    const phase = beacon.phases[0];
+    expect(phase?.check?.(valid(), ctx(null))).toEqual([]);
+  });
+
+  it("refuses links and rules in the output schema (AC-9)", () => {
+    const withLink = {
+      ...valid(),
+      next_steps: [{ kind: "link", text: "a", url: "https://x" }],
+    };
+    expect(advisorySchema.safeParse(withLink).success).toBe(false);
+    expect(
+      advisorySchema.safeParse({ ...valid(), next_steps: [] }).success,
+    ).toBe(false);
+  });
+});
+
+describe("the advisory prompt (AC-11)", () => {
+  it("carries the first name, business facts, scores and flag labels in the fenced block", () => {
+    const { instructions, prompt } = advisoryPhase.buildPrompt({
+      ...ctx("Ada"),
+      scores,
+    });
+    expect(instructions).toContain("<client_data>");
+    expect(instructions).toContain("Never use em dashes");
+    const data = prompt.slice(
       prompt.indexOf("<client_data>"),
       prompt.indexOf("</client_data>"),
     );
-    for (const line of [
-      "Business name: Ada <b>Foods</b>",
-      "First name: Ada",
-      "Stage: Building Blocks",
-      `Score: ${scores.total.toFixed(1)}/100`,
-      "Industry: Food & Beverage",
-      "Years in business: 3-5 years",
-      "Primary challenge: Managing cash flow/getting paid",
-    ])
-      expect(fenced).toContain(line);
-    const json = fenced.slice(fenced.indexOf("Advisory (JSON):\n") + 17);
-    expect(JSON.parse(json)).toEqual(rule);
-    expect(fenced).not.toContain("food-and-beverage");
-    expect(instructions).toContain("<client_data>");
+    expect(data).toContain("First name: Ada");
+    expect(data).toContain("Business name: Ada <b>Foods</b>");
+    expect(data).toContain(`Overall score: ${scores.total.toFixed(1)}/100`);
+    expect(data).toContain("Financial Health:");
+    expect(data).toContain(flagLabel("CASH_CRISIS"));
+    expect(data).not.toContain("CASH_CRISIS");
+    expect(prompt).toContain("write critical_priorities");
   });
 
-  it('gives a guest the first name "none"', () => {
-    expect(promptFor(null).prompt).toContain("First name: none");
+  it("says none for a guest's first name, and null sections without flags", () => {
+    const calm = scoresOf({
+      ...ANSWERS,
+      cash_flow: "consistent-surplus",
+      profit_margin: "30-pct-plus",
+      cash_runway: "6-plus-months",
+      founder_dependency: "runs-2-plus-weeks-without-me",
+      formal_registration: "fully-registered-and-tax-compliant",
+      pricing_power: "some-would-leave-but-still-profitable",
+      acquisition_channel: "paid-advertising",
+      payment_speed: "31-60-days",
+    });
+    const { prompt } = advisoryPhase.buildPrompt({
+      ...ctx(null),
+      scores: calm,
+    });
+    expect(prompt).toContain("First name: none");
+    expect(calm.flags.critical).toEqual([]);
+    expect(prompt).toContain("critical_priorities is null");
+  });
+});
+
+describe("the view and preview (AC-12, AC-13)", () => {
+  const view = beaconView({ scores, content: { advisory: valid() } });
+
+  it("shows the header, bars, flag lists, then the advisory sections in order", () => {
+    expect(view.map((b) => [b.kind, b.title])).toEqual([
+      ["score_header", "Beacon"],
+      ["category_bars", "Your five areas"],
+      ["bullets", "Critical flags"],
+      ["bullets", "Opportunities"],
+      ["rich_section", "Executive Summary"],
+      ["rich_section", "Critical Priorities (Next 30 Days)"],
+      ["rich_section", "Strategic Recommendations"],
+      ["rich_section", "Growth Opportunities"],
+      ["rich_section", "Your Next Steps"],
+    ]);
+  });
+
+  it("leaves out a null section", () => {
+    const blocks = beaconView({
+      scores,
+      content: { advisory: { ...valid(), growth_opportunities: null } },
+    });
+    expect(blocks.map((b) => b.title)).not.toContain("Growth Opportunities");
+  });
+
+  it("uses plain flag labels", () => {
+    const critical = view.find((b) => b.title === "Critical flags");
+    expect(critical).toMatchObject({
+      items: expect.arrayContaining(["Cash crisis"]),
+    });
+  });
+
+  it("previews exactly the head of the ready view", () => {
+    const preview = beaconPreview(scores);
+    expect(view.slice(0, preview.length)).toEqual(preview);
+    expect(beacon.toPreview?.(scores)).toEqual(preview);
+  });
+
+  it("leaves Stellar without a preview", () => {
+    expect(tools.filter((t) => t.toPreview).map((t) => t.id)).toEqual([
+      "beacon",
+    ]);
   });
 });

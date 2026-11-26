@@ -2,12 +2,12 @@
  * Server only. Scripted AI SDK mock models for `pnpm e2e` (spec 0007). Used only when
  * `fakeAiEnabled()` (`env.ts`): `E2E_FAKE_AI=true` and not a production deploy.
  *
- * - `chat`: replies keyed by the latest user text. "business idea" proposes Stellar, "how healthy" proposes Beacon and "deeper" proposes Beacon Pro
+ * - `chat`: replies keyed by the latest user text. "business idea" proposes Stellar and "how healthy" proposes Beacon
  *   (a `startRun` call, which waits for approval); a tool result (the approved run) gets
  *   a short text; anything else gets a short steer towards a tool.
  * - `helper`: known facts extraction finds nothing, so a run opens on its first card.
- * - `report`: a fixed Stellar analysis, for Beacon its own rule advisory back, and for
- *   Beacon Pro a fixed advisory that fits the flags in its prompt.
+ * - `report`: a fixed Stellar analysis, or for Beacon a fixed advisory that fits the
+ *   flags in its prompt.
  *
  * Keep the chat script in step with the assistant's tool flow (spec 0007, Consequences).
  */
@@ -67,9 +67,7 @@ export const chatScript = (prompt: Prompt): StreamPart[] => {
     ? "stellar"
     : /how healthy/i.test(said)
       ? "beacon"
-      : /deeper/i.test(said)
-        ? "beacon_pro"
-        : null;
+      : null;
   if (toolId)
     return [
       {
@@ -83,11 +81,9 @@ export const chatScript = (prompt: Prompt): StreamPart[] => {
   return textParts(FAKE_REPLIES.steer);
 };
 
-const ADVISORY_MARK = "Advisory (JSON):\n";
+const BEACON_MARK = "Write the Beacon advisory report";
 
-const PRO_MARK = "Write the Beacon Pro advisory report";
-
-/** A paragraph of plain words, so the fake advisory meets Pro's length check. */
+/** A paragraph of plain words, so the fake advisory meets Beacon's length check. */
 const filler = (words: number) => ({
   kind: "paragraph",
   text: Array.from(
@@ -98,10 +94,10 @@ const filler = (words: number) => ({
 });
 
 /**
- * A fixed Beacon Pro advisory (`src/tools/beacon/pro-report.ts`) of about 1000 words. Its
+ * A fixed Beacon advisory (`src/tools/beacon/report.ts`) of about 1000 words. Its
  * conditional sections follow the flags the prompt lists, so it passes the phase check.
  */
-export const fakeProAdvisory = (prompt: string) => ({
+export const fakeBeaconAdvisory = (prompt: string) => ({
   executive_summary: [filler(300)],
   critical_priorities: /Critical flags: none/.test(prompt)
     ? null
@@ -128,8 +124,8 @@ export const fakeProAdvisory = (prompt: string) => ({
 
 /**
  * What the scripted report model returns, from the prompt alone. Pure. Beacon's
- * advisory phase gets its own rule advisory back unchanged (it carries it in the
- * prompt), which passes the phase check; every other phase gets the Stellar analysis.
+ * advisory phase gets the fixed advisory, which passes its phase check; every other
+ * phase gets the Stellar analysis.
  */
 export const reportScript = (prompt: Prompt): unknown => {
   const text = prompt
@@ -139,11 +135,9 @@ export const reportScript = (prompt: Prompt): unknown => {
         : [],
     )
     .join("\n");
-  if (text.includes(PRO_MARK)) return fakeProAdvisory(text);
-  const start = text.indexOf(ADVISORY_MARK);
-  if (start === -1) return FAKE_STELLAR_ANALYSIS;
-  const json = text.slice(start + ADVISORY_MARK.length);
-  return JSON.parse(json.slice(0, json.indexOf("\n</client_data>"))) as unknown;
+  return text.includes(BEACON_MARK)
+    ? fakeBeaconAdvisory(text)
+    : FAKE_STELLAR_ANALYSIS;
 };
 
 const streaming = (script: (prompt: Prompt) => StreamPart[]) =>
