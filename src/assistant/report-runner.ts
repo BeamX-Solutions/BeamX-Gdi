@@ -78,6 +78,11 @@ export type RunnerDeps = {
     key: string,
     output: unknown,
   ) => Promise<Result<void, WriteError>>;
+  /** Ends the call between phases (spec 0013, AC-6). */
+  readonly savePartial: (
+    runId: string,
+    attempt: number,
+  ) => Promise<Result<void, WriteError>>;
   readonly markReady: (
     runId: string,
     attempt: number,
@@ -113,6 +118,8 @@ export type RunInput = { readonly runId: string; readonly attempt: number };
 /** What happened, for logs and tests. The report row is the real record. */
 export type RunOutcome =
   | { readonly outcome: "ready" }
+  /** One phase saved and more to go, for a tool with `phasesPerCall: 1` (spec 0013). */
+  | { readonly outcome: "partial"; readonly saved: string }
   | { readonly outcome: "failed"; readonly kind: ReportErrorKind }
   /** A newer attempt owns the report, or the run is gone: nothing more is written. */
   | { readonly outcome: "stopped"; readonly reason: string };
@@ -415,6 +422,18 @@ const run = async (deps: RunnerDeps, input: RunInput): Promise<RunOutcome> => {
       phaseKey: phase.key,
       ms: deps.now() - started,
     });
+
+    // One phase per call (spec 0013, AC-6): stop here while phases remain, so the next
+    // call starts fresh inside its own 300 second budget.
+    const remaining = toolModule.phases.some(
+      (p) => !Object.hasOwn(earlier, p.key),
+    );
+    if (toolModule.phasesPerCall === 1 && remaining) {
+      const paused = await deps.savePartial(runId, attempt);
+      if (!paused.ok) return STOPPED("stale_attempt");
+      deps.log("report_partial", { runId, attempt, phaseKey: phase.key });
+      return { outcome: "partial", saved: phase.key };
+    }
   }
 
   // 5. Merge, validate, and mark ready (which charges the hold once).

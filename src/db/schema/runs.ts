@@ -37,6 +37,8 @@ export const reportStatus = pgEnum("report_status", [
   "generating",
   "ready",
   "failed",
+  // Some phases saved, the next call continues (spec 0013).
+  "partial",
 ]);
 
 export const toolRun = pgTable(

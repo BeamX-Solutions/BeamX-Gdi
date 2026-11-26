@@ -61,7 +61,7 @@ const scriptedModel = (replies: readonly Reply[]) => {
 };
 
 type Row = {
-  status: "pending" | "generating" | "ready" | "failed";
+  status: "pending" | "generating" | "ready" | "failed" | "partial";
   attempts: number;
   content: Record<string, unknown> | null;
   error: ReportError | null;
@@ -163,6 +163,12 @@ const setup = (s: Setup) => {
       if (row.status !== "generating" || row.attempts !== attempt)
         return err({ code: "stale_attempt" });
       row.content = { ...(row.content ?? {}), [key]: output };
+      return ok(undefined);
+    },
+    savePartial: async (_run, attempt) => {
+      if (row.status !== "generating" || row.attempts !== attempt)
+        return err({ code: "stale_attempt" });
+      row.status = "partial";
       return ok(undefined);
     },
     markReady: async (_run, attempt, content, modelId) => {
@@ -270,6 +276,59 @@ describe("runReport, happy path (AC-8, AC-12)", () => {
       two: { text: "B" },
       three: { text: "C" },
     });
+  });
+});
+
+describe("runReport, one phase per call (spec 0013, AC-6, AC-7)", () => {
+  const perCall: ToolModule = { ...threePhaseTool, phasesPerCall: 1 };
+
+  it("saves one phase, stops as partial, and the next call continues on the same attempt", async () => {
+    const t = setup({
+      tool: perCall,
+      replies: [{ text: step("A") }, { text: step("B") }, { text: step("C") }],
+    });
+    expect(await runReport(t.deps, { runId: RUN, attempt: 1 })).toEqual({
+      outcome: "partial",
+      saved: "one",
+    });
+    expect(t.row).toMatchObject({ status: "partial", charged: false });
+    expect(t.prompts).toHaveLength(1);
+
+    // The next call claims the partial report without spending an attempt.
+    t.row.status = "generating";
+    expect(await runReport(t.deps, { runId: RUN, attempt: 1 })).toEqual({
+      outcome: "partial",
+      saved: "two",
+    });
+    expect(t.prompts).toHaveLength(2);
+    expect(t.prompts[1]).toContain('\\"one\\":{\\"text\\":\\"A\\"}');
+
+    t.row.status = "generating";
+    expect(await runReport(t.deps, { runId: RUN, attempt: 1 })).toEqual({
+      outcome: "ready",
+    });
+    expect(t.prompts).toHaveLength(3);
+    expect(t.row).toMatchObject({ status: "ready", charged: true });
+    expect(t.row.content).toEqual({
+      one: { text: "A" },
+      two: { text: "B" },
+      three: { text: "C" },
+    });
+    expect(t.logs.filter((l) => l.event === "report_partial")).toHaveLength(2);
+  });
+
+  it("never reruns a saved phase after a failed call", async () => {
+    const t = setup({
+      tool: perCall,
+      attempts: 2,
+      content: { one: { text: "A" } },
+      replies: [{ text: step("B") }],
+    });
+    expect(await runReport(t.deps, { runId: RUN, attempt: 2 })).toEqual({
+      outcome: "partial",
+      saved: "two",
+    });
+    expect(t.prompts).toHaveLength(1);
   });
 });
 

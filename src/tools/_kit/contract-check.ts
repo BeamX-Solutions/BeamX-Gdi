@@ -7,11 +7,11 @@ import { z } from "zod";
 import type { ToolModule, ToolQuestion } from "../_contract";
 import { isFactKey } from "./facts";
 
-/** Each phase's AI call stays well under the 10 minute stale window. */
-export const MAX_PHASE_TIMEOUT_MS = 240_000;
-
-/** Call plus repair for every phase fits inside the route's `maxDuration` of 800s. */
-export const MAX_RUN_MS = 780_000;
+/**
+ * What one report call may spend (spec 0013, AC-10): the route's 300 second
+ * `maxDuration` (Vercel Hobby) minus a margin for the claim, the save and the charge.
+ */
+export const MAX_CALL_MS = 280_000;
 
 const duplicates = (values: readonly string[]): readonly string[] =>
   [...new Set(values.filter((v, i) => values.indexOf(v) !== i))].sort();
@@ -33,7 +33,12 @@ const whenThrows = (when: () => boolean): boolean => {
 export const moduleViolations = (tool: ToolModule): readonly string[] => {
   const name = `tool "${tool.id}"`;
   const phaseKeys = tool.phases.map((p) => p.key);
-  const totalMs = tool.phases.reduce((sum, p) => sum + 2 * p.timeoutMs, 0);
+  // Each phase may need a repair call, so it costs up to twice its timeout. A tool with
+  // `phasesPerCall: 1` spends one phase per call; any other spends all of them.
+  const callMs =
+    tool.phasesPerCall === 1
+      ? Math.max(...tool.phases.map((p) => 2 * p.timeoutMs))
+      : tool.phases.reduce((sum, p) => sum + 2 * p.timeoutMs, 0);
   const contentKeys =
     tool.contentSchema instanceof z.ZodObject
       ? Object.keys(tool.contentSchema.shape)
@@ -66,14 +71,10 @@ export const moduleViolations = (tool: ToolModule): readonly string[] => {
       .map(
         (q) => `${name} has a "when" on "${q.id}" that throws on empty answers`,
       ),
-    ...tool.phases
-      .filter((p) => p.timeoutMs > MAX_PHASE_TIMEOUT_MS)
-      .map(
-        (p) =>
-          `${name} phase "${p.key}" has timeoutMs ${p.timeoutMs}, over ${MAX_PHASE_TIMEOUT_MS}`,
-      ),
-    ...(totalMs > MAX_RUN_MS
-      ? [`${name} needs up to ${totalMs}ms for its phases, over ${MAX_RUN_MS}`]
+    ...(callMs > MAX_CALL_MS
+      ? [
+          `${name} needs up to ${callMs}ms in one call (two tries per phase), over ${MAX_CALL_MS}`,
+        ]
       : []),
     ...tool.questions.flatMap((q) => factViolations(name, q)),
   ];

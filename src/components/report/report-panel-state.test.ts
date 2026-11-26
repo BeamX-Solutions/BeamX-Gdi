@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { reportErrorCopy } from "@/components/feedback/error-copy";
 import {
   asRetrying,
+  claimKey,
   panelView,
   pollDelayMs,
   shouldPoll,
@@ -188,5 +189,38 @@ describe("asRetrying", () => {
 
   it("goes back to loading from offline", () => {
     expect(asRetrying({ kind: "offline" })).toEqual({ kind: "loading" });
+  });
+});
+
+describe("claimKey (spec 0013, AC-8)", () => {
+  const base = {
+    phases: [
+      { label: "One", done: true },
+      { label: "Two", done: false },
+    ],
+    error: null,
+    canRetry: false,
+    stale: false,
+  };
+
+  it("claims a pending report once, and each partial state once", () => {
+    expect(claimKey("r1", { ...base, status: "pending" })).toBe("r1:pending");
+    expect(claimKey("r1", { ...base, status: "partial" })).toBe("r1:partial:1");
+    expect(
+      claimKey("r1", {
+        ...base,
+        status: "partial",
+        phases: base.phases.map((p) => ({ ...p, done: true })),
+      }),
+    ).toBe("r1:partial:2");
+  });
+
+  it("does not claim a generating, ready or failed report", () => {
+    for (const status of ["generating", "ready", "failed"] as const)
+      expect(claimKey("r1", { ...base, status })).toBeNull();
+  });
+
+  it("keeps polling a partial report", () => {
+    expect(shouldPoll({ ...base, status: "partial" })).toBe(true);
   });
 });

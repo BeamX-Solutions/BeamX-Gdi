@@ -63,8 +63,10 @@ export const runsWithReports = (userId: string, conversationId: string) =>
     .orderBy(desc(toolRun.createdAt), desc(toolRun.id));
 
 /**
- * Compare and set: pending or failed or stale `generating` becomes `generating`. Refused
- * when the run has no active credit hold (spec 0004, AC-7).
+ * Compare and set: pending or failed or stale `generating` becomes `generating`, using
+ * an attempt. A `partial` report (spec 0013) becomes `generating` on the same attempt:
+ * attempts count failed calls, not phases. Refused when the run has no active credit
+ * hold (spec 0004, AC-7).
  */
 export const claim = async (
   userId: string,
@@ -72,10 +74,14 @@ export const claim = async (
 ): Promise<Result<ReportRow, ClaimError>> => {
   const [claimed, current, holds] = await db.batch([
     db.execute(sql`
-      UPDATE report SET status = 'generating', attempts = attempts + 1, updated_at = now()
-      WHERE run_id = ${runId}::uuid AND attempts < ${MAX_ATTEMPTS}
-        AND (status IN ('pending', 'failed')
-             OR (status = 'generating' AND updated_at < now() - make_interval(mins => ${STALE_AFTER_MINUTES})))
+      UPDATE report SET status = 'generating',
+        attempts = CASE WHEN status = 'partial' THEN attempts ELSE attempts + 1 END,
+        updated_at = now()
+      WHERE run_id = ${runId}::uuid
+        AND (status = 'partial'
+             OR (attempts < ${MAX_ATTEMPTS}
+                 AND (status IN ('pending', 'failed')
+                      OR (status = 'generating' AND updated_at < now() - make_interval(mins => ${STALE_AFTER_MINUTES})))))
         AND EXISTS (SELECT 1 FROM tool_run WHERE id = ${runId}::uuid AND user_id = ${userId}::uuid)
         AND ${activeHoldExists(runId)}
       RETURNING id
@@ -103,7 +109,8 @@ export const claim = async (
   if (!row) return err({ code: "not_found" });
   if (claimed.rows.length > 0) return ok(row);
   if (row.status === "ready") return err({ code: "already_ready" });
-  if (row.attempts >= MAX_ATTEMPTS) return err({ code: "attempts_exhausted" });
+  if (row.status !== "partial" && row.attempts >= MAX_ATTEMPTS)
+    return err({ code: "attempts_exhausted" });
   if (holds.length === 0) return err({ code: "no_credit_hold" });
   return err({ code: "already_generating" });
 };
@@ -252,10 +259,26 @@ export const savePhase = async (
   return rows.rows.length > 0 ? ok(undefined) : err({ code: "stale_attempt" });
 };
 
+/**
+ * Ends a call between phases (spec 0013, AC-6): `generating` on this attempt becomes
+ * `partial`, keeping the saved phases. The next claim continues on the same attempt.
+ */
+export const savePartial = async (
+  runId: string,
+  attempt: number,
+): Promise<Result<void, WriteError>> => {
+  const rows = await db.execute(sql`
+    UPDATE report SET status = 'partial', updated_at = now()
+    WHERE run_id = ${runId}::uuid AND status = 'generating' AND attempts = ${attempt}
+    RETURNING run_id
+  `);
+  return rows.rows.length > 0 ? ok(undefined) : err({ code: "stale_attempt" });
+};
+
 const statusRowSchema = z.object({
   tool_id: z.string(),
   tool_version: z.string(),
-  status: z.enum(["pending", "generating", "ready", "failed"]),
+  status: z.enum(["pending", "generating", "ready", "failed", "partial"]),
   attempts: z.number().int(),
   updated_at: z.string(),
   error: z.unknown(),
@@ -269,7 +292,7 @@ const statusRowSchema = z.object({
 export type ReportStatus = {
   readonly toolId: string;
   readonly toolVersion: string;
-  readonly status: "pending" | "generating" | "ready" | "failed";
+  readonly status: "pending" | "generating" | "ready" | "failed" | "partial";
   readonly attempts: number;
   /** Raw timestamp string, as stored. */
   readonly updatedAt: string;

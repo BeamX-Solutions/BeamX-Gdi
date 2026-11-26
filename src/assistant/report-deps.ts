@@ -20,6 +20,7 @@ export const reportDeps: RunnerDeps = {
   getRun: runs.get,
   reportStatus: reports.status,
   savePhase: reports.savePhase,
+  savePartial: reports.savePartial,
   markReady: reports.markReady,
   markFailed: reports.markFailed,
   recordUsage: withSpend(usage.record),

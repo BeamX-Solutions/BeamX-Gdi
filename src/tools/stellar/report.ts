@@ -81,7 +81,7 @@ export const analysisPhase: TypedPhase<StellarScores> = {
   label: "Analysing your idea",
   modelRole: "report",
   maxOutputTokens: 16_000,
-  timeoutMs: 180_000,
+  timeoutMs: 130_000,
   output: analysisSchema,
   buildPrompt: ({ answers, scores }) => ({
     instructions: INSTRUCTIONS,
