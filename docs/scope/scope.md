@@ -199,11 +199,11 @@ Run the deeper Beacon Pro assessment, with its report streaming in live. It is a
 Design note (spec 0011): "streams in live" means the score shows at once and the advisory lands whole when Claude finishes; no word by word typing.
 spec [0011](../specs/0011-beacon-pro/index.md)
 - [x] Design it (spec): `/architect beacon pro in chat`
-- [ ] Build it: `/develop beacon pro in chat`
-  - [ ] Pro module: prompt, check, view, registry line, parity (AC-1, AC-2, AC-9, AC-10, AC-11, AC-12)
-  - [ ] Score preview in the contract, status route and panel (AC-13)
-  - [ ] Answer reuse: queries and `startRun` with the reuse line on the card (AC-3 to AC-8)
-  - [ ] Assistant suggestions, eval, and the end to end thread (AC-14, AC-15, AC-16)
+- [x] Build it: `/develop beacon pro in chat` · code in `src/tools/beacon/` (`pro-*.ts`, `flags.ts`), `src/assistant/tools/start-run.ts`, `src/assistant/tools/reuse.ts`, `src/db/queries/runs.ts`, `src/db/queries/credits.ts`, `src/components/report`
+  - [x] Pro module: prompt, check, view, registry line, parity (AC-1, AC-2, AC-9, AC-10, AC-11, AC-12)
+  - [x] Score preview in the contract, status route and panel (AC-13)
+  - [x] Answer reuse: queries and `startRun` with the reuse line on the card (AC-3 to AC-8)
+  - [x] Assistant suggestions, eval, and the end to end thread (AC-14, AC-15, AC-16)
 - [ ] Verify it: `/check verify beacon pro in chat`
 
 ### 12. Luna marketing plan in chat · needs a decision
