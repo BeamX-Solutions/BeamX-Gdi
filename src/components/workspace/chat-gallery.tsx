@@ -44,6 +44,8 @@ import {
 } from "@/components/fixtures/chat";
 import { failureCopy } from "./chat-request";
 import { Composer, type ComposerHandle } from "./composer";
+import { ProfileList } from "@/components/profile/profile-list";
+import { profileRows } from "@/components/profile/profile-rows";
 import { QuestionDemo } from "./question-demo";
 import { RunProgressBar } from "./run-progress-bar";
 import { StatusLine } from "./status-line";
@@ -269,6 +271,46 @@ export function ChatGallery() {
             done={0}
             total={12}
             onPause={() => undefined}
+          />
+        </div>
+      </Block>
+
+      <Block title="Business profile">
+        <div className="grid min-w-0 gap-6 lg:grid-cols-2">
+          <div data-testid="profile-demo">
+            <ProfileList
+              rows={profileRows(
+                [
+                  {
+                    key: "business_name",
+                    value: "Ada Foods",
+                    sourceToolId: "beacon",
+                    updatedAt: "2026-11-24T10:00:00Z",
+                  },
+                  {
+                    key: "industry",
+                    value: "restaurants",
+                    sourceToolId: null,
+                    updatedAt: "2026-11-25T09:00:00Z",
+                  },
+                  {
+                    key: "years_in_business",
+                    value: { min: 1, max: 3 },
+                    sourceToolId: "beacon",
+                    updatedAt: "2026-11-24T10:00:00Z",
+                  },
+                ],
+                (id) => (id === "beacon" ? "Beacon" : null),
+                "Africa/Lagos",
+              )}
+              onSave={async () => true}
+              onRemove={async () => undefined}
+            />
+          </div>
+          <ProfileList
+            rows={[]}
+            onSave={async () => true}
+            onRemove={async () => undefined}
           />
         </div>
       </Block>

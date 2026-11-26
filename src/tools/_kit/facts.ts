@@ -5,7 +5,8 @@
  * its options covers it, never as a guess. Pure.
  */
 import { z } from "zod";
-import type { AnswerValue, QuestionFact } from "../_contract";
+import type { AnswerValue, QuestionFact, QuestionView } from "../_contract";
+import { parseAnswer } from "./answer-schema";
 
 // ---------------------------------------------------------------------------
 // Value shapes
@@ -278,3 +279,128 @@ export const answerFromFact = (
   fact: QuestionFact,
   stored: unknown,
 ): AnswerValue | null => fact.fromFact(stored);
+
+// ---------------------------------------------------------------------------
+// Edit cards (the profile page, spec 0012 AC-8)
+// ---------------------------------------------------------------------------
+
+/** The card a profile edit shows for a key, and how its answer maps to the fact. */
+export type FactEditor = {
+  readonly question: QuestionView;
+  readonly fact: QuestionFact;
+};
+
+const yearBuckets = {
+  "less-than-1": { min: 0, max: 1 },
+  "1-2": { min: 1, max: 2 },
+  "3-5": { min: 3, max: 5 },
+  "6-10": { min: 6, max: 10 },
+  "10-plus": { min: 10, max: null },
+} as const satisfies Readonly<Record<string, Range>>;
+
+const teamBuckets = {
+  "just-me": { min: 1, max: 1 },
+  "2-5": { min: 2, max: 5 },
+  "6-20": { min: 6, max: 20 },
+  "21-50": { min: 21, max: 50 },
+  "50-plus": { min: 50, max: null },
+} as const satisfies Readonly<Record<string, Range>>;
+
+const options = (
+  labels: Readonly<Record<string, string>>,
+): readonly { readonly value: string; readonly label: string }[] =>
+  Object.entries(labels).map(([value, label]) => ({ value, label }));
+
+const single = (
+  key: FactKey,
+  labels: Readonly<Record<string, string>>,
+): QuestionView => ({
+  kind: "single",
+  id: key,
+  prompt: factCatalog[key].label,
+  options: options(labels),
+});
+
+/** One edit card per key (AC-8). */
+export const factEditors: Readonly<Record<FactKey, FactEditor>> = {
+  business_name: {
+    question: {
+      kind: "text",
+      id: "business_name",
+      prompt: "Business name",
+      input: "text",
+      maxLength: 100,
+    },
+    fact: textFact("business_name"),
+  },
+  business_website: {
+    question: {
+      kind: "text",
+      id: "business_website",
+      prompt: "Website",
+      input: "text",
+      maxLength: 200,
+      placeholder: "https://www.example.com",
+    },
+    fact: textFact("business_website"),
+  },
+  industry: {
+    question: single("industry", industryLabels),
+    fact: industryFact(
+      Object.fromEntries(industryValues.map((v) => [v, v])) as Record<
+        string,
+        Industry
+      >,
+    ),
+  },
+  years_in_business: {
+    question: single("years_in_business", {
+      "less-than-1": "Less than 1 year",
+      "1-2": "1 to 2 years",
+      "3-5": "3 to 5 years",
+      "6-10": "6 to 10 years",
+      "10-plus": "10+ years",
+    }),
+    fact: rangeFact("years_in_business", yearBuckets),
+  },
+  team_size: {
+    question: single("team_size", {
+      "just-me": "Just me",
+      "2-5": "2 to 5 people",
+      "6-20": "6 to 20 people",
+      "21-50": "21 to 50 people",
+      "50-plus": "50+ people",
+    }),
+    fact: rangeFact("team_size", teamBuckets),
+  },
+  business_model: {
+    question: single("business_model", modelLabels),
+    fact: choiceFact(
+      "business_model",
+      Object.fromEntries(businessModels.map((v) => [v, v])),
+    ),
+  },
+  geographic_scope: {
+    question: single("geographic_scope", scopeLabels),
+    fact: choiceFact(
+      "geographic_scope",
+      Object.fromEntries(geographicScopes.map((v) => [v, v])),
+    ),
+  },
+};
+
+/**
+ * A profile edit checked end to end (AC-8): the key is in the catalog, the answer fits
+ * the key's edit card, and it maps to a valid fact. Pure.
+ */
+export const factFromEdit = (
+  key: string,
+  answer: unknown,
+): { readonly key: FactKey; readonly value: unknown } | null => {
+  if (!isFactKey(key)) return null;
+  const editor = factEditors[key];
+  const parsed = parseAnswer({ questions: [editor.question] }, key, answer);
+  if (!parsed.ok) return null;
+  const value = parseFact(key, editor.fact.toFact(parsed.value));
+  return value === null ? null : { key, value };
+};

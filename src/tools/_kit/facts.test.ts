@@ -3,6 +3,9 @@ import { beaconQuestions } from "../beacon/questions";
 import {
   choiceFact,
   factCatalog,
+  factEditors,
+  factFromEdit,
+  factKeys,
   formatFact,
   industryFact,
   parseFact,
@@ -148,5 +151,42 @@ describe("text and choice facts", () => {
     expect(model.fromFact("b2c")).toBe("B2C");
     expect(model.fromFact("marketplace")).toBeNull();
     expect(model.toFact("Other")).toBeNull();
+  });
+});
+
+describe("edit cards (AC-8)", () => {
+  it("has one card per key, and every option reads back as itself", () => {
+    expect(Object.keys(factEditors)).toEqual(factKeys);
+    for (const key of factKeys) {
+      const { question, fact } = factEditors[key];
+      if (question.kind !== "single") continue;
+      for (const option of question.options)
+        expect(fact.fromFact(fact.toFact(option.value))).toBe(option.value);
+    }
+  });
+
+  it("checks an edit against its card and the catalog", () => {
+    expect(factFromEdit("industry", "restaurants")).toEqual({
+      key: "industry",
+      value: "restaurants",
+    });
+    expect(factFromEdit("years_in_business", "6-10")).toEqual({
+      key: "years_in_business",
+      value: { min: 6, max: 10 },
+    });
+    expect(factFromEdit("business_website", "https://ada.ng")).toEqual({
+      key: "business_website",
+      value: "https://ada.ng",
+    });
+    expect(factFromEdit("business_website", "ada.ng")).toBeNull();
+    expect(factFromEdit("industry", "space")).toBeNull();
+    expect(factFromEdit("not_a_key", "x")).toBeNull();
+    expect(factFromEdit("business_name", "")).toBeNull();
+  });
+
+  it("opens Beacon's 1-3 years fact on no edit bucket, since none holds it exactly", () => {
+    expect(
+      factEditors.years_in_business.fact.fromFact({ min: 1, max: 3 }),
+    ).toBeNull();
   });
 });
