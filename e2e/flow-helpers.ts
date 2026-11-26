@@ -50,13 +50,15 @@ export const scan = async (page: Page) => {
 };
 
 /**
- * Answers whatever card is live until the run ends: the first option on a choice card,
- * a short sentence on a text card. Follows the cards rather than a fixed list, so it
+ * Answers whatever card is live until the run ends: the first option on a choice card
+ * (one box and Confirm on a multiple choice card), a short sentence on a text card. Follows the cards rather than a fixed list, so it
  * works for any tool. Returns how many cards it answered.
  */
 export const answerEveryCard = async (
   page: Page,
   limit: number,
+  /** True stops after `limit` answers instead of failing (to leave a run midway). */
+  stopAtLimit = false,
 ): Promise<number> => {
   // The run is over once the view report card or the report itself shows. On phones the
   // report opens as a full screen sheet, which hides the thread behind it.
@@ -66,13 +68,17 @@ export const answerEveryCard = async (
   const idle = page.getByRole("textbox", { name: "Message", disabled: false });
   for (let answered = 0; answered < limit; answered++) {
     const radio = page.getByRole("radio").first();
+    const box = page.getByRole("checkbox").first();
     const text = page.getByRole("group").getByRole("textbox").first();
-    await expect(radio.or(text).or(ended).first()).toBeVisible({
+    await expect(radio.or(box).or(text).or(ended).first()).toBeVisible({
       timeout: TURN_MS,
     });
     if (await ended.first().isVisible()) return answered;
     if (await radio.isVisible()) {
       await radio.click();
+    } else if (await box.isVisible()) {
+      await box.click();
+      await page.getByRole("button", { name: "Confirm" }).click();
     } else {
       await text.fill(
         "I help market traders sell more by taking orders online.",
@@ -82,6 +88,7 @@ export const answerEveryCard = async (
     // The tap is its own turn; wait for it to land before reading the next card.
     await expect(idle.or(ended).first()).toBeVisible({ timeout: TURN_MS });
   }
+  if (stopAtLimit) return limit;
   throw new Error(`The run did not end after ${limit} answers`);
 };
 
