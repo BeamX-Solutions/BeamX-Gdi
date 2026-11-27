@@ -29,7 +29,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 12 | Luna marketing plan in chat | Slice 3 | in-progress |
 | 13 | Ask about your results | Slice 4 | in-progress |
 | 14 | Chat & report history | Slice 4 | in-progress |
-| 15 | Report PDF & email | Slice 5 | planned |
+| 15 | Report PDF & email | Slice 5 | in-progress |
 | 16 | Book a consultation | Slice 5 | planned |
 | 17 | File upload | Slice 6 | planned |
 | 18 | Privacy, terms & consent | Launch | planned |
@@ -248,10 +248,18 @@ Design note (2026-11-27, built without a spec, recommended picks): the rail list
 
 ## Slice 5: Take it away and talk to BeamX
 
-### 15. Report PDF & email · needs a decision
+### 15. Report PDF & email · in-progress
 Download any report as a branded PDF, or have it emailed, as the standalone tools do today.
 **Done when:** every tool's report downloads as a PDF and arrives by email with the PDF attached.
-- [ ] Design it (spec): `/architect report pdf & email`
+Design note (spec 0015): PDFs are made on the server with `@react-pdf/renderer` when asked for, never stored; Luna keeps the standalone's plan layout, Stellar and Beacon share one layout drawn from the panel's blocks. Email is for accounts only (a verified address), at most 5 an hour.
+spec [0015](../specs/0015-report-pdf-email/index.md) (recommended picks; review before relying on it)
+- [x] Design it (spec): `/architect report pdf & email`
+- [x] Build it: `/develop report pdf & email` · code in `src/pdf/`, `src/assistant/report-pdf.ts`, `src/assistant/report-share.ts`, `src/email/report-email.tsx`, `src/app/api/runs/[runId]/pdf/`, `src/app/api/runs/[runId]/email/`, `src/components/report/report-share.tsx`
+  - [x] PDF layouts: Luna's ported plan and the shared block layout (AC-2 to AC-4)
+  - [x] The PDF route, owner only, fonts traced into the bundle (AC-1, AC-7)
+  - [x] The report email and its route, accounts only, 5 an hour (AC-5, AC-7)
+  - [x] Download PDF and Email me under a ready report, `/design`, end to end (AC-6)
+- [ ] Verify it: `/check verify report pdf & email`
 
 ### 16. Book a consultation · needs a decision
 After a report, the assistant offers BeamX's free 30 minute consultation and books it in chat. BeamX staff get the client's context and reports. This is the main success measure. All four standalone tools book through BeamX's Calendly today (`calendly.com/beamxsolutions`).

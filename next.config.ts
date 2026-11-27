@@ -5,6 +5,14 @@ const nextConfig: NextConfig = {
   /* config options here */
   cacheComponents: true,
   partialPrefetching: true,
+  // The report PDF reads its fonts and logo from disk at run time (spec 0015, AC-4).
+  outputFileTracingIncludes: {
+    "/api/runs/[runId]/pdf": ["./src/pdf/fonts/**", "./public/brand/logo.png"],
+    "/api/runs/[runId]/email": [
+      "./src/pdf/fonts/**",
+      "./public/brand/logo.png",
+    ],
+  },
   turbopack: {
     rules: {
       "*.css": {

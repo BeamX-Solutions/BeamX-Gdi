@@ -2,15 +2,17 @@
 
 ## Overview
 
-The 6 digit code emails for sign up and password reset (spec 0009, AC-17), sent through Resend and rendered with React Email. Better Auth's `emailOTP` plugin calls `sendCodeEmail` from `src/auth/auth.ts`.
+The 6 digit code emails for sign up and password reset (spec 0009, AC-17), sent through Resend and rendered with React Email. Better Auth's `emailOTP` plugin calls `sendCodeEmail` from `src/auth/auth.ts`. The report email (spec 0015) sends a ready report's PDF to the account's address; `src/assistant/report-share.ts` calls `sendReportEmail`.
 
 ## Key files
 
-| Path             | Owns                                                                                                    |
-| ---------------- | ------------------------------------------------------------------------------------------------------- |
-| `copy.ts`        | Pure words of each email (`codeEmailCopy`, `codeEmailText`), so the HTML and plain text always match    |
-| `code-email.tsx` | The React Email template                                                                                |
-| `send.ts`        | `codeMailer` (deps passed in, testable) and the wired `sendCodeEmail`; returns a `Result`, never throws |
+| Path               | Owns                                                                                                    |
+| ------------------ | ------------------------------------------------------------------------------------------------------- |
+| `copy.ts`          | Pure words of each email (`codeEmailCopy`, `codeEmailText`), so the HTML and plain text always match    |
+| `code-email.tsx`   | The React Email template                                                                                |
+| `send.ts`          | `codeMailer` (deps passed in, testable) and the wired `sendCodeEmail`; returns a `Result`, never throws |
+| `report-copy.ts`   | Pure words of the report email (`reportEmailCopy`, `reportEmailText`)                                   |
+| `report-email.tsx` | The report email template; `reportMailer` / `sendReportEmail` in `send.ts` attach the PDF               |
 
 ## Conventions
 
@@ -31,5 +33,6 @@ Declined: Resend MCP
 ## Related specs
 
 - [0009 Accounts and sign up to save](../../docs/specs/0009-accounts-sign-up/index.md)
+- [0015 Report PDF and email](../../docs/specs/0015-report-pdf-email/index.md)
 
 _Drafted by /sync from the introducing change, worth a quick human pass._

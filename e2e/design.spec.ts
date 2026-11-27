@@ -5,6 +5,9 @@ const wcagTags = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
 
 test.describe("/design", () => {
   test("has no WCAG 2.2 A or AA violations (AC-3)", async ({ page }) => {
+    // The showcase holds every component state; axe needs more than 30 seconds for it
+    // on a phone when other tests share the machine.
+    test.setTimeout(90_000);
     await page.goto("/design");
     await expect(
       page.getByRole("heading", { name: "BeamX design system", level: 1 }),

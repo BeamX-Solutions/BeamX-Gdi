@@ -1,6 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
 import { FAKE_REPLIES, FAKE_STELLAR_ANALYSIS } from "../src/lib/fake-model";
-import { answerEveryCard, scan, signUp, TURN_MS } from "./flow-helpers";
+import {
+  answerEveryCard,
+  expectPdfDownload,
+  scan,
+  signUp,
+  TURN_MS,
+} from "./flow-helpers";
 
 // Spec 0007, AC-12: one guest goes from the first message to a ready Stellar report and
 // back after a reload, against a production build with the scripted fake model
@@ -67,6 +73,15 @@ test.describe("validate an idea in chat: the whole flow (AC-12)", () => {
     if (!(await reportText(page).isVisible())) await viewReport.click();
     await expect(reportText(page)).toBeVisible({ timeout: TURN_MS });
     await scan(page);
+
+    // Spec 0015, AC-6: a guest can download the PDF; emailing it needs an account.
+    const share = await expectPdfDownload(page, "Stellar");
+    await expect(
+      share.getByRole("button", { name: "Email me this report" }),
+    ).toHaveCount(0);
+    await expect(
+      share.getByRole("button", { name: "Create a free account" }),
+    ).toBeVisible();
 
     // Spec 0009, AC-1: the guest's ready report brings the save prompt into the thread.
     // On phones the report is a sheet over the thread; close it first.

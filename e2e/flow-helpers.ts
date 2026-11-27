@@ -150,3 +150,25 @@ export const grant = (email: string, amount: number) => {
   })();
   expect(output).toContain("Done. Balance");
 };
+
+/**
+ * Spec 0015, AC-1, AC-6: the ready report's share row downloads a real PDF with the
+ * BeamX file name. Fetched with the page's own cookies, so only the owner gets it.
+ */
+export const expectPdfDownload = async (page: Page, tool: string) => {
+  const share = page.getByTestId("report-share").filter({ visible: true });
+  const link = share.getByRole("link", { name: "Download PDF" });
+  await expect(link).toBeVisible({ timeout: TURN_MS });
+  const href = await link.getAttribute("href");
+  if (href === null) throw new Error("Download PDF has no href");
+  const res = await page.request.get(href);
+  expect(res.status()).toBe(200);
+  expect(res.headers()["content-type"]).toBe("application/pdf");
+  expect(res.headers()["content-disposition"]).toMatch(
+    new RegExp(
+      String.raw`attachment; filename="BeamX-${tool}-\d{4}-\d{2}-\d{2}\.pdf"`,
+    ),
+  );
+  expect((await res.body()).subarray(0, 5).toString("latin1")).toBe("%PDF-");
+  return share;
+};

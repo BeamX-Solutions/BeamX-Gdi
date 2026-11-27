@@ -22,6 +22,8 @@ import {
   panelView,
   type PanelView,
 } from "@/components/report/report-panel-state";
+import { ReportShareView } from "@/components/report/report-share";
+import type { ShareState } from "@/components/report/report-share-state";
 import { ReportSkeleton } from "@/components/report/report-skeleton";
 import { ReportStatusView } from "@/components/report/report-status-view";
 import { ScoreHeader } from "@/components/report/score-header";
@@ -108,6 +110,39 @@ function PanelDemo({
     </div>
   );
 }
+
+/** The share row's states (spec 0015, AC-6). */
+const shareDemos: readonly {
+  readonly testId: string;
+  readonly title: string;
+  readonly guest: boolean;
+  readonly state: ShareState;
+}[] = [
+  {
+    testId: "share-idle",
+    title: "Account",
+    guest: false,
+    state: { kind: "idle" },
+  },
+  {
+    testId: "share-sent",
+    title: "Account, sent",
+    guest: false,
+    state: { kind: "sent", sentTo: "a***@gmail.com" },
+  },
+  {
+    testId: "share-limit",
+    title: "Account, over the hourly limit",
+    guest: false,
+    state: { kind: "failed", reason: "limit" },
+  },
+  {
+    testId: "share-guest",
+    title: "Guest",
+    guest: true,
+    state: { kind: "idle" },
+  },
+];
 
 /** Report parts, skeleton, error cards, and the panel states on fixture data. */
 export function ReportGallery() {
@@ -289,6 +324,27 @@ export function ReportGallery() {
         <p className="text-sm text-muted-foreground">
           Retries: {retries} · Start again: {startAgain}
         </p>
+      </Block>
+
+      <Block title="Keep this report: Download PDF and Email me">
+        <div className="grid min-w-0 gap-6 lg:grid-cols-2">
+          {shareDemos.map((demo) => (
+            <div
+              key={demo.testId}
+              data-testid={demo.testId}
+              className="min-w-0"
+            >
+              <p className="mb-2 text-sm font-medium">{demo.title}</p>
+              <ReportShareView
+                pdfHref="#report"
+                guest={demo.guest}
+                state={demo.state}
+                onEmail={() => undefined}
+                onSignUp={() => undefined}
+              />
+            </div>
+          ))}
+        </div>
       </Block>
     </div>
   );

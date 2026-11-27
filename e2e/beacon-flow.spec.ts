@@ -1,5 +1,11 @@
 import { expect, test, type Page } from "@playwright/test";
-import { answerEveryCard, scan, signUp, TURN_MS } from "./flow-helpers";
+import {
+  answerEveryCard,
+  expectPdfDownload,
+  scan,
+  signUp,
+  TURN_MS,
+} from "./flow-helpers";
 
 // Spec 0010, AC-12 and spec 0011, AC-16: a guest asks how healthy their business is,
 // gets Beacon proposed at 150 credits, signs up from the short balance card (a guest's
@@ -87,6 +93,15 @@ test.describe("health check in chat: the whole Beacon flow (spec 0010, AC-12; sp
       await expect(page.getByRole("region", { name })).toBeVisible({
         timeout: REPORT_MS,
       });
+    await scan(page);
+
+    // Spec 0015, AC-5, AC-6: an account downloads the PDF and emails it to itself. Off
+    // Vercel with no Resend key the email is printed to the server terminal.
+    const share = await expectPdfDownload(page, "Beacon");
+    await share.getByRole("button", { name: "Email me this report" }).click();
+    await expect(share.getByText(/^Sent to \w\*\*\*@/)).toBeVisible({
+      timeout: TURN_MS,
+    });
     await scan(page);
     // On phones the report is a sheet over the header; close it to read the chip.
     const sheet = page.getByRole("dialog");
