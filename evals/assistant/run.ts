@@ -128,6 +128,9 @@ const observe = (chunks: readonly UIMessageChunk[]): TurnObservation => ({
       ? [{ name: c.toolName, input: c.input }]
       : [],
   ),
+  toolResults: chunks.flatMap((c): string[] =>
+    c.type === "tool-output-available" ? [JSON.stringify(c.output)] : [],
+  ),
   approvalRequested: chunks.some((c) => c.type === "tool-approval-request"),
   text: chunks
     .flatMap((c) => (c.type === "text-delta" ? [c.delta] : []))

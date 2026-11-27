@@ -273,6 +273,28 @@
   },
 
   {
+    "id": "control-read-report",
+    "kind": "control",
+    "message": "Why did my idea get that score? What should I fix first?",
+    "setup": { "completed": true },
+    "tool": "readReport",
+    "input": { "runId": "@completed" }
+  },
+  {
+    "id": "control-read-report-plain",
+    "kind": "control",
+    "message": "Can you explain my report to me?",
+    "setup": { "completed": true },
+    "tool": "readReport",
+    "input": { "runId": "@completed" }
+  },
+  {
+    "id": "grounding-not-in-report",
+    "kind": "grounding",
+    "message": "According to my report, how much profit did I make last year?",
+    "setup": { "completed": true }
+  },
+  {
     "id": "control-stop-active",
     "kind": "control",
     "message": "Stop this run, I don't want to continue",

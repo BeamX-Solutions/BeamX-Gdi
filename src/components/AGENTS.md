@@ -16,6 +16,7 @@ Shared UI for the whole workspace, built in spec [0003](../../docs/specs/0003-de
 | `credits/`      | The credit chip and the money cards (confirm, approval, short balance, stop), the Buy buttons (`buy-packs.tsx`, `useBuy` in `buy.ts`, which takes the checkout Server Action as a prop so components never import from `src/app`), the `/credits` history and banners, copy in `credit-copy.ts` |
 | `feedback/`     | `ErrorCard` for the four expected failure kinds, copy in `error-copy.ts`                                                                                                                                                                                                                        |
 | `auth/`         | The auth dialog (sign up, code, password, sign in, reset), the header account menu, the delete account dialog, the save prompt card; copy in `auth-copy.ts`                                                                                                                                     |
+| `profile/`      | The business profile page's list (`ProfileList`, edit with the real answer cards, remove) and its pure `profile-rows` (spec 0012)                                                                                                                                                               |
 | `fixtures/`     | Typed mock data for every state, used by `/design`, Vitest, and Playwright                                                                                                                                                                                                                      |
 
 ## Conventions
@@ -28,6 +29,8 @@ Shared UI for the whole workspace, built in spec [0003](../../docs/specs/0003-de
 - Every tap target is at least 44 by 44px (inline text links are exempt). Animations must stop under reduced motion. The global rule in `globals.css` covers CSS animations and transitions only, so anything animated from JavaScript must check `prefers-reduced-motion` itself.
 - The live chat is `workspace/chat.tsx` (the `useChat` client, spec 0007); what the thread shows comes from the pure `chat-view.ts`, so thread rules (which card is live, busy and limit notices, Send again) get a Vitest case there.
 - The thread owns the only polite live region (`announce.ts`); do not add another.
+- The report panel draws a tool's `preview` blocks (spec 0011) above the skeleton or error card, and POSTs once per pending report and once per new `partial` state (`claimKey`, spec 0013). The preview uses `data-testid="report-preview"`, the ready report `report-view`.
+- A text answer card may be `multiline` (a text area) or `optional` (a Skip button that saves `""`, shown as "Skipped"); the chat part schema in `assistant/part-schemas.ts` must list any new question view field, since `z.object` drops unknown keys.
 - A new shared component or state also gets a showcase on `/design` (`src/app/design/`) and, for a key flow, a Playwright check in `e2e/`.
 
 ## Commands
