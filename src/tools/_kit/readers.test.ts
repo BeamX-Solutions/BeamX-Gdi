@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { sampleTool } from "../test-tools/sample";
-import { scoreRun, toAnswers, type StoredAnswer } from "./readers";
+import type { ToolModule } from "../_contract";
+import { industryFact, textFact } from "./facts";
+import { runFacts, scoreRun, toAnswers, type StoredAnswer } from "./readers";
 
 const row = (
   questionId: string,
@@ -60,6 +62,7 @@ describe("scoreRun (AC-16)", () => {
         scores: { points: 4 },
         answerCount: 5,
         lastAnswerAt: "2026-11-20 10:00:02+00",
+        facts: [],
       },
     });
   });
@@ -85,5 +88,40 @@ describe("scoreRun (AC-16)", () => {
     expect(
       scoreRun(sampleTool, [...complete.slice(1), row("stage", 42)]),
     ).toMatchObject({ ok: false, error: { code: "stored_data_invalid" } });
+  });
+});
+
+describe("runFacts (spec 0012, AC-5)", () => {
+  const linked = {
+    questions: [
+      {
+        kind: "text",
+        id: "name",
+        prompt: "Name?",
+        input: "text",
+        fact: textFact("business_name"),
+      },
+      {
+        kind: "single",
+        id: "industry",
+        prompt: "Industry?",
+        options: [
+          { value: "shop", label: "Shop" },
+          { value: "other", label: "Other" },
+        ],
+        fact: industryFact({ shop: "retail", other: null }),
+      },
+      { kind: "text", id: "plain", prompt: "Plain?", input: "text" },
+    ],
+  } as const satisfies Pick<ToolModule, "questions">;
+
+  it("maps linked answers to facts and leaves out unlinked and null ones", () => {
+    expect(
+      runFacts(linked, { name: " Ada ", industry: "shop", plain: "x" }),
+    ).toEqual([
+      { key: "business_name", questionId: "name", value: "Ada" },
+      { key: "industry", questionId: "industry", value: "retail" },
+    ]);
+    expect(runFacts(linked, { industry: "other" })).toEqual([]);
   });
 });

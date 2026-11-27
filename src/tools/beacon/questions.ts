@@ -8,6 +8,7 @@
  * which is how the parity tests map a fixture answer to its value.
  */
 import type { ToolQuestion } from "../_contract";
+import { industryFact, rangeFact, textFact } from "../_kit/facts";
 
 /** The business name's length limit. */
 export const BUSINESS_NAME_MAX = 100;
@@ -27,14 +28,27 @@ export const beaconQuestions: readonly ToolQuestion[] = [
     input: "text",
     maxLength: BUSINESS_NAME_MAX,
     area: YOUR_BUSINESS,
-    factKey: "business_name",
+    fact: textFact("business_name"),
   },
   {
     kind: "single",
     id: "industry",
     prompt: "Which industry is your business in?",
     area: YOUR_BUSINESS,
-    factKey: "industry",
+    fact: industryFact({
+      "retail-trade": "retail",
+      "food-and-beverage": "food_beverage",
+      "professional-services": "professional_services",
+      "beauty-and-personal-care": "beauty_personal_care",
+      "logistics-and-transportation": "logistics",
+      "manufacturing-production": "manufacturing",
+      hospitality: "hospitality",
+      "construction-trades": "construction",
+      "healthcare-services": "healthcare",
+      "education-training": "education",
+      agriculture: "agriculture",
+      other: null,
+    }),
     options: [
       { value: "retail-trade", label: "Retail/Trade" },
       { value: "food-and-beverage", label: "Food & Beverage" },
@@ -58,7 +72,13 @@ export const beaconQuestions: readonly ToolQuestion[] = [
     id: "years_in_business",
     prompt: "How long has the business been running?",
     area: YOUR_BUSINESS,
-    factKey: "years_in_business",
+    fact: rangeFact("years_in_business", {
+      "less-than-1-year": { min: 0, max: 1 },
+      "1-3-years": { min: 1, max: 3 },
+      "3-5-years": { min: 3, max: 5 },
+      "5-10-years": { min: 5, max: 10 },
+      "10-plus-years": { min: 10, max: null },
+    }),
     options: [
       { value: "less-than-1-year", label: "Less than 1 year" },
       { value: "1-3-years", label: "1-3 years" },

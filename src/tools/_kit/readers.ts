@@ -64,11 +64,34 @@ export type ScoreRunError =
   | ScoreError
   | { readonly code: "invalid_scores"; readonly reason: string };
 
+/** A profile fact a completed run contributes (spec 0012, AC-5). */
+export type RunFact = {
+  readonly key: string;
+  readonly questionId: string;
+  readonly value: unknown;
+};
+
 export type ScoredRun = {
   readonly scores: unknown;
   readonly answerCount: number;
   readonly lastAnswerAt: string | null;
+  /** Visible answers of linked questions, mapped by `toFact`; nulls left out. */
+  readonly facts: readonly RunFact[];
 };
+
+/** The profile facts in a run's visible answers (spec 0012, AC-5). Pure. */
+export const runFacts = (
+  tool: Pick<ToolModule, "questions">,
+  answers: Answers,
+): readonly RunFact[] =>
+  tool.questions.flatMap((q) => {
+    const answer = answers[q.id];
+    if (q.fact === undefined || answer === undefined) return [];
+    const value = q.fact.toFact(answer);
+    return value === null || value === undefined
+      ? []
+      : [{ key: q.fact.key, questionId: q.id, value }];
+  });
 
 /**
  * Scores a run from its stored answer rows (spec 0005, AC-16). The count and latest
@@ -100,5 +123,6 @@ export const scoreRun = (
     scores: scores.data,
     answerCount: rows.length,
     lastAnswerAt: latest(rows),
+    facts: runFacts(tool, answers.value),
   });
 };

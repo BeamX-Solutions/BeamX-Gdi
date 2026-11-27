@@ -78,8 +78,20 @@ export type ToolQuestion = QuestionView & {
   readonly when?: (answers: Answers) => boolean;
   /** An extra rule after the card's own checks. Returns a short reason, or null when fine. */
   readonly refine?: (value: AnswerValue) => string | null;
-  /** The profile fact this answer maps to (#9 uses it to skip facts already known). */
-  readonly factKey?: string;
+  /** The profile fact this answer maps to and from (spec 0012). */
+  readonly fact?: QuestionFact;
+};
+
+/**
+ * How a question links to a business profile fact (spec 0012, AC-2). Both functions are
+ * pure. `toFact` turns an answer into the canonical fact value, or null to store nothing;
+ * `fromFact` turns a stored fact into exactly one valid answer, or null when no single
+ * option covers it.
+ */
+export type QuestionFact = {
+  readonly key: string;
+  readonly toFact: (answer: AnswerValue) => unknown;
+  readonly fromFact: (fact: unknown) => AnswerValue | null;
 };
 
 // ---------------------------------------------------------------------------

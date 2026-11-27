@@ -2,6 +2,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { db } from "../client";
 import { account, aiUsage, conversation, toolRun, user } from "../schema";
 import { linkGuestCreditStatements } from "./credits";
+import { linkGuestProfileStatements } from "./profile";
 import { runInBatches } from "@/lib/batches";
 import { logEvent } from "@/lib/log";
 
@@ -18,6 +19,8 @@ export const LINKED_TABLES = [
   "credit_account",
   "credit_ledger",
   "credit_hold",
+  // Merged, not moved (spec 0012, AC-10): see `linkGuestProfileStatements`.
+  "business_profile",
 ] as const;
 /**
  * Left alone on purpose: Better Auth owns `session` and `account` (its own link flow
@@ -66,6 +69,8 @@ export const linkGuest = async (
       .where(eq(aiUsage.userId, guestUserId))
       .returning({ id: aiUsage.id }),
     ...linkGuestCreditStatements(guestUserId, newUserId),
+    // Spec 0012, AC-10: the guest profile merges into the account, then goes.
+    ...linkGuestProfileStatements(guestUserId, newUserId),
   ]);
   const counts = {
     conversation: conversations.length,

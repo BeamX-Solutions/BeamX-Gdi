@@ -2,7 +2,13 @@
 
 import { useRouter } from "next/navigation";
 import { useContext, useState } from "react";
-import { LogOutIcon, Trash2Icon, UserRoundIcon } from "lucide-react";
+import {
+  BriefcaseBusinessIcon,
+  LogOutIcon,
+  Trash2Icon,
+  UserRoundIcon,
+} from "lucide-react";
+import Link from "next/link";
 import { authClient } from "@/auth/client";
 import { Button } from "@/components/ui/button";
 import {
@@ -104,6 +110,12 @@ export function AccountControl({
             </span>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
+          <DropdownMenuItem asChild>
+            <Link href="/profile">
+              <BriefcaseBusinessIcon aria-hidden />
+              Business profile
+            </Link>
+          </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => void signOut()}>
             <LogOutIcon aria-hidden />
             Sign out

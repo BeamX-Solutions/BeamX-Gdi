@@ -58,6 +58,7 @@ import {
   type OwnerBox,
   type ToolEvent,
 } from "./tools";
+import { prefillOffers, prefillOfferTitle, type ProfileFact } from "./prefill";
 import {
   partsStream,
   type ActiveRead,
@@ -95,6 +96,8 @@ export type AiTurnDeps = StepDeps &
     /** The `helper` role, for known facts extraction (AC-5). */
     readonly helperModel: () => ResolvedModel;
     readonly recordUsage: (input: UsageInput) => Promise<unknown>;
+    /** The owner's business profile facts, values unparsed (spec 0012, AC-6). */
+    readonly profileFacts: (ownerId: string) => Promise<readonly ProfileFact[]>;
     /** A run's saved answers with their sources (the version change offer, AC-5b). */
     readonly oldAnswers: (
       ownerId: string,
@@ -257,23 +260,29 @@ const startedParts = async (
   };
   switch (started.from.kind) {
     case "new": {
-      const facts = await extractKnownFacts(
-        {
-          model: deps.helperModel,
-          recordUsage: deps.recordUsage,
-          log: deps.log,
-          now: deps.now,
-        },
-        {
-          tool,
-          history: turn.history,
-          answers,
-          ownerId: turn.owner.current,
-          conversationId: turn.conversationId,
-          runId: run.id,
-        },
-      );
-      const card = prefillPart(tool, run.id, PREFILL_TITLES.chat, facts);
+      // Known facts from the chat and the business profile, read side by side
+      // (spec 0012, AC-6). A failed profile read only leaves its facts out.
+      const [facts, profile] = await Promise.all([
+        extractKnownFacts(
+          {
+            model: deps.helperModel,
+            recordUsage: deps.recordUsage,
+            log: deps.log,
+            now: deps.now,
+          },
+          {
+            tool,
+            history: turn.history,
+            answers,
+            ownerId: turn.owner.current,
+            conversationId: turn.conversationId,
+            runId: run.id,
+          },
+        ),
+        deps.profileFacts(turn.owner.current).catch(() => []),
+      ]);
+      const offers = prefillOffers(tool, answers, facts, profile);
+      const card = prefillPart(tool, run.id, prefillOfferTitle(offers), offers);
       return card === null ? firstCard() : [card];
     }
     case "offer": {

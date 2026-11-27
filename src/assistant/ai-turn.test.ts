@@ -138,6 +138,8 @@ type World = {
   oldAnswers: OldAnswer[];
   /** What `startFromWithHold` returns when set (otherwise a copied run). */
   startFromError: StartFromHoldError | null;
+  /** The owner's profile facts (spec 0012). */
+  profile: { key: string; value: unknown }[];
 };
 
 const makeWorld = (over: Partial<World> = {}): World => ({
@@ -154,6 +156,7 @@ const makeWorld = (over: Partial<World> = {}): World => ({
   usage: [],
   oldAnswers: [],
   startFromError: null,
+  profile: [],
   ...over,
 });
 
@@ -271,6 +274,7 @@ const fakeDeps = (
     return { status: "recorded", id: "u1" };
   },
   oldAnswers: async () => ok([...world.oldAnswers]),
+  profileFacts: async () => [...world.profile],
   newId: (() => {
     const n = { i: 0 };
     return () => `gen-${++n.i}`;
@@ -1639,12 +1643,14 @@ describe("known facts extraction (AC-5)", () => {
               prompt: "Where are you?",
               value: "idea",
               label: "Just an idea",
+              source: "chat",
             },
             {
               questionId: "channels",
               prompt: "Where do you sell?",
               value: ["whatsapp", "instagram"],
               label: "WhatsApp, Instagram",
+              source: "chat",
             },
           ],
         },
@@ -1784,5 +1790,76 @@ describe("createAiTurn: usage", () => {
       openChat: async () => err({ code: "not_found" }),
     })(textTurn(world, "m1", "hello"));
     expect(await turn.usage).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Spec 0012: business profile facts on the prefill card
+// ---------------------------------------------------------------------------
+
+describe("profile facts on the prefill card (spec 0012, AC-6, AC-7)", () => {
+  const linked: ToolModule = {
+    ...sampleTool,
+    questions: sampleTool.questions.map((q) =>
+      q.id === "stage"
+        ? {
+            ...q,
+            fact: {
+              key: "business_model",
+              toFact: () => "b2c",
+              fromFact: (fact: unknown) => (fact === "b2c" ? "idea" : null),
+            },
+          }
+        : q,
+    ),
+  };
+  const getTool = (id: string) =>
+    id === "sample" ? ok(linked) : registry.getTool(id);
+
+  it("offers a mapped profile fact, then saves it with source profile", async () => {
+    const world = makeWorld({
+      profile: [{ key: "business_model", value: "b2c" }],
+    });
+    const { proposed, chunks } = await proposeAndTap(
+      world,
+      [{ calls: [{ toolName: "startRun", input: { toolId: "sample" } }] }],
+      [{ text: "Started." }],
+      { getTool },
+    );
+    expect(approvalOf(proposed)).toHaveLength(1);
+    expect(dataOf(chunks)).toEqual([
+      {
+        type: "data-prefill",
+        data: {
+          runId: RUN,
+          title: "From your profile",
+          items: [
+            expect.objectContaining({
+              questionId: "stage",
+              value: "idea",
+              source: "profile",
+            }),
+          ],
+        },
+      },
+    ]);
+  });
+
+  it("shows the first card when the profile has nothing that maps", async () => {
+    const world = makeWorld({
+      profile: [{ key: "business_model", value: "b2b" }],
+    });
+    const { chunks } = await proposeAndTap(
+      world,
+      [{ calls: [{ toolName: "startRun", input: { toolId: "sample" } }] }],
+      [{ text: "Started." }],
+      { getTool },
+    );
+    expect(dataOf(chunks)).toEqual([
+      expect.objectContaining({
+        type: "data-question",
+        data: expect.objectContaining({ questionId: "stage" }),
+      }),
+    ]);
   });
 });

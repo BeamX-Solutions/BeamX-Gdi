@@ -44,6 +44,8 @@ import {
 } from "@/components/fixtures/chat";
 import { failureCopy } from "./chat-request";
 import { Composer, type ComposerHandle } from "./composer";
+import { ProfileList } from "@/components/profile/profile-list";
+import { profileRows } from "@/components/profile/profile-rows";
 import { QuestionDemo } from "./question-demo";
 import { RunProgressBar } from "./run-progress-bar";
 import { StatusLine } from "./status-line";
@@ -273,6 +275,46 @@ export function ChatGallery() {
         </div>
       </Block>
 
+      <Block title="Business profile">
+        <div className="grid min-w-0 gap-6 lg:grid-cols-2">
+          <div data-testid="profile-demo">
+            <ProfileList
+              rows={profileRows(
+                [
+                  {
+                    key: "business_name",
+                    value: "Ada Foods",
+                    sourceToolId: "beacon",
+                    updatedAt: "2026-11-24T10:00:00Z",
+                  },
+                  {
+                    key: "industry",
+                    value: "restaurants",
+                    sourceToolId: null,
+                    updatedAt: "2026-11-25T09:00:00Z",
+                  },
+                  {
+                    key: "years_in_business",
+                    value: { min: 1, max: 3 },
+                    sourceToolId: "beacon",
+                    updatedAt: "2026-11-24T10:00:00Z",
+                  },
+                ],
+                (id) => (id === "beacon" ? "Beacon" : null),
+                "Africa/Lagos",
+              )}
+              onSave={async () => true}
+              onRemove={async () => undefined}
+            />
+          </div>
+          <ProfileList
+            rows={[]}
+            onSave={async () => true}
+            onRemove={async () => undefined}
+          />
+        </div>
+      </Block>
+
       <Block title="Credit and prefill cards">
         <div className="grid min-w-0 gap-6 lg:grid-cols-2">
           <ConfirmCard
@@ -343,6 +385,25 @@ export function ChatGallery() {
                 questionId: "customer",
                 prompt: "Who is your customer?",
                 label: "Small shop owners in Lagos",
+              },
+            ]}
+            onAcceptAll={() => undefined}
+            onEdit={() => undefined}
+          />
+          <PrefillCard
+            title="What I already know"
+            items={[
+              {
+                questionId: "business_name",
+                prompt: "What is your business called?",
+                label: "Ada Foods",
+                source: "profile",
+              },
+              {
+                questionId: "industry",
+                prompt: "Which industry is your business in?",
+                label: "Food & Beverage",
+                source: "chat",
               },
             ]}
             onAcceptAll={() => undefined}

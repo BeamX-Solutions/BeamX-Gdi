@@ -35,8 +35,24 @@ export type {
 } from "./_contract";
 export { modelRoles } from "./_contract";
 export type { UnknownTool, UnsupportedVersion } from "./_kit/registry";
-export { scoreRun, toAnswers, type StoredAnswer } from "./_kit/readers";
+export {
+  runFacts,
+  scoreRun,
+  toAnswers,
+  type RunFact,
+  type StoredAnswer,
+} from "./_kit/readers";
 export { parseAnswer, type AnswerError } from "./_kit/answer-schema";
 export { nextQuestion, questionProgress, visibleQuestions } from "./_kit/flow";
 export { formatAnswer } from "./_kit/format-answer";
 export { DATA_BLOCK_RULE, fenceData } from "./_kit/prompt";
+export {
+  factCatalog,
+  factEditors,
+  factFromEdit,
+  factKeys,
+  formatFact,
+  isFactKey,
+  parseFact,
+  type FactKey,
+} from "./_kit/facts";

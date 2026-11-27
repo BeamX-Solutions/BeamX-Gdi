@@ -23,10 +23,10 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 22 | Credits & billing | Slice 1 | done |
 | 21 | Abuse & AI cost guards | Slice 1 | done |
 | 8 | Accounts & sign up to save | Slice 2 | in-progress |
-| 9 | Shared business profile | Slice 2 | planned |
+| 9 | Shared business profile | Slice 2 | in-progress |
 | 10 | Beacon health check in chat | Slice 3 | done |
 | 11 | Beacon becomes the Claude advisory | Slice 3 | in-progress |
-| 12 | Luna marketing plan in chat | Slice 3 | planned |
+| 12 | Luna marketing plan in chat | Slice 3 | in-progress |
 | 13 | Ask about your results | Slice 4 | planned |
 | 14 | Chat & report history | Slice 4 | planned |
 | 15 | Report PDF & email | Slice 5 | planned |
@@ -174,10 +174,18 @@ spec [0009](../specs/0009-accounts-sign-up/index.md) · code in `src/auth`, `src
 - [x] Verify it: `/check verify accounts & sign up to save`
 - [x] Test it: `/test accounts & sign up to save`
 
-### 9. Shared business profile · needs a decision
+### 9. Shared business profile · in-progress
 One profile (name, industry, size, location, goals, and so on) built from answers across tools, so the client never answers the same question twice. They can view and edit it.
 **Done when:** after one tool run, a second tool skips the questions the profile already answers, and the client can edit the profile.
-- [ ] Design it (spec): `/architect shared business profile`
+Design note (spec 0012): "skips" means the known facts arrive on the prefill card for a one tap confirm, and a fact crosses tools only when it maps exactly onto the new question's options.
+spec [0012](../specs/0012-business-profile/index.md) (recommended picks, written while the engineer was away; review before building)
+- [x] Design it (spec): `/architect shared business profile`
+- [x] Build it: `/develop shared business profile` · code in `src/tools/_kit/facts.ts`, `src/db/queries/profile.ts`, `src/assistant/prefill.ts`, `src/app/profile`, `src/components/profile`
+  - [x] Profile table, writes at run completion, guest merge (AC-5, AC-10, AC-11)
+  - [x] Fact catalog, question mappings and round trip test (AC-1 to AC-4, AC-12)
+  - [x] Profile facts on the prefill card (AC-6, AC-7)
+  - [x] `/profile` page with edit and remove, and the end to end flow (AC-8, AC-9)
+- [ ] Verify it: `/check verify shared business profile`
 
 ## Slice 3: The other tools
 
@@ -204,11 +212,20 @@ spec [0011](../specs/0011-beacon-advisory/index.md)
   - [x] Assistant eval and the end to end thread (AC-10 to AC-12)
 - [ ] Verify it: `/check verify beacon becomes the claude advisory`
 
-### 12. Luna marketing plan in chat · needs a decision
+### 12. Luna marketing plan in chat · in-progress
 Run Luna's long questionnaire (50 questions: 12 about the business, 38 across 9 marketing areas) in chat without wearing the client out. Progress is shown, the client can stop and resume, and the plan is generated at the end. Luna has no scoring: the plan is written by Claude in five phases in a row, which won't fit in one request, so each finished phase is saved and a failure resumes from the phase that broke.
 Design note (spec 0001, 2026-11-22): the app runs on Vercel Hobby (300 seconds per function call), so the plan runs one phase per call, chained on the server, the way the standalone Luna already runs on Hobby; spec 0005's AC-7 changes with it.
 **Done when:** a client can pause midway, come back, finish, and get the full marketing plan in the panel, and a plan that fails partway resumes from the failed phase.
-- [ ] Design it (spec): `/architect luna marketing plan in chat`
+Design note (spec 0013): one phase per call, continued by the report panel's poll (as the standalone Luna's browser does); a closed tab pauses the plan until the client returns.
+spec [0013](../specs/0013-luna-marketing-plan/index.md) (recommended picks, written while the engineer was away; review before building)
+- [x] Design it (spec): `/architect luna marketing plan in chat`
+- [ ] Build it: `/develop luna marketing plan in chat`
+  - [ ] One phase per call: contract field, `partial` status, attempts per failed call, per call budget (AC-6, AC-7, AC-10)
+  - [ ] Panel continuation and reopen (AC-8, AC-9)
+  - [ ] Luna questions, cards, progress by square (AC-1 to AC-4)
+  - [ ] The five phases and the plan view (AC-5, AC-11)
+  - [ ] Profile links, eval, end to end with pause and a phase failure (AC-12, AC-13)
+- [ ] Verify it: `/check verify luna marketing plan in chat`
 
 ## Slice 4: Conversation around results
 
