@@ -30,7 +30,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 13 | Ask about your results | Slice 4 | planned |
 | 14 | Chat & report history | Slice 4 | planned |
 | 15 | Report PDF & email | Slice 5 | in-progress |
-| 16 | Book a consultation | Slice 5 | planned |
+| 16 | Book a consultation | Slice 5 | in-progress |
 | 17 | File upload | Slice 6 | planned |
 | 18 | Privacy, terms & consent | Launch | planned |
 | 19 | Public landing page & SEO | Launch | planned |
@@ -254,10 +254,18 @@ spec [0015](../specs/0015-report-pdf-email/index.md) (recommended picks; review 
   - [x] Download PDF and Email me under a ready report, `/design`, end to end (AC-6)
 - [ ] Verify it: `/check verify report pdf & email`
 
-### 16. Book a consultation · needs a decision
+### 16. Book a consultation · in-progress
 After a report, the assistant offers BeamX's free 30 minute consultation and books it in chat. BeamX staff get the client's context and reports. This is the main success measure. All four standalone tools book through BeamX's Calendly today (`calendly.com/beamxsolutions`).
 **Done when:** a client books a consultation from chat, gets a confirmation, and BeamX receives the booking with the related reports.
-- [ ] Design it (spec): `/architect book a consultation`
+Design note (spec 0016): Calendly's own page in a dialog, prefilled for accounts; Calendly's signed webhook is the only thing that records a booking, then the chat confirms it and BeamX gets the client's profile and report PDFs. Needs Calendly Standard for webhooks.
+spec [0016](../specs/0016-book-consultation/index.md) (recommended picks; review before relying on it)
+- [x] Design it (spec): `/architect book a consultation`
+- [x] Build it: `/develop book a consultation` · code in `src/assistant/consultation/`, `src/assistant/tools/offer-consultation.ts`, `src/db/queries/consultations.ts`, `src/app/api/webhooks/calendly/`, `src/app/api/consultations/`, `src/components/consultation/`, `src/email/consultation-email.tsx`, `scripts/calendly/`
+  - [x] Schema, migration `0007_consultation`, queries, guest link (AC-2, AC-5, AC-7)
+  - [x] Signed webhook, chat confirmation, BeamX email with report PDFs (AC-4 to AC-7, AC-9)
+  - [x] The tool, instructions, card and Calendly dialog, status poll, `/design`, end to end (AC-1, AC-3, AC-8)
+  - [x] `pnpm calendly:subscribe`, eval cases (AC-10)
+- [ ] Verify it: `/check verify book a consultation`
 
 ## Slice 6: Bring your own documents
 
