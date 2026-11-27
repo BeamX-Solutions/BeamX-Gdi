@@ -1,4 +1,5 @@
 import { and, asc, eq, sql } from "drizzle-orm";
+import { z } from "zod";
 import { db } from "../client";
 import { isUniqueViolation } from "../errors";
 import { newId } from "../id";
@@ -543,4 +544,50 @@ export const getActive = async (userId: string, conversationId: string) => {
     activeStatements(userId, conversationId),
   );
   return toActive(live, answers);
+};
+
+/** A ready report in another chat (spec 0014, AC-4). */
+export type RecentReport = {
+  readonly runId: string;
+  readonly toolId: string;
+  /** Raw timestamp string, as stored. */
+  readonly completedAt: string;
+};
+
+const recentRowSchema = z.object({
+  id: z.string(),
+  tool_id: z.string(),
+  completed_at: z.string(),
+});
+
+/**
+ * The user's latest completed runs with a `ready` report outside this chat, newest
+ * first (spec 0014, AC-4). One statement, owner scoped.
+ */
+export const recentReports = async (
+  userId: string,
+  excludeConversationId: string,
+  limit: number,
+): Promise<readonly RecentReport[]> => {
+  const rows = await db.execute(sql`
+    SELECT r.id, r.tool_id, r.completed_at::text AS completed_at
+    FROM tool_run r
+    JOIN report p ON p.run_id = r.id AND p.status = 'ready'
+    WHERE r.user_id = ${userId}::uuid AND r.status = 'completed'
+      AND r.conversation_id IS DISTINCT FROM ${excludeConversationId}::uuid
+    ORDER BY r.completed_at DESC, r.id DESC
+    LIMIT ${limit}
+  `);
+  return rows.rows.flatMap((raw) => {
+    const row = recentRowSchema.safeParse(raw);
+    return row.success
+      ? [
+          {
+            runId: row.data.id,
+            toolId: row.data.tool_id,
+            completedAt: row.data.completed_at,
+          },
+        ]
+      : [];
+  });
 };

@@ -27,7 +27,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 10 | Beacon health check in chat | Slice 3 | done |
 | 11 | Beacon becomes the Claude advisory | Slice 3 | in-progress |
 | 12 | Luna marketing plan in chat | Slice 3 | in-progress |
-| 13 | Ask about your results | Slice 4 | planned |
+| 13 | Ask about your results | Slice 4 | in-progress |
 | 14 | Chat & report history | Slice 4 | in-progress |
 | 15 | Report PDF & email | Slice 5 | planned |
 | 16 | Book a consultation | Slice 5 | planned |
@@ -229,10 +229,15 @@ spec [0013](../specs/0013-luna-marketing-plan/index.md) (recommended picks, writ
 
 ## Slice 4: Conversation around results
 
-### 13. Ask about your results · needs a decision
+### 13. Ask about your results · in-progress
 After a report, the client asks follow ups ("why is my cost score low?", "what should I do first?") and gets answers grounded in their own reports and profile.
 **Done when:** answers cite the client's actual scores, and the assistant says when something is not in their reports instead of guessing.
-- [ ] Design it (spec): `/architect ask about your results`
+spec [0014](../specs/0014-ask-about-results/index.md) (recommended picks; review before relying on it)
+- [x] Design it (spec): `/architect ask about your results`
+- [x] Build it: `/develop ask about your results` · code in `src/assistant/tools/read-report.ts`, `src/assistant/report-text.ts`, `src/assistant/run-state.ts`, `src/db/queries/runs.ts`
+  - [x] Report text, the `readReport` tool and other chats' reports (AC-1 to AC-4, AC-6)
+  - [x] Instructions, eval cases and results (AC-5, AC-7)
+- [ ] Verify it: `/check verify ask about your results`
 
 ### 14. Chat & report history · in-progress
 A sidebar of past chats and reports, like the big AI assistants, so a client can reopen and continue any of them.
