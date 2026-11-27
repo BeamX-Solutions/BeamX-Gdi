@@ -44,7 +44,7 @@ export type Pack = z.infer<typeof packSchema>;
 
 export const billingConfig: BillingConfig = billingConfigSchema.parse({
   ngnPerCredit: 100,
-  grants: { starter: 30, signup: 50, guestPerIpPerDay: 3 },
+  grants: { starter: 30, signup: 150, guestPerIpPerDay: 3 },
   packs: [
     { id: "p100", credits: 100, priceNgn: 10_000 },
     { id: "p300", credits: 300, priceNgn: 27_000 },
