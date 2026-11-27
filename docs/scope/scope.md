@@ -286,12 +286,16 @@ Clients attach files (financials, a pitch deck, a sales export) that the assista
 ### 18. Privacy, terms & consent · needs a decision · Beta
 A privacy notice, terms, cookie consent, and a way for clients to export or delete their data. Required because the workspace stores business data (Nigeria's data protection law, and GDPR for clients abroad).
 **Done when:** consent is captured before tracking, the policies are linked everywhere, and a client can delete their account and all their data.
-- [ ] Design it (spec): `/architect privacy, terms & consent`
+spec [0017](../specs/0017-privacy-terms-consent/index.md) (engineer picks 2026-11-28; policy text needs a lawyer's review)
+- [x] Design it (spec): `/architect privacy, terms & consent`
+- [ ] Build it: `/develop privacy, terms & consent`
 
 ### 19. Public landing page & SEO · needs a decision
 A public page that explains the workspace and starts a guest chat. It has proper metadata, a sitemap, and social cards so it can be found and shared.
 **Done when:** the page renders server side with metadata and social cards, and its main button opens a guest chat.
-- [ ] Design it (spec): `/architect public landing page & seo`
+spec [0018](../specs/0018-landing-page-seo/index.md) (engineer picks 2026-11-28)
+- [x] Design it (spec): `/architect public landing page & seo`
+- [ ] Build it: `/develop public landing page & seo`
 
 ## Deferred
 Left out of the current build pass, kept here so the plan stays honest.
