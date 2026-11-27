@@ -1,7 +1,7 @@
 # 0013. Luna marketing plan in chat
 
 **Date**: 2026-11-26
-**Status**: Proposed
+**Status**: In Progress
 
 ## Summary
 
@@ -18,15 +18,15 @@ Luna becomes the fourth tool: the client answers its 50 questions as cards in ch
 
 **Acceptance criteria**:
 - **AC-1**: `src/tools/luna/` registers `luna`, version `1`, name `Luna`, 500 credits (spec 0004), with the 50 questions ported from `fixtures/parity/luna/questions.json` in order, ids and option values kept as slugs of the standalone values, and `area` set to "Your business" or the square title.
-- **AC-2**: Card mapping: `select` and `radio` become `single`; `multiselect` becomes `multi` with `max` from `maxSelections` (else the option count) and `min` 1; `text` becomes `text` (max 200); `textarea` becomes `text` with `maxLength` 1000. The one optional question (`business-website`) gets a Skip action that stores an empty string; every other question is required.
-- **AC-3**: The progress line reads "Your business · Question 4 of 12" for the first 12, then "Square 3 of 9: Media Channels & Reach · Question 2 of 3", using the existing area progress (spec 0005).
+- **AC-2**: Card mapping: `select` and `radio` become `single`; `multiselect` becomes `multi` with `max` from `maxSelections` (else the option count) and `min` 1; `text` becomes `text` (max 200); `textarea` becomes `text` with `maxLength` 1000 and `multiline` (a text area). The one optional question (`business-website`) is `optional`: its card has a Skip button that saves an empty string, shown as "Skipped"; every other question is required.
+- **AC-3**: The progress line uses the shared area progress (spec 0005): "Your business · Area 1 of 10 · Question 4 of 12" for the first 12, then "Media Channels & Reach · Area 4 of 10 · Question 2 of 3".
 - **AC-4**: Pausing works as for every tool (spec 0006): the progress bar's pause, switching tools, or leaving the chat keeps the run and its hold; "continue" resumes at the first unanswered question. Answers already given are never asked again.
-- **AC-5**: Luna has no scoring. `score` checks that every required visible answer is present and returns `{ answered: number }`; the report has five phases with the standalone's slices: `analysis` (context only, never shown), `core` (`customerJourney`, `strategicInsights`, `risksPositioning`), `overview` (`executiveSummary`, `implementation`), `operations` (`resources`, `kpis`), `assets` (`templates`, `investmentRoi`). Each phase has a Zod output schema ported from `fixtures/parity/luna/plan-shape.md` and its instructions ported from the standalone `src/lib/claude.ts`; later phases receive earlier outputs through `earlier`.
+- **AC-5**: Luna has no scoring. `score` checks that every required visible answer is present and returns `{ answered: number }`; the report has five phases with the standalone's slices: `analysis` (context only, never shown), `core` (`customerJourney`, `strategicInsights`, `risksPositioning`), `overview` (`executiveSummary`, `implementation`), `operations` (`resources`, `kpis`), `assets` (`templates`, `investmentRoi`). Each phase has a Zod output schema ported from `fixtures/parity/luna/plan-shape.md` and its instructions ported from the standalone `src/lib/claude.ts`; later phases receive earlier outputs through `earlier`. Generated em and en dashes are not rejected (the standalone's own plans carry them, for example in money ranges); the view turns them into a spaced hyphen, as the standalone's `stripEmDashes` does.
 - **AC-6**: A tool module may set `phasesPerCall: 1`. For such a tool the runner saves one phase per claimed call and then sets the report to the new status `partial` (content keeps the saved phases) instead of continuing. The last phase marks the report `ready` and charges the hold, as today.
 - **AC-7**: Claiming a `partial` report starts the next phase without spending an attempt. The claim is a compare and set on `status = 'partial'`, so two tabs that POST at once start the phase once (the other gets `already_generating`). Attempts count failed calls only: a failed phase sets `failed`; Retry claims it again and uses an attempt; three failures release the hold (spec 0004, AC-5). A phase already saved is never run again.
 - **AC-8**: The report status payload reports `partial` as `status: "partial"` with the done phases ticked. The panel treats `partial` like `generating` for display, and POSTs the report once for each new partial state it sees (keyed by the count of done phases), so the next phase starts within one poll.
 - **AC-9**: If no client is watching, a `partial` report waits. When the client opens the chat again, the view report card or panel POSTs and the plan continues from the next phase. A `partial` report not touched for 10 minutes is not stale; it simply waits.
-- **AC-10**: The contract check changes from a whole run budget to a per call budget: for every tool, the phases one call may run (all of them, or one when `phasesPerCall` is 1) must fit `2 × timeoutMs` within 280 seconds (the route's 300 second `maxDuration` minus a margin). Stellar and Beacon are checked under this rule, and Stellar's phase timeout is lowered to fit (spec 0010 follow up).
+- **AC-10**: The contract check changes from a whole run budget to a per call budget (`MAX_CALL_MS` 280000): for every tool, the phases one call may run (all of them, or one when `phasesPerCall` is 1) must fit `2 × timeoutMs` within 280 seconds (the route's 300 second `maxDuration` minus a margin). Stellar and Beacon are checked under this rule, and Stellar's phase timeout is lowered from 180 to 130 seconds to fit (spec 0010 follow up).
 - **AC-11**: The ready plan shows, in order: an executive summary (text), the customer journey (rich sections per stage), strategic insights (advice list), risks and positioning (rich section), the implementation roadmap (timeline: three phases with their steps), resources (bullets), KPIs (bullets with target values), templates (rich sections), and investment and ROI (rich section with stat lines). Existing block kinds only; the full layout comes with the PDF (#15).
 - **AC-12**: Luna's seven business questions link to the profile catalog (spec 0012, AC-12) once #9 is built; until then the existing chat facts prefill applies.
 - **AC-13**: In chat, a client who says "I need a marketing plan for my restaurant" gets Luna proposed at 500 credits, answers the cards across two sittings (leaving after square 3 and coming back), and sees the ready plan; a phase failure shows Retry and resumes from that phase. Playwright covers it with the scripted fake model; one real model run is recorded in `verify.md`.
@@ -78,7 +78,7 @@ Reasoning and options: see [rationale.md](rationale.md).
 | phase token budgets | `maxOutputTokens` | the standalone's `max_tokens` per call (analysis 12000, core and overview their values in `claude.ts`, operations 9000, assets 9000), capped by the runner ceiling |
 | website | prompt line | the `business-website` answer only; no fetch (AC-14) |
 | model | role | `report_long` (AC-15) |
-| phase timeout | `timeoutMs` | 130 seconds per phase, so one call with a repair fits 280 seconds (AC-10) |
+| phase timeout | `timeoutMs` | 135 seconds per phase, so one call with a repair fits 280 seconds (AC-10) |
 | price | 500 | `luna.creditPrice` (spec 0004) |
 | next phase trigger | when | the panel's poll seeing `partial` with a new done count |
 | attempts | count | failed calls only (AC-7) |
@@ -107,11 +107,11 @@ Reasoning and options: see [rationale.md](rationale.md).
 
 Tracer Bullet: a thin Luna thread end to end first (all questions, one real phase, partial continuation), then the remaining phases and the plan view.
 
-1. Contract `phasesPerCall` and the per call budget check; lower Stellar's timeout; the `report_long` model role; migration adding `partial`; `reports.claim` and `reports.savePartial`; runner stop after one phase, satisfies **AC-6**, **AC-7**, **AC-10**, **AC-15**
-2. Status payload and panel: `partial` shown as generating, one POST per new partial state, reopen continues, satisfies **AC-8**, **AC-9**
-3. Luna module: questions with card mapping and Skip for the optional one, progress by square, completeness `score`, registry line, parity test on questions, satisfies **AC-1**, **AC-2**, **AC-3**, **AC-4**
-4. The five phases with ported prompts and schemas (website address only), the plan view, `/design` fixture with axe, satisfies **AC-5**, **AC-11**, **AC-14**
-5. Profile links (if #9 landed), assistant eval run with Luna registered, Playwright flow with pause and a phase failure, one real model run, satisfies **AC-12**, **AC-13**
+1. [x] Contract `phasesPerCall` and the per call budget check; lower Stellar's timeout; the `report_long` model role; migration adding `partial`; `reports.claim` and `reports.savePartial`; runner stop after one phase, satisfies **AC-6**, **AC-7**, **AC-10**, **AC-15**
+2. [x] Status payload and panel: `partial` shown as generating, one POST per new partial state, reopen continues, satisfies **AC-8**, **AC-9**
+3. [x] Luna module: questions with card mapping and Skip for the optional one, progress by square, completeness `score`, registry line, parity test on questions, satisfies **AC-1**, **AC-2**, **AC-3**, **AC-4**
+4. [x] The five phases with ported prompts and schemas (website address only), the plan view, `/design` fixture with axe, satisfies **AC-5**, **AC-11**, **AC-14**
+5. [x] Profile links (if #9 landed), assistant eval run with Luna registered, Playwright flow with pause and a phase failure, one real model run, satisfies **AC-12**, **AC-13**
 
 ## Consequences
 

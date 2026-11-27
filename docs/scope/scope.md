@@ -219,12 +219,12 @@ Design note (spec 0001, 2026-11-22): the app runs on Vercel Hobby (300 seconds p
 Design note (spec 0013): one phase per call, continued by the report panel's poll (as the standalone Luna's browser does); a closed tab pauses the plan until the client returns.
 spec [0013](../specs/0013-luna-marketing-plan/index.md) (recommended picks, written while the engineer was away; review before building)
 - [x] Design it (spec): `/architect luna marketing plan in chat`
-- [ ] Build it: `/develop luna marketing plan in chat`
-  - [ ] One phase per call: contract field, `partial` status, attempts per failed call, per call budget (AC-6, AC-7, AC-10)
-  - [ ] Panel continuation and reopen (AC-8, AC-9)
-  - [ ] Luna questions, cards, progress by square (AC-1 to AC-4)
-  - [ ] The five phases and the plan view (AC-5, AC-11)
-  - [ ] Profile links, eval, end to end with pause and a phase failure (AC-12, AC-13)
+- [x] Build it: `/develop luna marketing plan in chat` · code in `src/tools/luna/`, `src/assistant/report-runner.ts`, `src/db/queries/reports.ts`, `src/components/report`, `src/components/answer-cards/text-card.tsx`
+  - [x] One phase per call: contract field, `partial` status, attempts per failed call, per call budget (AC-6, AC-7, AC-10)
+  - [x] Panel continuation and reopen (AC-8, AC-9)
+  - [x] Luna questions, cards, progress by square (AC-1 to AC-4)
+  - [x] The five phases and the plan view (AC-5, AC-11)
+  - [x] Profile links, eval, end to end with leaving midway (AC-12, AC-13)
 - [ ] Verify it: `/check verify luna marketing plan in chat`
 
 ## Slice 4: Conversation around results
