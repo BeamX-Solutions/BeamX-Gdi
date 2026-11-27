@@ -63,7 +63,13 @@ export const evalCase = z.discriminatedUnion("kind", [
   z.strictObject({
     ...turnBase,
     kind: z.literal("control"),
-    tool: z.enum(["stopRun", "resumeRun", "showQuestion", "restartRun"]),
+    tool: z.enum([
+      "stopRun",
+      "resumeRun",
+      "showQuestion",
+      "restartRun",
+      "offerConsultation",
+    ]),
     input: z.record(z.string(), z.string()).optional(),
   }),
   /** The reply states no number (prices, scores and balances come from cards). */

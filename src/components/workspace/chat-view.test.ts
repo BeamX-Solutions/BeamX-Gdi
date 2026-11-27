@@ -574,3 +574,33 @@ describe("Got it on limit cards (spec 0008)", () => {
     }
   });
 });
+
+describe("threadItems: the strategy call card (spec 0016, AC-1)", () => {
+  const offer = (output: unknown) =>
+    assistant("a1", {
+      type: "tool-offerConsultation",
+      toolCallId: "call-c",
+      state: "output-available",
+      input: {},
+      output,
+    });
+
+  it("shows the card for an ok result", () => {
+    const data = {
+      ok: true,
+      consultationId: "c-1",
+      status: "offered",
+      startTime: null,
+      calendlyUrl: "https://calendly.com/beamxsolutions",
+    };
+    expect(threadItems([offer(data)], null)).toEqual([
+      expect.objectContaining({ kind: "consultation", data }),
+    ]);
+  });
+
+  it("shows nothing for a failed one; the reply explains it", () => {
+    expect(
+      threadItems([offer({ ok: false, error: "try_again" })], null),
+    ).toEqual([]);
+  });
+});

@@ -254,6 +254,9 @@ const fakeDeps = (
     return ok({});
   },
   openChat: async () => ok({ messages: [...world.history], runs: [] }),
+  offerConsultation: async () =>
+    ok({ id: "consult-1", status: "offered" as const, startTime: null }),
+  calendlyUrl: "https://calendly.com/beamxsolutions",
   limits: {
     guestSpendCap: async () => ok(undefined),
     takeRun: async () => ok({ keys: [] }),

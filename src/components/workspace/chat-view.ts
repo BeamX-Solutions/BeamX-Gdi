@@ -104,7 +104,15 @@ export type ThreadItem =
       readonly price: number;
       readonly available: number;
       readonly shortfall: number;
+    }
+  /** The strategy call card (spec 0016); its live state comes from its own poll. */
+  | {
+      readonly kind: "consultation";
+      readonly id: string;
+      readonly data: ConsultationData;
     };
+
+export type ConsultationData = z.infer<typeof consultationOutput>;
 
 // ---------------------------------------------------------------------------
 // Part shapes
@@ -153,6 +161,15 @@ const insufficientOutput = z.object({
   price: z.int(),
   available: z.int(),
   shortfall: z.int(),
+});
+
+/** `offerConsultation`'s ok result (spec 0016, AC-2). */
+const consultationOutput = z.object({
+  ok: z.literal(true),
+  consultationId: z.string(),
+  status: z.enum(["offered", "booked", "canceled"]),
+  startTime: z.string().nullable(),
+  calendlyUrl: z.string(),
 });
 
 const summaryOutput = z.object({ summary: creditSummarySchema });
@@ -275,6 +292,10 @@ const toolItems = (
             state,
           },
         ];
+  }
+  if (part.state === "output-available" && name === "offerConsultation") {
+    const data = parse(consultationOutput, part.output);
+    return data === null ? [] : [{ kind: "consultation", id, data }];
   }
   if (part.state === "output-available") {
     const short = parse(insufficientOutput, part.output);

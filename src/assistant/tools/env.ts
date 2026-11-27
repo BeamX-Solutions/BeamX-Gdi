@@ -9,6 +9,7 @@ import type {
   RunQuote,
   StartFromHoldError,
 } from "@/db/queries/credits";
+import type { Consultation } from "@/db/queries/consultations";
 import type { AbandonError, ResumeError } from "@/db/queries/runs";
 import type { CreditSummary } from "@/billing/summary";
 import type { RunLimitError, RunTicket } from "@/lib/limits";
@@ -83,6 +84,13 @@ export type AssistantToolDeps = Pick<StepDeps, "ownerOf"> & {
     ownerId: string,
     runId: string,
   ) => Promise<Result<unknown, AbandonError>>;
+  /** `consultations.offer`: the chat's open strategy call (spec 0016, AC-2). */
+  readonly offerConsultation: (
+    ownerId: string,
+    conversationId: string,
+  ) => Promise<Result<Consultation, NotFound>>;
+  /** The Calendly page the booking card shows (`CALENDLY_URL`). */
+  readonly calendlyUrl: string;
   /** The guest guards at Approve (spec 0008, AC-2, AC-4). Each allows on a Redis error. */
   readonly limits: {
     readonly guestSpendCap: () => Promise<Result<void, SpendCapError>>;

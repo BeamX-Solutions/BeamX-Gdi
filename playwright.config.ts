@@ -64,6 +64,8 @@ export default defineConfig({
       LIMIT_RUNS_PER_GUEST: "10000",
       LIMIT_RUNS_PER_IP: "10000",
       LIMIT_GUESTS_PER_IP: "10000",
+      // Spec 0016: e2e/consultation.spec.ts signs its webhook with this key.
+      CALENDLY_WEBHOOK_SIGNING_KEY: "e2e-calendly-signing-key",
     },
   },
 });

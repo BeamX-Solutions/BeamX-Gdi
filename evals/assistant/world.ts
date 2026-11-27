@@ -161,6 +161,13 @@ export const evalDeps = (
     resumeRunWithHold: async (_o, runId) => ok({ runId }),
     startFromWithHold: async () => ok({ runId: RUN_IDS.active }),
     abandonRun: async () => ok({}),
+    offerConsultation: async () =>
+      ok({
+        id: "00000000-0000-4000-8000-0000000000c1",
+        status: "offered" as const,
+        startTime: null,
+      }),
+    calendlyUrl: "https://calendly.com/beamxsolutions",
     limits: {
       guestSpendCap: async () => ok(undefined),
       takeRun: async () => ok({ keys: [] }),
