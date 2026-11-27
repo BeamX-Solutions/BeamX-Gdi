@@ -28,6 +28,7 @@ export const FAKE_REPLIES = {
   approved: "Great, let's check your idea. Tap an answer on each card.",
   steer:
     "I can check a business idea for you with Stellar. Tell me about your idea to start.",
+  consultation: "Happy to set that up. Pick a time on the card below.",
 } as const;
 
 const usage = {
@@ -62,8 +63,26 @@ const textOf = (message: ReturnType<typeof lastTurn>): string =>
 /** What the scripted chat model says next, from the prompt alone. Pure. */
 export const chatScript = (prompt: Prompt): StreamPart[] => {
   const last = lastTurn(prompt);
-  if (last?.role === "tool") return textParts(FAKE_REPLIES.approved);
+  if (last?.role === "tool")
+    return textParts(
+      last.content.some(
+        (p) => p.type === "tool-result" && p.toolName === "offerConsultation",
+      )
+        ? FAKE_REPLIES.consultation
+        : FAKE_REPLIES.approved,
+    );
   const said = textOf(last);
+  // Spec 0016: asking for a call shows the strategy call card.
+  if (/strategy call|talk to (someone|an adviser)/i.test(said))
+    return [
+      {
+        type: "tool-call",
+        toolCallId: `fake-${prompt.length}`,
+        toolName: "offerConsultation",
+        input: "{}",
+      },
+      finish("tool-calls"),
+    ];
   const toolId = /business idea/i.test(said)
     ? "stellar"
     : /how healthy/i.test(said)

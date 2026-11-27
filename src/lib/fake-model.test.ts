@@ -56,6 +56,31 @@ describe("chatScript", () => {
   });
 });
 
+describe("chatScript and the strategy call (spec 0016)", () => {
+  it("offers the card when asked, then points to it", () => {
+    const parts = chatScript([user("Can I book a strategy call?"), note]);
+    expect(parts[0]).toMatchObject({
+      type: "tool-call",
+      toolName: "offerConsultation",
+    });
+    const after = chatScript([
+      user("Can I book a strategy call?"),
+      {
+        role: "tool",
+        content: [
+          {
+            type: "tool-result",
+            toolCallId: "c1",
+            toolName: "offerConsultation",
+            output: { type: "json", value: { ok: true } },
+          },
+        ],
+      },
+    ]);
+    expect(textOf(after)).toBe(FAKE_REPLIES.consultation);
+  });
+});
+
 describe("chatScript and Beacon (spec 0010)", () => {
   it("proposes Beacon for a health check", () => {
     expect(

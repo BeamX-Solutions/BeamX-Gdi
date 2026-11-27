@@ -8,6 +8,7 @@ import { ConfirmCard } from "@/components/credits/confirm-card";
 import { CreditChip } from "@/components/credits/credit-chip";
 import { SIGN_UP_LABEL } from "@/components/auth/auth-copy";
 import { SavePromptCard } from "@/components/auth/save-prompt-card";
+import { ConsultationCardView } from "@/components/consultation/consultation-card";
 import { ShortBalanceCard } from "@/components/credits/short-balance-card";
 import type { BuyCredits } from "@/components/credits/buy";
 import {
@@ -453,6 +454,27 @@ export function ChatGallery() {
             packs={[]}
             onSignUp={() => undefined}
           />
+        </div>
+      </Block>
+
+      <Block title="Strategy call card">
+        <p className="text-sm text-muted-foreground">
+          Spec 0016: offered (Book a time opens Calendly in a dialog), waiting
+          for Calendly to confirm, booked, and canceled.
+        </p>
+        <div className="grid gap-4 md:grid-cols-2">
+          {(
+            [
+              { kind: "offered" },
+              { kind: "waiting" },
+              { kind: "booked", when: "Wed 2 Dec at 10:00 (Lagos time)" },
+              { kind: "canceled" },
+            ] as const
+          ).map((view) => (
+            <div key={view.kind} data-testid={`consultation-${view.kind}`}>
+              <ConsultationCardView view={view} onBook={() => undefined} />
+            </div>
+          ))}
         </div>
       </Block>
 

@@ -40,6 +40,7 @@ pnpm e2e          # Playwright + axe against a production build (build first wit
 pnpm db:generate  # write a migration after a schema change (CI fails on drift)
 pnpm db:migrate   # apply migrations
 pnpm credits:adjust   # staff credit correction (asks first); credits:import-luna loads the Luna export
+pnpm calendly:subscribe  # staff: create the Calendly webhook subscription once per environment (asks first)
 pnpm eval:assistant  # real model eval of the assistant (spends tokens, needs ANTHROPIC_API_KEY); commit the results file it writes
 ```
 

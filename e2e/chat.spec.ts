@@ -283,10 +283,9 @@ test.describe("thread (AC-6)", () => {
   test("announces the status, then the full reply once, never token by token", async ({
     page,
   }) => {
-    await page.getByRole("button", { name: "Stream a reply" }).click();
-    await expect(region(page)).toHaveText("Writing your reply…");
-
-    // While streaming, the region never holds a partial reply.
+    // Watch the region before streaming starts, so a fast reply can't slip past the
+    // observer on a slow machine. It must hold the status, then the whole reply, and
+    // never a partial reply.
     const seen: string[] = [];
     await page.exposeFunction("recordLive", (text: string) => seen.push(text));
     await region(page).evaluate((el) => {
@@ -297,9 +296,11 @@ test.describe("thread (AC-6)", () => {
       ).observe(el, { childList: true, characterData: true, subtree: true });
     });
 
+    await page.getByRole("button", { name: "Stream a reply" }).click();
     await expect(region(page)).toHaveText(streamedReply, { timeout: 10_000 });
     await page.waitForTimeout(300);
-    expect(seen).toEqual([streamedReply]);
+    const texts = [...new Set(seen.filter((t) => t !== ""))];
+    expect(texts).toEqual(["Writing your reply…", streamedReply]);
   });
 
   test("the live region is the only one in the thread", async ({ page }) => {

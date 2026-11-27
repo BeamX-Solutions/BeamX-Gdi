@@ -69,6 +69,7 @@ export const evalCase = z.discriminatedUnion("kind", [
       "showQuestion",
       "restartRun",
       "readReport",
+      "offerConsultation",
     ]),
     input: z.record(z.string(), z.string()).optional(),
   }),

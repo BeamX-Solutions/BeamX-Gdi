@@ -16,6 +16,7 @@ import {
   SIGN_UP_LABEL,
 } from "@/components/auth/auth-copy";
 import { useAuthOpen } from "@/components/auth/auth-open-context";
+import { ConsultationCard } from "@/components/consultation/consultation-card";
 import { SavePromptCard } from "@/components/auth/save-prompt-card";
 import { AnsweredBubble } from "@/components/answer-cards/answered-bubble";
 import { PrefillCard } from "@/components/answer-cards/prefill-card";
@@ -73,6 +74,11 @@ type ChatItemProps = {
   readonly conversationId?: string;
   /** Starts a credit checkout; without it the short balance card only lists the packs. */
   readonly buy?: BuyCredits;
+  /** An account's name and email, which prefill the booking widget; null for a guest. */
+  readonly contact?: {
+    readonly name: string | null;
+    readonly email: string | null;
+  } | null;
 };
 
 /** One card of the thread (spec 0007, "Part renderers"). Renders from props only. */
@@ -85,6 +91,7 @@ export function ChatItem({
   toolNames,
   conversationId,
   buy,
+  contact = null,
 }: ChatItemProps) {
   // Guests get a Sign up action on their limit notices and short balance card (spec
   // 0009, AC-1); null outside a chat frame, where no prompt can open the dialog.
@@ -243,6 +250,15 @@ export function ChatItem({
           onSignUp={signUp}
           buy={buy}
           returnTo={conversationId ?? null}
+        />
+      );
+    case "consultation":
+      return (
+        <ConsultationCard
+          consultationId={item.data.consultationId}
+          calendlyUrl={item.data.calendlyUrl}
+          initial={{ status: item.data.status, startTime: item.data.startTime }}
+          prefill={contact ?? { name: null, email: null }}
         />
       );
     default: {

@@ -406,5 +406,25 @@
       "I sell cakes from home. Honestly I'm missing a lot: I don't have a clear product list, no bank account for the business, and no regular customers yet."
     ],
     "expect": { "foundation": "missing-multiple" }
+  },
+  {
+    "id": "control-book-call",
+    "kind": "control",
+    "message": "I'd like to book a consultation with someone at BeamX",
+    "tool": "offerConsultation"
+  },
+  {
+    "id": "control-book-call-after-report",
+    "kind": "control",
+    "message": "Can I talk to an adviser about my Stellar results?",
+    "setup": { "completed": true },
+    "tool": "offerConsultation"
+  },
+  {
+    "id": "control-book-call-mid-run",
+    "kind": "control",
+    "message": "Before I continue, can I book a call with your team?",
+    "setup": { "active": { "answers": { "foundation": "all-three" } } },
+    "tool": "offerConsultation"
   }
 ]

@@ -478,6 +478,14 @@ function LiveChat({
 
   // Signed in users never see the sign up prompts (spec 0009, AC-1).
   const guest = session.data?.user.isAnonymous ?? true;
+  // Prefills the booking widget for an account (spec 0016, AC-3).
+  const contact =
+    guest || !session.data
+      ? null
+      : {
+          name: session.data.user.name || null,
+          email: session.data.user.email || null,
+        };
   // The save prompt waits for the newest report to be ready.
   const reportReady =
     shown?.runId === latest?.runId &&
@@ -508,6 +516,7 @@ function LiveChat({
                 toolNames={toolNames}
                 conversationId={id}
                 buy={buy}
+                contact={contact}
               />
               {item.kind === "report" && item.data.runId === latest?.runId ? (
                 <SavePrompt

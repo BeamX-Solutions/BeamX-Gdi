@@ -5,3 +5,4 @@ export * from "./usage";
 export * from "./credits";
 export * from "./payments";
 export * from "./profile";
+export * from "./consultations";

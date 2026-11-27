@@ -35,16 +35,39 @@ export const emailedCode = async (email: string): Promise<string> => {
 const wcagTags = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
 
 export const scan = async (page: Page) => {
-  // Let open animations (a dialog's fade in) finish, or axe measures half faded text.
-  // Endless ones, like the shimmer, never finish, so they are skipped.
-  await page.evaluate(() =>
-    Promise.all(
-      document
+  // The pointer rests where the last click was; a card that appears under it would be
+  // measured in its hover colors. Move it out of the way.
+  await page.mouse.move(0, 0);
+  // Let open animations (a dialog's fade in, a hover fading out) finish, or axe measures
+  // half faded colors. A card that mounts a moment later starts a new one, so check
+  // again until none are left. Endless ones, like the shimmer, are skipped.
+  await page.evaluate(async () => {
+    for (let round = 0; round < 10; round += 1) {
+      const running = document
         .getAnimations()
-        .filter((a) => a.effect?.getComputedTiming().endTime !== Infinity)
-        .map((a) => a.finished.catch(() => undefined)),
-    ),
-  );
+        .filter(
+          (a) =>
+            a.playState === "running" &&
+            a.effect?.getComputedTiming().endTime !== Infinity,
+        );
+      if (running.length === 0) {
+        // One more frame, so anything mounting right now has started.
+        await new Promise((r) => requestAnimationFrame(() => r(null)));
+        if (
+          document
+            .getAnimations()
+            .every(
+              (a) =>
+                a.playState !== "running" ||
+                a.effect?.getComputedTiming().endTime === Infinity,
+            )
+        )
+          return;
+        continue;
+      }
+      await Promise.all(running.map((a) => a.finished.catch(() => undefined)));
+    }
+  });
   const results = await new AxeBuilder({ page }).withTags(wcagTags).analyze();
   expect(results.violations).toEqual([]);
 };

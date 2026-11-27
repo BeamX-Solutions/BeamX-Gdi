@@ -2,6 +2,7 @@
  * Server only. The real dependencies of `handleTurn`: the query layer, the registry,
  * the turn lock, the clock, the logger, and the AI turn on the `chat` model role.
  */
+import * as consultations from "@/db/queries/consultations";
 import * as conversations from "@/db/queries/conversations";
 import * as credits from "@/db/queries/credits";
 import * as messages from "@/db/queries/messages";
@@ -11,6 +12,7 @@ import * as usage from "@/db/queries/usage";
 import { openCreditAccount } from "./billing-deps";
 import { toCreditSummary } from "@/billing/summary";
 import { newId } from "@/db/id";
+import { env } from "@/lib/env";
 import { logEvent } from "@/lib/log";
 import { turnLock } from "@/lib/turn-lock";
 import { ok } from "@/lib/result";
@@ -113,6 +115,8 @@ const aiTurnDeps: AiTurnDeps = {
     return started.ok ? ok({ runId: started.value.run.id }) : started;
   },
   abandonRun: runs.abandon,
+  offerConsultation: consultations.offer,
+  calendlyUrl: env.CALENDLY_URL,
   limits: { guestSpendCap, takeRun, giveBackRun },
   helperModel: () => resolveModel("helper"),
   recordUsage: withSpend(usage.record),

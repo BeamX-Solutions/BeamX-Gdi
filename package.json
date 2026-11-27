@@ -19,6 +19,7 @@
     "credits:adjust": "tsx --env-file-if-exists=.env scripts/credits/adjust.ts",
     "credits:import-luna": "tsx --env-file-if-exists=.env scripts/credits/import-luna.ts",
     "eval:assistant": "tsx --env-file-if-exists=.env evals/assistant/run.ts",
+    "calendly:subscribe": "tsx --env-file-if-exists=.env scripts/calendly/subscribe.ts",
     "check:colors": "bash scripts/check-raw-colors.sh",
     "e2e": "playwright test"
   },

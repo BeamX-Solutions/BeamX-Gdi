@@ -12,6 +12,8 @@ const nextConfig: NextConfig = {
       "./src/pdf/fonts/**",
       "./public/brand/logo.png",
     ],
+    // BeamX's booking email attaches the client's reports (spec 0016, AC-6).
+    "/api/webhooks/calendly": ["./src/pdf/fonts/**", "./public/brand/logo.png"],
   },
   turbopack: {
     rules: {

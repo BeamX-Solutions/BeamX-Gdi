@@ -50,6 +50,13 @@
       "when": 1795734589486,
       "tag": "0006_report_partial",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1795783650964,
+      "tag": "0007_consultation",
+      "breakpoints": true
     }
   ]
 }
