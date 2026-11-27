@@ -8,6 +8,9 @@ import { tool } from "ai";
 import { z } from "zod";
 import type { ToolEnv } from "./env";
 
+/** How long BeamX's free strategy call is, so the reply can say it from a result. */
+export const CONSULTATION_MINUTES = 30;
+
 export const offerConsultationInput = z.strictObject({});
 
 export const offerConsultationOutput = z.union([
@@ -17,6 +20,7 @@ export const offerConsultationOutput = z.union([
     status: z.enum(["offered", "booked", "canceled"]),
     startTime: z.string().nullable(),
     calendlyUrl: z.string(),
+    minutes: z.literal(CONSULTATION_MINUTES),
   }),
   z.object({ ok: z.literal(false), error: z.literal("try_again") }),
 ]);
@@ -42,6 +46,7 @@ export const offerConsultationTool = (env: ToolEnv) =>
               status: read.value.status,
               startTime: read.value.startTime,
               calendlyUrl: deps.calendlyUrl,
+              minutes: CONSULTATION_MINUTES,
             };
       deps.log("assistant_tool", {
         name: "offerConsultation",
