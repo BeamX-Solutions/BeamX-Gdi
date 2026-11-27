@@ -71,6 +71,10 @@ test.describe("business profile (spec 0012)", () => {
     await expect(prefill).toBeVisible({ timeout: TURN_MS });
     await expect(prefill.getByText("Retail/Trade")).toBeVisible();
     await expect(prefill.getByText("Less than 1 year")).toBeVisible();
+    // The card shows while the turn is still ending, with its buttons disabled (and
+    // faded). Scan once they are usable, or axe measures them mid fade.
+    for (const button of await prefill.getByRole("button").all())
+      await expect(button).toBeEnabled({ timeout: TURN_MS });
     await scan(page);
 
     // The profile page shows the facts and where they came from, and edits one.
