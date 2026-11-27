@@ -58,6 +58,9 @@ export const limitKeys = {
   guests: (ip: string, day: string) => `limit:guests:${ip}:${day}`,
   spend: (day: string) => `spend:${day}`,
   spendTripped: (day: string) => `spend:tripped:${day}`,
+  /** Report emails per account per UTC hour (spec 0015, AC-5); `hour` is `YYYY-MM-DDTHH`. */
+  reportEmail: (userId: string, hour: string) =>
+    `limit:report_email:${userId}:${hour}`,
 } as const;
 
 /**
@@ -78,7 +81,9 @@ export type LimitName =
   | "spend"
   // Spec 0004's billing counters share the store.
   | "free_chat"
-  | "guest_grant";
+  | "guest_grant"
+  // Spec 0015's report emails.
+  | "report_email";
 
 /** The per minute windows: AI turns per user, card taps per user, every POST per IP. */
 export type BurstWindow = "user" | "cards" | "ip";

@@ -13,6 +13,12 @@ import { logEvent } from "@/lib/log";
 import { err, ok, type Result } from "@/lib/result";
 import { CodeEmail } from "./code-email";
 import { codeEmailCopy, codeEmailText, type CodePurpose } from "./copy";
+import {
+  reportEmailCopy,
+  reportEmailText,
+  type ReportEmailInput,
+} from "./report-copy";
+import { ReportEmail } from "./report-email";
 
 export type EmailSendError = { readonly code: "email_send_failed" };
 
@@ -79,6 +85,83 @@ export const sendCodeEmail = codeMailer({
   from: env.EMAIL_FROM,
   deployed: env.VERCEL_ENV !== undefined,
   render: (purpose, code) => render(CodeEmail({ purpose, code })),
+  log: logEvent,
+  devPrint: (line) => {
+    console.info(line);
+  },
+});
+
+/** A report email with its PDF (spec 0015, AC-5). */
+export type ReportEmailDeps = {
+  readonly send:
+    | ((
+        email: OutgoingEmail & {
+          readonly attachments: readonly {
+            readonly filename: string;
+            readonly content: Buffer;
+          }[];
+        },
+      ) => Promise<{ readonly error: unknown }>)
+    | null;
+  readonly from: string | undefined;
+  readonly deployed: boolean;
+  readonly render: (input: ReportEmailInput) => Promise<string>;
+  readonly log: typeof logEvent;
+  readonly devPrint: (line: string) => void;
+};
+
+export const reportMailer =
+  (deps: ReportEmailDeps) =>
+  async (
+    to: string,
+    input: ReportEmailInput,
+    pdf: { readonly filename: string; readonly content: Buffer },
+  ): Promise<Result<void, EmailSendError>> => {
+    if (deps.send === null || deps.from === undefined) {
+      if (deps.deployed) {
+        deps.log("email_send_failed", {
+          reason: "not_configured",
+          purpose: "report",
+        });
+        return err({ code: "email_send_failed" });
+      }
+      deps.devPrint(
+        `[dev] report email (${pdf.filename}, ${pdf.content.length} bytes) for ${to}`,
+      );
+      return ok(undefined);
+    }
+    try {
+      const { error } = await deps.send({
+        from: deps.from,
+        to,
+        subject: reportEmailCopy(input).subject,
+        html: await deps.render(input),
+        text: reportEmailText(input),
+        attachments: [pdf],
+      });
+      if (error) {
+        deps.log("email_send_failed", {
+          reason: "provider",
+          purpose: "report",
+        });
+        return err({ code: "email_send_failed" });
+      }
+      deps.log("email_sent", { purpose: "report" });
+      return ok(undefined);
+    } catch {
+      deps.log("email_send_failed", { reason: "exception", purpose: "report" });
+      return err({ code: "email_send_failed" });
+    }
+  };
+
+export const sendReportEmail = reportMailer({
+  send: resend
+    ? (email) =>
+        resend.emails.send({ ...email, attachments: [...email.attachments] })
+    : null,
+  from: env.EMAIL_FROM,
+  deployed: env.VERCEL_ENV !== undefined,
+  render: (input) => render(ReportEmail(input)),
   log: logEvent,
   devPrint: (line) => {
     console.info(line);
