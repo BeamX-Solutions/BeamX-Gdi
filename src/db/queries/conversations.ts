@@ -1,4 +1,5 @@
 import { and, desc, eq, sql } from "drizzle-orm";
+import { z } from "zod";
 import { db } from "../client";
 import { newId } from "../id";
 import { conversation, toolRun } from "../schema";
@@ -249,4 +250,78 @@ export const remove = async (
       .returning({ id: conversation.id }),
   ]);
   return deleted.length === 0 ? err({ code: "not_found" }) : ok(true);
+};
+
+/** One chat in the history rail (feature #14). */
+export type HistoryChat = {
+  readonly id: string;
+  /** The stored title, or null (the caller derives one from `firstUserParts`). */
+  readonly title: string | null;
+  readonly lastMessageAt: string;
+  /** The parts of the chat's first user message, unparsed, or null. */
+  readonly firstUserParts: unknown;
+  /** Tool ids of this chat's ready reports, newest first. */
+  readonly readyToolIds: readonly string[];
+};
+
+const historyRowSchema = z.object({
+  id: z.string(),
+  title: z.string().nullable(),
+  last_message_at: z.string(),
+  first_user_parts: z.unknown(),
+  ready_tool_ids: z.array(z.string()).nullable(),
+});
+
+/**
+ * The history rail's page (feature #14): newest activity first, keyset paged on
+ * (last_message_at, id) like `list`, each chat with its first user message (for a title)
+ * and the tools of its ready reports. One statement, owner scoped.
+ */
+export const history = async (
+  userId: string,
+  options: { cursor?: string; limit?: number } = {},
+): Promise<
+  Result<
+    { items: readonly HistoryChat[]; nextCursor: string | null },
+    { readonly code: "invalid_cursor" }
+  >
+> => {
+  const size = Math.min(Math.max(options.limit ?? 30, 1), 100);
+  const after =
+    options.cursor === undefined ? null : decodeListCursor(options.cursor);
+  if (options.cursor !== undefined && after === null)
+    return err({ code: "invalid_cursor" });
+  const rows = await db.execute(sql`
+    SELECT c.id, c.title, c.last_message_at::text AS last_message_at,
+      (SELECT m.parts FROM message m
+        WHERE m.conversation_id = c.id AND m.role = 'user'
+        ORDER BY m.created_at, m.id LIMIT 1) AS first_user_parts,
+      (SELECT array_agg(r.tool_id ORDER BY r.completed_at DESC)
+        FROM tool_run r JOIN report p ON p.run_id = r.id AND p.status = 'ready'
+        WHERE r.conversation_id = c.id AND r.user_id = c.user_id) AS ready_tool_ids
+    FROM conversation c
+    WHERE c.user_id = ${userId}::uuid
+      ${after ? sql`AND (c.last_message_at, c.id) < (${after[0]}::timestamptz, ${after[1]}::uuid)` : sql``}
+    ORDER BY c.last_message_at DESC, c.id DESC
+    LIMIT ${size + 1}
+  `);
+  const parsed = rows.rows.flatMap((raw) => {
+    const row = historyRowSchema.safeParse(raw);
+    return row.success ? [row.data] : [];
+  });
+  const items = parsed.slice(0, size).map((r): HistoryChat => ({
+    id: r.id,
+    title: r.title,
+    lastMessageAt: r.last_message_at,
+    firstUserParts: r.first_user_parts,
+    readyToolIds: r.ready_tool_ids ?? [],
+  }));
+  const last = items.at(-1);
+  return ok({
+    items,
+    nextCursor:
+      parsed.length > size && last
+        ? encodeListCursor({ lastMessageAt: last.lastMessageAt, id: last.id })
+        : null,
+  });
 };
