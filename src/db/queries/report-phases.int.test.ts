@@ -195,3 +195,36 @@ describe("reports.failStale (AC-15)", () => {
     expect(await holdStatus(runId)).toBe("active");
   });
 });
+
+describe("partial reports (spec 0013, AC-6, AC-7)", () => {
+  it("saves partial between phases and claims it again without an attempt", async () => {
+    const { u, runId } = await completedRun();
+    const first = unwrap(await reports.claim(u, runId));
+    expect(first.attempts).toBe(1);
+    unwrap(await reports.savePhase(runId, 1, "one", { text: "A" }));
+    unwrap(await reports.savePartial(runId, 1));
+    expect(unwrap(await reports.status(u, runId))).toMatchObject({
+      status: "partial",
+      attempts: 1,
+      phaseKeys: ["one"],
+      stale: false,
+    });
+
+    // The next call continues on the same attempt; a second claim at once is refused.
+    const next = unwrap(await reports.claim(u, runId));
+    expect(next).toMatchObject({ status: "generating", attempts: 1 });
+    expect(await reports.claim(u, runId)).toEqual({
+      ok: false,
+      error: { code: "already_generating" },
+    });
+  });
+
+  it("refuses to save partial for a stale attempt", async () => {
+    const { u, runId } = await completedRun();
+    unwrap(await reports.claim(u, runId));
+    expect(await reports.savePartial(runId, 2)).toEqual({
+      ok: false,
+      error: { code: "stale_attempt" },
+    });
+  });
+});

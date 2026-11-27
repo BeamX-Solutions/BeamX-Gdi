@@ -102,7 +102,7 @@ const errorViewKind = z.custom<ReportErrorViewKind>(
 );
 
 export const reportPayloadSchema = z.object({
-  status: z.enum(["pending", "generating", "ready", "failed"]),
+  status: z.enum(["pending", "generating", "ready", "failed", "partial"]),
   phases: z.array(z.object({ label: z.string(), done: z.boolean() })),
   error: z
     .object({ kind: errorViewKind, title: z.string(), message: z.string() })

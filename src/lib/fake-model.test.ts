@@ -103,3 +103,42 @@ describe("reportScript", () => {
     }
   });
 });
+
+describe("the fake model and Luna (spec 0013)", () => {
+  it("proposes Luna for a marketing plan", () => {
+    expect(
+      chatScript([user("I need a marketing plan for my restaurant"), note])[0],
+    ).toMatchObject({
+      type: "tool-call",
+      input: JSON.stringify({ toolId: "luna" }),
+    });
+  });
+
+  it("answers every Luna phase with output that passes its schema and check", () => {
+    const luna = getTool("luna");
+    if (!luna.ok) throw new Error("luna is not registered");
+    const answers = Object.fromEntries(
+      luna.value.questions.map((q) => [
+        q.id,
+        q.kind === "single"
+          ? (q.options[0]?.value ?? "")
+          : q.kind === "multi"
+            ? [q.options[0]?.value ?? ""]
+            : "Ada Foods",
+      ]),
+    );
+    const earlier: Record<string, unknown> = {};
+    for (const phase of luna.value.phases) {
+      const ctx = {
+        answers,
+        scores: { answered: 50 },
+        earlier,
+        client: { firstName: null },
+      };
+      const output = reportScript([user(phase.buildPrompt(ctx).prompt)]);
+      expect(phase.output.safeParse(output).success).toBe(true);
+      expect(phase.check?.(output, ctx) ?? []).toEqual([]);
+      earlier[phase.key] = output;
+    }
+  });
+});

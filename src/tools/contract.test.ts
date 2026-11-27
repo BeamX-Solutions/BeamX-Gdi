@@ -6,10 +6,7 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import type { ReportPhase, ToolModule } from "./_contract";
-import {
-  contractViolations,
-  MAX_PHASE_TIMEOUT_MS,
-} from "./_kit/contract-check";
+import { contractViolations, MAX_CALL_MS } from "./_kit/contract-check";
 import { makeRegistry } from "./_kit/registry";
 import { tools } from "./registry";
 import { pairBasic, pairPro } from "./test-tools/pair";
@@ -148,28 +145,29 @@ describe("broken modules", () => {
     ]);
   });
 
-  it("catches a phase timeout over the limit", () => {
+  it("catches one phase that cannot fit one call with its repair (spec 0013, AC-10)", () => {
     const broken = withPhases(sampleTool, [
-      { ...firstPhase(sampleTool), timeoutMs: MAX_PHASE_TIMEOUT_MS + 1 },
+      { ...firstPhase(sampleTool), timeoutMs: MAX_CALL_MS / 2 + 1 },
     ]);
     expect(contractViolations([broken])).toEqual([
-      `tool "sample" phase "advice" has timeoutMs ${MAX_PHASE_TIMEOUT_MS + 1}, over ${MAX_PHASE_TIMEOUT_MS}`,
+      `tool "sample" needs up to ${MAX_CALL_MS + 2}ms in one call (two tries per phase), over ${MAX_CALL_MS}`,
     ]);
   });
 
-  it("catches phases that cannot fit in maxDuration", () => {
+  it("sums the phases of one call, unless the tool runs one phase per call", () => {
     const slow = (key: "one" | "two" | "three"): ReportPhase => ({
       ...firstPhase(threePhaseTool),
       key,
-      timeoutMs: MAX_PHASE_TIMEOUT_MS,
+      timeoutMs: 100_000,
     });
-    const broken = withPhases(threePhaseTool, [
+    const together = withPhases(threePhaseTool, [
       slow("one"),
       slow("two"),
       slow("three"),
     ]);
-    expect(contractViolations([broken])).toEqual([
-      'tool "three-phase" needs up to 1440000ms for its phases, over 780000',
+    expect(contractViolations([together])).toEqual([
+      'tool "three-phase" needs up to 600000ms in one call (two tries per phase), over 280000',
     ]);
+    expect(contractViolations([{ ...together, phasesPerCall: 1 }])).toEqual([]);
   });
 });

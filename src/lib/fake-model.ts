@@ -2,16 +2,17 @@
  * Server only. Scripted AI SDK mock models for `pnpm e2e` (spec 0007). Used only when
  * `fakeAiEnabled()` (`env.ts`): `E2E_FAKE_AI=true` and not a production deploy.
  *
- * - `chat`: replies keyed by the latest user text. "business idea" proposes Stellar and "how healthy" proposes Beacon
+ * - `chat`: replies keyed by the latest user text. "business idea" proposes Stellar, "how healthy" proposes Beacon and "marketing plan" proposes Luna
  *   (a `startRun` call, which waits for approval); a tool result (the approved run) gets
  *   a short text; anything else gets a short steer towards a tool.
  * - `helper`: known facts extraction finds nothing, so a run opens on its first card.
- * - `report`: a fixed Stellar analysis, or for Beacon a fixed advisory that fits the
- *   flags in its prompt.
+ * - `report`: a fixed Stellar analysis, for Beacon a fixed advisory that fits the flags
+ *   in its prompt, and for each Luna phase its slice of the standalone's example plan.
  *
  * Keep the chat script in step with the assistant's tool flow (spec 0007, Consequences).
  */
 import type { LanguageModel } from "ai";
+import examplePlan from "../../fixtures/parity/luna/example-plan.json";
 import { MockLanguageModelV4, simulateReadableStream } from "ai/test";
 
 type DoStreamOptions = Parameters<MockLanguageModelV4["doStream"]>[0];
@@ -67,7 +68,9 @@ export const chatScript = (prompt: Prompt): StreamPart[] => {
     ? "stellar"
     : /how healthy/i.test(said)
       ? "beacon"
-      : null;
+      : /marketing plan/i.test(said)
+        ? "luna"
+        : null;
   if (toolId)
     return [
       {
@@ -122,6 +125,43 @@ export const fakeBeaconAdvisory = (prompt: string) => ({
   ],
 });
 
+/** Luna's phases, by the first line of their prompt (`src/tools/luna/report.ts`). */
+const plan = examplePlan.plan;
+const LUNA_SLICES: readonly (readonly [string, unknown])[] = [
+  [
+    "Analyze this business.",
+    {
+      businessModelAssessment: "A focused service with steady demand.",
+      marketOpportunity: "Offices nearby want healthy lunches.",
+      competitivePositioning: "Fresher and faster than the canteen.",
+      customerAvatarRefinement: "Office managers ordering for teams.",
+      strategicRecommendations: ["Sign two anchor offices."],
+      riskFactors: ["Delivery delays in traffic."],
+      growthPotential: "Room for three more districts.",
+    },
+  ],
+  [
+    "Develop the core marketing plan",
+    {
+      customerJourney: plan.customerJourney,
+      strategicInsights: plan.strategicInsights,
+      risksPositioning: plan.risksPositioning,
+    },
+  ],
+  [
+    "Write the executive summary",
+    {
+      executiveSummary: plan.executiveSummary,
+      implementation: plan.implementation,
+    },
+  ],
+  ["Detail the resources", { resources: plan.resources, kpis: plan.kpis }],
+  [
+    "Produce the templates",
+    { templates: plan.templates, investmentRoi: plan.investmentRoi },
+  ],
+];
+
 /**
  * What the scripted report model returns, from the prompt alone. Pure. Beacon's
  * advisory phase gets the fixed advisory, which passes its phase check; every other
@@ -135,9 +175,9 @@ export const reportScript = (prompt: Prompt): unknown => {
         : [],
     )
     .join("\n");
-  return text.includes(BEACON_MARK)
-    ? fakeBeaconAdvisory(text)
-    : FAKE_STELLAR_ANALYSIS;
+  if (text.includes(BEACON_MARK)) return fakeBeaconAdvisory(text);
+  const luna = LUNA_SLICES.find(([mark]) => text.startsWith(mark));
+  return luna ? luna[1] : FAKE_STELLAR_ANALYSIS;
 };
 
 const streaming = (script: (prompt: Prompt) => StreamPart[]) =>

@@ -54,8 +54,25 @@ export const pollDelayMs = (elapsedMs: number): number =>
 
 /** Keep polling while the report is on its way. A stale report waits for a Retry. */
 export const shouldPoll = (payload: ReportPayload): boolean =>
-  (payload.status === "pending" || payload.status === "generating") &&
+  (payload.status === "pending" ||
+    payload.status === "generating" ||
+    payload.status === "partial") &&
   !payload.stale;
+
+/**
+ * When the panel should POST the report (spec 0007; spec 0013, AC-8): once for a pending
+ * report, and once for each new partial state (keyed by how many phases are done), so
+ * the next phase starts within one poll. Null means no POST. Pure.
+ */
+export const claimKey = (
+  runId: string,
+  payload: ReportPayload,
+): string | null => {
+  if (payload.status === "pending") return `${runId}:pending`;
+  if (payload.status === "partial")
+    return `${runId}:partial:${payload.phases.filter((p) => p.done).length}`;
+  return null;
+};
 
 /** Done phases are ticked, the first open one is in progress, the rest wait. */
 export const skeletonSteps = (

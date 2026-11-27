@@ -49,11 +49,12 @@ export const answerSchema = (
     case "text": {
       if (question.input === "text") {
         const max = question.maxLength ?? DEFAULT_TEXT_MAX;
-        return z
+        const text = z
           .string()
           .trim()
-          .min(1, "Enter an answer.")
           .max(max, `Keep it to ${max} characters or fewer.`);
+        // An optional question accepts "" (its Skip button, spec 0013).
+        return question.optional ? text : text.min(1, "Enter an answer.");
       }
       const base =
         question.input === "money"

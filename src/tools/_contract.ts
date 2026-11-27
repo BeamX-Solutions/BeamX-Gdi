@@ -49,6 +49,10 @@ export type QuestionView =
       readonly input: "text" | "number" | "money";
       readonly placeholder?: string;
       readonly maxLength?: number;
+      /** A text answer that may run to several lines: drawn as a text area (spec 0013). */
+      readonly multiline?: true;
+      /** A text answer the client may skip: a Skip button saves "" (spec 0013). */
+      readonly optional?: true;
       readonly minValue?: number;
       readonly maxValue?: number;
     };
@@ -194,7 +198,8 @@ export type ReportBlock =
 // ---------------------------------------------------------------------------
 
 /** Model roles a phase may ask for. The runner maps each to a model id in `assistant/models.ts`. */
-export const modelRoles = ["report"] as const;
+/** `report_long` is a faster model for long phases that must fit one call (spec 0013). */
+export const modelRoles = ["report", "report_long"] as const;
 export type ModelRole = (typeof modelRoles)[number];
 
 export type PromptParts = {
@@ -283,6 +288,11 @@ export type ToolModule = ToolReader & {
    * Receives scores already parsed by `scoresSchema`.
    */
   readonly toPreview?: (scores: unknown) => readonly ReportBlock[];
+  /**
+   * 1 runs one phase per report call and saves the report as `partial` between calls
+   * (spec 0013); absent runs every phase in one call.
+   */
+  readonly phasesPerCall?: 1;
 };
 
 // ---------------------------------------------------------------------------
@@ -330,6 +340,7 @@ export type TypedTool<S, C> = TypedReader<S, C> & {
   readonly phases: readonly [TypedPhase<S>, ...TypedPhase<S>[]];
   readonly readers?: Readonly<Record<string, ToolReader>>;
   readonly toPreview?: (scores: S) => readonly ReportBlock[];
+  readonly phasesPerCall?: 1;
 };
 
 /**
@@ -399,6 +410,7 @@ export const defineTool = <S, C>(def: TypedTool<S, C>): ToolModule => ({
     };
   }),
   ...(def.readers ? { readers: def.readers } : {}),
+  ...(def.phasesPerCall ? { phasesPerCall: def.phasesPerCall } : {}),
   ...(def.toPreview
     ? {
         toPreview: (scores: unknown) =>

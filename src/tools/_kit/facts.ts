@@ -217,8 +217,8 @@ const onlyOne = <V>(
 };
 
 /**
- * A bucketed answer (years, team size) as a range. Read back only when exactly one
- * bucket contains the stored range (AC-3).
+ * A bucketed answer (years, team size) as a range. Read back from the bucket equal to
+ * the stored range, else from the one bucket that contains it, if exactly one does (AC-3).
  */
 export const rangeFact = (
   key: "years_in_business" | "team_size",
@@ -231,9 +231,13 @@ export const rangeFact = (
       : null,
   fromFact: (fact) => {
     const parsed = rangeSchema.safeParse(fact);
-    return parsed.success
-      ? onlyOne(buckets, (b) => within(parsed.data, b))
-      : null;
+    if (!parsed.success) return null;
+    const r = parsed.data;
+    // An exact bucket wins ("Pre-launch" 0 to 0 also fits inside "Less than 1 year").
+    return (
+      onlyOne(buckets, (b) => b.min === r.min && b.max === r.max) ??
+      onlyOne(buckets, (b) => within(r, b))
+    );
   },
 });
 

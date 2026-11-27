@@ -7,9 +7,10 @@
 import type { ToolModule } from "./_contract";
 import { makeRegistry } from "./_kit/registry";
 import { beacon } from "./beacon";
+import { luna } from "./luna";
 import { stellar } from "./stellar";
 
-export const tools: readonly ToolModule[] = [stellar, beacon];
+export const tools: readonly ToolModule[] = [stellar, beacon, luna];
 
 const registry = makeRegistry(tools);
 

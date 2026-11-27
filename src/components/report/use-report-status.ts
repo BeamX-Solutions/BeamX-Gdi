@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { reportPayloadSchema } from "./report-payload";
 import {
   asRetrying,
+  claimKey,
   pollDelayMs,
   shouldPoll,
   type FetchState,
@@ -42,7 +43,8 @@ const request = async (
  *
  * A `pending` report has never been claimed, so the first poll that sees one POSTs it
  * once (spec 0007: the view report card starts the report). The claim is idempotent
- * (spec 0005), so a remount that POSTs again is harmless.
+ * (spec 0005), so a remount that POSTs again is harmless. A `partial` report (spec 0013)
+ * is POSTed once per new partial state, which starts its next phase.
  */
 export function useReportStatus(runId: string | null) {
   const [state, setState] = useState<FetchState>({ kind: "loading" });
@@ -53,7 +55,8 @@ export function useReportStatus(runId: string | null) {
     setTracked(runId);
     setState({ kind: "loading" });
   }
-  // Runs this mount already POSTed, so a pending poll claims each one once.
+  // Claims this mount already POSTed (a pending report, each partial state), so each
+  // is claimed once.
   const claimed = useRef(new Set<string>());
 
   useEffect(() => {
@@ -67,8 +70,9 @@ export function useReportStatus(runId: string | null) {
       if (controller.signal.aborted) return;
       setState(next);
       if (next.kind !== "loaded") return;
-      if (next.payload.status === "pending" && !claimed.current.has(runId)) {
-        claimed.current.add(runId);
+      const key = claimKey(runId, next.payload);
+      if (key !== null && !claimed.current.has(key)) {
+        claimed.current.add(key);
         await request(runId, "POST", controller.signal);
         if (!controller.signal.aborted) void poll();
         return;

@@ -43,6 +43,13 @@
       "when": 1795729402741,
       "tag": "0005_business_profile",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1795734589486,
+      "tag": "0006_report_partial",
+      "breakpoints": true
     }
   ]
 }

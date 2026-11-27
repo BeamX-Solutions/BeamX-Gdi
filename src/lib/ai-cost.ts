@@ -14,9 +14,15 @@ export type ModelPrice = {
   readonly cacheWrite: number;
 };
 
-/** Anthropic first party API prices, checked 2026-11-20. */
+/** Anthropic first party API prices, checked 2026-11-27 (cache write = 1.25 x input). */
 export const modelPrices: Readonly<Record<string, ModelPrice>> = {
   "claude-opus-5-5": { input: 4, output: 20, cacheRead: 0.2, cacheWrite: 5 },
+  "claude-sonnet-5-5": {
+    input: 2,
+    output: 10,
+    cacheRead: 0.1,
+    cacheWrite: 2.5,
+  },
 };
 
 /** Token counts as `ai_usage` stores them. `inputTokens` is the total, cache included. */

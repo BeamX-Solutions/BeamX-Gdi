@@ -3,6 +3,7 @@
 import { useId, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { CardFrame } from "./card-frame";
 import { formatNumber } from "./format-answer";
 import { validateTextAnswer } from "./validate";
@@ -76,29 +77,44 @@ export function TextCard({
               ₦
             </span>
           ) : null}
-          <Input
-            id={inputId}
-            type="text"
-            inputMode={
-              money
-                ? "numeric"
-                : question.input === "number"
-                  ? "decimal"
-                  : "text"
-            }
-            enterKeyHint="done"
-            autoComplete="off"
-            value={raw}
-            placeholder={question.placeholder}
-            disabled={disabled}
-            autoFocus={initialValue !== undefined}
-            aria-labelledby={promptId}
-            aria-describedby={error ? errorId : undefined}
-            aria-invalid={error ? true : undefined}
-            className={money ? "pl-8" : undefined}
-            onChange={(event) => setRaw(event.target.value)}
-            onBlur={groupOnBlur}
-          />
+          {question.multiline ? (
+            <Textarea
+              id={inputId}
+              rows={4}
+              value={raw}
+              placeholder={question.placeholder}
+              disabled={disabled}
+              autoFocus={initialValue !== undefined}
+              aria-labelledby={promptId}
+              aria-describedby={error ? errorId : undefined}
+              aria-invalid={error ? true : undefined}
+              onChange={(event) => setRaw(event.target.value)}
+            />
+          ) : (
+            <Input
+              id={inputId}
+              type="text"
+              inputMode={
+                money
+                  ? "numeric"
+                  : question.input === "number"
+                    ? "decimal"
+                    : "text"
+              }
+              enterKeyHint="done"
+              autoComplete="off"
+              value={raw}
+              placeholder={question.placeholder}
+              disabled={disabled}
+              autoFocus={initialValue !== undefined}
+              aria-labelledby={promptId}
+              aria-describedby={error ? errorId : undefined}
+              aria-invalid={error ? true : undefined}
+              className={money ? "pl-8" : undefined}
+              onChange={(event) => setRaw(event.target.value)}
+              onBlur={groupOnBlur}
+            />
+          )}
         </div>
         {error ? (
           <p
@@ -109,9 +125,24 @@ export function TextCard({
             {error}
           </p>
         ) : null}
-        <Button type="submit" className="self-start" disabled={disabled}>
-          Submit
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button type="submit" disabled={disabled}>
+            Submit
+          </Button>
+          {question.optional ? (
+            <Button
+              type="button"
+              variant="ghost"
+              disabled={disabled}
+              onClick={() => {
+                setError(null);
+                onSubmit("");
+              }}
+            >
+              Skip
+            </Button>
+          ) : null}
+        </div>
       </form>
     </CardFrame>
   );

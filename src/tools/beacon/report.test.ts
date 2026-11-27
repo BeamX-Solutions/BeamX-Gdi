@@ -84,7 +84,7 @@ const ctx = (firstName: string | null): PhaseContext => ({
 
 describe("the Beacon module (AC-1)", () => {
   it("is Beacon v2 at 150 credits with one advisory phase", () => {
-    expect(tools.map((t) => t.id)).toEqual(["stellar", "beacon"]);
+    expect(tools.map((t) => t.id)).toEqual(["stellar", "beacon", "luna"]);
     expect(beacon).toMatchObject({
       id: "beacon",
       version: "2",

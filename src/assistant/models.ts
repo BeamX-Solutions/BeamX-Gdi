@@ -15,6 +15,8 @@ export type AssistantRole = ModelRole | "chat" | "helper";
 
 export const modelConfigs = {
   report: { id: "claude-opus-5-5", effort: "medium" },
+  // Long phases that must fit one 300 second call (spec 0013): faster than Opus.
+  report_long: { id: "claude-sonnet-5-5", effort: "low" },
   chat: { id: "claude-opus-5-5", effort: "low" },
   helper: { id: "claude-opus-5-5", effort: "low" },
 } as const satisfies Readonly<Record<AssistantRole, ModelConfig>>;
