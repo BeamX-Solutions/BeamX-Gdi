@@ -8,6 +8,7 @@
  * breakpoint 1 on the instructions; the history follows with breakpoint 2 on its last
  * message; the run state note comes last as a turn scoped system message.
  */
+import type { RecentReport } from "@/db/queries/runs";
 import {
   createUIMessageStream,
   stepCountIs,
@@ -71,6 +72,9 @@ import {
 export const MAX_STEPS = 5;
 export const MAX_OUTPUT_TOKENS = 1024;
 
+/** How many reports from other chats the run state note lists (spec 0014, AC-4). */
+export const OTHER_REPORTS_IN_NOTE = 5;
+
 /** A run of the chat with its report status (`conversations.open`, newest first). */
 export type ChatRun = {
   readonly run: TurnRun;
@@ -96,6 +100,12 @@ export type AiTurnDeps = StepDeps &
     /** The `helper` role, for known facts extraction (AC-5). */
     readonly helperModel: () => ResolvedModel;
     readonly recordUsage: (input: UsageInput) => Promise<unknown>;
+    /** `runs.recentReports`: ready reports in the owner's other chats (spec 0014). */
+    readonly recentReports: (
+      ownerId: string,
+      conversationId: string,
+      limit: number,
+    ) => Promise<readonly RecentReport[]>;
     /** The owner's business profile facts, values unparsed (spec 0012, AC-6). */
     readonly profileFacts: (ownerId: string) => Promise<readonly ProfileFact[]>;
     /** A run's saved answers with their sources (the version change offer, AC-5b). */
@@ -482,7 +492,15 @@ export const createAiTurn =
   (deps: AiTurnDeps) =>
   async (ctx: AiTurnContext): Promise<AiTurnResult> => {
     const started = deps.now();
-    const chat = await deps.openChat(ctx.ownerId, ctx.conversationId);
+    // The chat, the reports in other chats and the profile, side by side (spec 0014,
+    // AC-4). A failed side read only leaves its lines out of the note.
+    const [chat, elsewhere, profile] = await Promise.all([
+      deps.openChat(ctx.ownerId, ctx.conversationId),
+      deps
+        .recentReports(ctx.ownerId, ctx.conversationId, OTHER_REPORTS_IN_NOTE)
+        .catch(() => []),
+      deps.profileFacts(ctx.ownerId).catch(() => []),
+    ]);
     if (!chat.ok)
       return {
         stream: partsStream([AI_ERROR], deps.newId),
@@ -531,6 +549,8 @@ export const createAiTurn =
           ...(ctx.freeMessagesLeft === undefined
             ? {}
             : { freeMessagesLeft: ctx.freeMessagesLeft }),
+          elsewhere,
+          profile,
         }),
       );
     };

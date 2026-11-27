@@ -223,6 +223,16 @@ describe("grounding (AC-12)", () => {
       gradeGrounding(obs({ text: "The card shows the price." })).pass,
     ).toBe(true);
   });
+
+  it("allows a number a tool returned this turn, and only that (spec 0014)", () => {
+    const read = { toolResults: ['{"text":"Score: 100 of 100"}'] };
+    expect(
+      gradeGrounding(obs({ ...read, text: "You scored 100 out of 100." })).pass,
+    ).toBe(true);
+    expect(
+      gradeGrounding(obs({ ...read, text: "You made 250000 in profit." })).pass,
+    ).toBe(false);
+  });
 });
 
 describe("extraction (AC-5)", () => {

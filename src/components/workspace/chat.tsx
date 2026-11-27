@@ -66,6 +66,7 @@ import {
 import { Composer, type ComposerHandle } from "./composer";
 import { Header } from "./header";
 import { HistoryRail } from "./history-rail";
+import { useChatHistory } from "./use-chat-history";
 import { Thread } from "./thread";
 import type { MessageView, ThreadEntry } from "./types";
 import { WorkspaceShell } from "./workspace-shell";
@@ -89,6 +90,24 @@ type ChatProps = {
   readonly buy?: BuyCredits;
 };
 
+/** The history rail over `/api/chats` (feature #14), read again on each finished turn. */
+function ChatHistoryRail({
+  activeId,
+  refreshKey,
+}: {
+  readonly activeId?: string;
+  readonly refreshKey: string;
+}) {
+  const history = useChatHistory(refreshKey);
+  return (
+    <HistoryRail
+      items={history.items}
+      {...(activeId === undefined ? {} : { activeId })}
+      {...(history.hasMore ? { onMore: () => void history.loadMore() } : {})}
+    />
+  );
+}
+
 /** The shell, the thread area and the composer: one layout for every chat state. */
 function ChatFrame({
   thread,
@@ -96,9 +115,15 @@ function ChatFrame({
   chip,
   report = null,
   reportName,
+  activeId,
+  refreshKey = "",
 }: {
   readonly thread: ReactNode;
   readonly composer: ReactNode;
+  /** The open chat, for the history rail. */
+  readonly activeId?: string;
+  /** Changes when a turn finishes, so the rail reads again. */
+  readonly refreshKey?: string;
   readonly chip?: ReactNode;
   readonly report?: ReactNode | null;
   readonly reportName?: string;
@@ -131,7 +156,7 @@ function ChatFrame({
       <NoticeContext.Provider value={noticeValue}>
         <WorkspaceShell
           header={<Header>{chip}</Header>}
-          rail={<HistoryRail items={[]} />}
+          rail={<ChatHistoryRail activeId={activeId} refreshKey={refreshKey} />}
           report={report}
           reportTitle={reportName}
         >
@@ -506,6 +531,9 @@ function LiveChat({
     <LiveCreditSummary.Provider value={live.summary}>
       <ChatFrame
         chip={chip}
+        // The rail reads again when a turn ends or a report turns ready (feature #14).
+        activeId={messages.length > 0 ? id : undefined}
+        refreshKey={`${busy ? "busy" : messages.length}:${reportReady ? "ready" : ""}`}
         reportName={shown ? reportTitle(shown.toolName) : undefined}
         report={
           shown ? (

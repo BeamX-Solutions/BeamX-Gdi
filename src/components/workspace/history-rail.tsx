@@ -11,19 +11,28 @@ export type HistoryItem = {
   readonly id: string;
   readonly title: string;
   readonly href: string;
+  /** "Beacon report", when the chat has a ready report (feature #14). */
+  readonly reports?: string | null;
 };
 
 /**
- * Chat history. 16rem open, 3.5rem collapsed on desktop; always open inside the phone drawer.
- * Placeholder list until feature #14 fills it.
+ * Chat history (feature #14): the client's chats, newest first, each with its reports,
+ * the open chat marked. 16rem open, 3.5rem collapsed on desktop; always open inside the
+ * phone drawer.
  */
 export function HistoryRail({
   items,
   newChatHref = "/",
+  activeId,
+  onMore,
 }: {
   readonly items: readonly HistoryItem[];
   /** Where "New chat" goes: the empty chat, or the shell demo on `/design`. */
   readonly newChatHref?: string;
+  /** The open chat, marked as the current page. */
+  readonly activeId?: string;
+  /** Loads the next page; absent when there is none. */
+  readonly onMore?: () => void;
 }) {
   const workspace = useWorkspace();
   const collapsed =
@@ -91,14 +100,33 @@ export function HistoryRail({
                 <li key={item.id}>
                   <Link
                     href={item.href}
-                    className="flex min-h-11 items-center rounded-md px-2 text-sm hover:bg-accent hover:text-accent-foreground"
+                    aria-current={item.id === activeId ? "page" : undefined}
+                    className={cn(
+                      "flex min-h-11 flex-col justify-center rounded-md px-2 py-1 text-sm hover:bg-accent hover:text-accent-foreground",
+                      item.id === activeId &&
+                        "bg-accent text-accent-foreground",
+                    )}
                   >
                     <span className="min-w-0 truncate">{item.title}</span>
+                    {item.reports ? (
+                      <span className="min-w-0 truncate text-xs text-muted-foreground">
+                        {item.reports}
+                      </span>
+                    ) : null}
                   </Link>
                 </li>
               ))}
             </ul>
           )}
+          {onMore ? (
+            <Button
+              variant="ghost"
+              className="mt-1 w-full justify-start"
+              onClick={onMore}
+            >
+              Show more
+            </Button>
+          ) : null}
         </nav>
       )}
     </aside>

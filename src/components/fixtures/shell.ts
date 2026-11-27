@@ -6,7 +6,12 @@ export const historyItems: readonly HistoryItem[] = [
     title: "Is my bakery idea worth starting?",
     href: "/design/shell",
   },
-  { id: "h2", title: "Beacon health check, Ade Stores", href: "/design/shell" },
+  {
+    id: "h2",
+    title: "Beacon health check, Ade Stores",
+    href: "/design/shell",
+    reports: "Beacon report",
+  },
   {
     id: "h3",
     title: "Marketing plan for a tailoring shop in Abuja",

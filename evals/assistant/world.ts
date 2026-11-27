@@ -10,7 +10,10 @@ import type { ResolvedModel } from "@/assistant/model-provider";
 import type { SavedMessage } from "@/assistant/parts";
 import type { ActiveRead, AiTurnContext, TurnRun } from "@/assistant/turn";
 import type { RunQuote } from "@/db/queries/credits";
+import type { ReportRead } from "@/assistant/tools/read-report";
+import { FAKE_STELLAR_ANALYSIS } from "@/lib/fake-model";
 import {
+  getReader,
   getTool,
   tools,
   type AnswerValue,
@@ -75,6 +78,47 @@ const storedAnswers = (
     value,
     updatedAt: `2026-11-20 10:00:${String(i).padStart(2, "0")}+00`,
   }));
+
+/** A Stellar answer for every question: the first option, or a short sentence. */
+const completedAnswers = (): Readonly<Record<string, AnswerValue>> => {
+  const tool = getTool(SETUP_TOOL);
+  if (!tool.ok) return {};
+  return Object.fromEntries(
+    tool.value.questions.map((q) => [
+      q.id,
+      q.kind === "single"
+        ? (q.options[0]?.value ?? "")
+        : q.kind === "multi"
+          ? [q.options[0]?.value ?? ""]
+          : q.kind === "scale"
+            ? q.min
+            : "Fresh bread for offices in Yaba.",
+    ]),
+  );
+};
+
+/**
+ * `readRun` over the world (spec 0014): the `@completed` run, scored by the real tool,
+ * with the fake model's Stellar analysis as its ready report. Any other run is unknown.
+ */
+const readRunOf = (world: EvalWorld, runId: string) => {
+  const tool = getTool(SETUP_TOOL);
+  if (runId !== RUN_IDS.completed || world.setup.completed !== true || !tool.ok)
+    return err({ code: "not_found" } as const);
+  const answers = completedAnswers();
+  const scored = tool.value.score(answers);
+  const read: ReportRead = {
+    run: {
+      toolId: SETUP_TOOL,
+      toolVersion: version(),
+      completedAt: "2026-11-24 10:00:00+00",
+      scores: scored.ok ? scored.value : null,
+    },
+    answers: storedAnswers(answers),
+    report: { status: "ready", content: { analysis: FAKE_STELLAR_ANALYSIS } },
+  };
+  return ok(read);
+};
 
 export const makeWorld = (setup: CaseSetup): EvalWorld => ({
   history: [],
@@ -172,6 +216,9 @@ export const evalDeps = (
     helperModel: () => models.helper,
     recordUsage: async () => ({ status: "recorded", id: "eval" }),
     profileFacts: async () => [],
+    getReader,
+    readRun: async (_o, runId) => readRunOf(world, runId),
+    recentReports: async () => [],
     oldAnswers: async () => ok([]),
     newId: () => `eval-${++n.id}`,
     now: () => Date.now(),

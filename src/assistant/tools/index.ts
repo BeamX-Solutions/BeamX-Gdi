@@ -6,6 +6,7 @@ import { refineRestartRun, restartRunTool } from "./restart-run";
 import { refineResumeRun, resumeRunTool } from "./resume-run";
 import { saveAnswerTool, showQuestionTool } from "./run-questions";
 import { refineStartRun, startRunTool } from "./start-run";
+import { readReportTool } from "./read-report";
 import { refineStopRun, stopRunTool } from "./stop-run";
 import { askWhenPresent } from "./money";
 import type { ToolEnv } from "./env";
@@ -17,6 +18,7 @@ export const TOOL_ORDER = [
   "stopRun",
   "saveAnswer",
   "showQuestion",
+  "readReport",
 ] as const;
 
 export const assistantTools = (env: ToolEnv) => ({
@@ -26,6 +28,7 @@ export const assistantTools = (env: ToolEnv) => ({
   stopRun: stopRunTool(env),
   saveAnswer: saveAnswerTool(env),
   showQuestion: showQuestionTool(env),
+  readReport: readReportTool(env),
 });
 
 export type AssistantTools = ReturnType<typeof assistantTools>;
