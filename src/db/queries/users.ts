@@ -1,6 +1,13 @@
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "../client";
-import { account, aiUsage, conversation, toolRun, user } from "../schema";
+import {
+  account,
+  aiUsage,
+  consultation,
+  conversation,
+  toolRun,
+  user,
+} from "../schema";
 import { linkGuestCreditStatements } from "./credits";
 import { linkGuestProfileStatements } from "./profile";
 import { runInBatches } from "@/lib/batches";
@@ -21,6 +28,7 @@ export const LINKED_TABLES = [
   "credit_hold",
   // Merged, not moved (spec 0012, AC-10): see `linkGuestProfileStatements`.
   "business_profile",
+  "consultation",
 ] as const;
 /**
  * Left alone on purpose: Better Auth owns `session` and `account` (its own link flow
@@ -71,6 +79,12 @@ export const linkGuest = async (
     ...linkGuestCreditStatements(guestUserId, newUserId),
     // Spec 0012, AC-10: the guest profile merges into the account, then goes.
     ...linkGuestProfileStatements(guestUserId, newUserId),
+    // Spec 0016: an offered or booked call follows its chat. Kept last so the counts
+    // above keep their positions.
+    db
+      .update(consultation)
+      .set({ userId: newUserId })
+      .where(eq(consultation.userId, guestUserId)),
   ]);
   const counts = {
     conversation: conversations.length,
