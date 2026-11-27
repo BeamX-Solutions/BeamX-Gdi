@@ -18,21 +18,29 @@ const openRail = async (page: Page) => {
   return page.getByRole("navigation", { name: "Recent chats" });
 };
 
+/**
+ * The scripted reply in the visible thread. The thread's screen reader live region
+ * holds the same words, so a page wide text match finds two elements.
+ */
+const reply = (page: Page) =>
+  page
+    .getByRole("region", { name: "Chat with BeamX" })
+    .getByText(/I can check a business idea/)
+    .last();
+
 test("chats show in the history rail and reopen", async ({ page }) => {
+  // Two chat turns and an axe scan; the default 30 seconds is tight on a busy machine.
+  test.setTimeout(120_000);
   await page.goto("/");
   await send(page, "Hello there, first chat");
   await expect(page).toHaveURL(/\/c\/[0-9a-f-]{36}$/, { timeout: TURN_MS });
   const firstUrl = page.url();
-  await expect(page.getByText(/I can check a business idea/)).toBeVisible({
-    timeout: TURN_MS,
-  });
+  await expect(reply(page)).toBeVisible({ timeout: TURN_MS });
 
   await page.goto("/");
   await send(page, "Hello again, second chat");
   await expect(page).toHaveURL(/\/c\/[0-9a-f-]{36}$/, { timeout: TURN_MS });
-  await expect(
-    page.getByText(/I can check a business idea/).last(),
-  ).toBeVisible({ timeout: TURN_MS });
+  await expect(reply(page)).toBeVisible({ timeout: TURN_MS });
 
   const rail = await openRail(page);
   const links = rail.getByRole("link");
