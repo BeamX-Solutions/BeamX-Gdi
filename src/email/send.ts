@@ -12,6 +12,12 @@ import { env } from "@/lib/env";
 import { logEvent } from "@/lib/log";
 import { err, ok, type Result } from "@/lib/result";
 import { CodeEmail } from "./code-email";
+import {
+  consultationEmailCopy,
+  consultationEmailText,
+  type ConsultationEmailInput,
+} from "./consultation-copy";
+import { ConsultationEmail } from "./consultation-email";
 import { codeEmailCopy, codeEmailText, type CodePurpose } from "./copy";
 import {
   reportEmailCopy,
@@ -162,6 +168,67 @@ export const sendReportEmail = reportMailer({
   from: env.EMAIL_FROM,
   deployed: env.VERCEL_ENV !== undefined,
   render: (input) => render(ReportEmail(input)),
+  log: logEvent,
+  devPrint: (line) => {
+    console.info(line);
+  },
+});
+
+/** The email BeamX gets for each booking or cancel (spec 0016, AC-6, AC-7). */
+export type ConsultationEmailDeps = Omit<ReportEmailDeps, "render"> & {
+  readonly render: (input: ConsultationEmailInput) => Promise<string>;
+};
+
+export const consultationMailer =
+  (deps: ConsultationEmailDeps) =>
+  async (
+    to: string,
+    input: ConsultationEmailInput,
+    attachments: readonly {
+      readonly filename: string;
+      readonly content: Buffer;
+    }[],
+  ): Promise<Result<void, EmailSendError>> => {
+    const purpose = `consultation_${input.kind}`;
+    if (deps.send === null || deps.from === undefined) {
+      if (deps.deployed) {
+        deps.log("email_send_failed", { reason: "not_configured", purpose });
+        return err({ code: "email_send_failed" });
+      }
+      deps.devPrint(
+        `[dev] ${purpose} email with ${attachments.length} reports for ${to}`,
+      );
+      return ok(undefined);
+    }
+    try {
+      const { error } = await deps.send({
+        from: deps.from,
+        to,
+        subject: consultationEmailCopy(input).subject,
+        html: await deps.render(input),
+        text: consultationEmailText(input),
+        attachments,
+      });
+      if (error) {
+        deps.log("email_send_failed", { reason: "provider", purpose });
+        return err({ code: "email_send_failed" });
+      }
+      deps.log("email_sent", { purpose });
+      return ok(undefined);
+    } catch {
+      deps.log("email_send_failed", { reason: "exception", purpose });
+      return err({ code: "email_send_failed" });
+    }
+  };
+
+export const sendConsultationEmail = consultationMailer({
+  send: resend
+    ? (email) =>
+        resend.emails.send({ ...email, attachments: [...email.attachments] })
+    : null,
+  from: env.EMAIL_FROM,
+  deployed: env.VERCEL_ENV !== undefined,
+  render: (input) => render(ConsultationEmail(input)),
   log: logEvent,
   devPrint: (line) => {
     console.info(line);

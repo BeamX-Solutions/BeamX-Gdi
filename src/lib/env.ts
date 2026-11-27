@@ -93,6 +93,28 @@ const schema = z.object({
     (v) => (v === "" ? undefined : v),
     z.string().min(3).optional(),
   ),
+  // Book a consultation (spec 0016). The Calendly page the booking widget shows.
+  CALENDLY_URL: z.preprocess(
+    (v) => (v === "" ? undefined : v),
+    z.url().default("https://calendly.com/beamxsolutions"),
+  ),
+  // The webhook subscription's signing key. Optional at boot: without it the webhook
+  // answers 503 and bookings are not confirmed in the chat.
+  CALENDLY_WEBHOOK_SIGNING_KEY: z.preprocess(
+    (v) => (v === "" ? undefined : v),
+    z.string().min(8).optional(),
+  ),
+  // A Calendly personal access token, read only by `pnpm calendly:subscribe`.
+  CALENDLY_API_TOKEN: z.preprocess(
+    (v) => (v === "" ? undefined : v),
+    z.string().min(1).optional(),
+  ),
+  // Where BeamX gets each booking with the client's reports. Without it that email is
+  // skipped and logged.
+  CONSULTATION_NOTIFY_EMAIL: z.preprocess(
+    (v) => (v === "" ? undefined : v),
+    z.email().optional(),
+  ),
   // "true" swaps every AI call for the scripted fake models in `src/lib/fake-model.ts`
   // (spec 0007), for `pnpm e2e`. Ignored on a production deploy, which refuses to boot
   // with it set (`envSchema`).
@@ -206,6 +228,13 @@ export const env: Env = skip
       PAYSTACK_SECRET_KEY: process.env.PAYSTACK_SECRET_KEY || undefined,
       RESEND_API_KEY: process.env.RESEND_API_KEY || undefined,
       EMAIL_FROM: process.env.EMAIL_FROM || undefined,
+      CALENDLY_URL:
+        process.env.CALENDLY_URL || "https://calendly.com/beamxsolutions",
+      CALENDLY_WEBHOOK_SIGNING_KEY:
+        process.env.CALENDLY_WEBHOOK_SIGNING_KEY || undefined,
+      CALENDLY_API_TOKEN: process.env.CALENDLY_API_TOKEN || undefined,
+      CONSULTATION_NOTIFY_EMAIL:
+        process.env.CONSULTATION_NOTIFY_EMAIL || undefined,
       E2E_FAKE_AI: process.env.E2E_FAKE_AI === "true",
       VERCEL_ENV:
         process.env.VERCEL_ENV === "production" ||
