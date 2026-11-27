@@ -28,7 +28,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 11 | Beacon becomes the Claude advisory | Slice 3 | in-progress |
 | 12 | Luna marketing plan in chat | Slice 3 | in-progress |
 | 13 | Ask about your results | Slice 4 | planned |
-| 14 | Chat & report history | Slice 4 | planned |
+| 14 | Chat & report history | Slice 4 | in-progress |
 | 15 | Report PDF & email | Slice 5 | planned |
 | 16 | Book a consultation | Slice 5 | planned |
 | 17 | File upload | Slice 6 | planned |
@@ -234,10 +234,12 @@ After a report, the client asks follow ups ("why is my cost score low?", "what s
 **Done when:** answers cite the client's actual scores, and the assistant says when something is not in their reports instead of guessing.
 - [ ] Design it (spec): `/architect ask about your results`
 
-### 14. Chat & report history
+### 14. Chat & report history · in-progress
 A sidebar of past chats and reports, like the big AI assistants, so a client can reopen and continue any of them.
 **Done when:** a signed in client sees past chats and reports, opens one, and continues the conversation.
-- [ ] Build it: `/develop chat & report history`
+Design note (2026-11-27, built without a spec, recommended picks): the rail lists chats newest first, 30 a page with Show more, each titled by its stored title or else the start of its first message (no AI title yet), with a line naming its ready reports ("Beacon report"); the open chat is marked; the list reads again when a turn ends or a report turns ready. Guests see their own chats too (they move to the account on sign up).
+- [x] Build it: `/develop chat & report history` · code in `src/app/api/chats`, `src/assistant/chat-history.ts`, `src/db/queries/conversations.ts` (`history`), `src/components/workspace` (`history-rail.tsx`, `use-chat-history.ts`, `history-payload.ts`)
+- [ ] Verify it: `/check verify chat & report history`
 
 ## Slice 5: Take it away and talk to BeamX
 

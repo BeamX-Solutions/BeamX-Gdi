@@ -14,7 +14,7 @@ import { reportApiDeps } from "@/assistant/report-deps";
 import { sessionUserId } from "@/auth/session";
 
 // Vercel Hobby's cap (spec 0001): every phase must fit in 300 seconds. Stellar has one
-// phase. Luna's five run one phase per call, chained on the server (designed in #12).
+// phase. Luna's five run one phase per call, continued by the panel (spec 0013).
 export const maxDuration = 300;
 
 const runIdSchema = z.uuid();
