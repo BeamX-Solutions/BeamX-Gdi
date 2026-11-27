@@ -25,6 +25,7 @@ import { Suggestion, Suggestions } from "@/components/ai-elements/suggestion";
 import { LiveCreditSummary } from "@/components/credits/credit-chip";
 import { ErrorCard } from "@/components/feedback/error-card";
 import { panelView } from "@/components/report/report-panel-state";
+import { ReportShare } from "@/components/report/report-share";
 import { ReportStatusView } from "@/components/report/report-status-view";
 import { useReportStatus } from "@/components/report/use-report-status";
 import { reportTitle } from "./chat-copy";
@@ -514,6 +515,7 @@ function LiveChat({
               onStartAgain={() =>
                 void send(`I'd like to start ${shown.toolName} again`)
               }
+              actions={<ReportShare runId={shown.runId} guest={guest} />}
             />
           ) : null
         }

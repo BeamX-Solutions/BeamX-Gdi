@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { ErrorCard } from "@/components/feedback/error-card";
 import { errorCopy } from "@/components/feedback/error-copy";
 import { START_AGAIN_LABEL, type PanelView } from "./report-panel-state";
@@ -10,6 +11,8 @@ type ReportStatusViewProps = {
   readonly onRetry: () => void;
   /** The one action when no retry is possible (credits returned, tool updated, unreadable). */
   readonly onStartAgain: () => void;
+  /** Shown under a ready report: Download PDF and Email me (spec 0015, AC-6). */
+  readonly actions?: ReactNode;
 };
 
 /**
@@ -30,7 +33,12 @@ export function ReportStatusView(props: ReportStatusViewProps) {
   );
 }
 
-function StatusBody({ view, onRetry, onStartAgain }: ReportStatusViewProps) {
+function StatusBody({
+  view,
+  onRetry,
+  onStartAgain,
+  actions,
+}: ReportStatusViewProps) {
   switch (view.kind) {
     case "generating":
       return <ReportSkeleton steps={view.steps} />;
@@ -53,7 +61,14 @@ function StatusBody({ view, onRetry, onStartAgain }: ReportStatusViewProps) {
         />
       );
     case "ready":
-      return <ReportView blocks={view.blocks} />;
+      return actions ? (
+        <div className="flex min-w-0 flex-col gap-6">
+          <ReportView blocks={view.blocks} />
+          {actions}
+        </div>
+      ) : (
+        <ReportView blocks={view.blocks} />
+      );
     default: {
       const unreachable: never = view;
       return unreachable;
