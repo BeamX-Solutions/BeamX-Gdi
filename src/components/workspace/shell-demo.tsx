@@ -19,7 +19,13 @@ export function ShellDemo() {
   return (
     <WorkspaceShell
       header={<Header />}
-      rail={<HistoryRail items={historyItems} newChatHref="/design/shell" />}
+      rail={
+        <HistoryRail
+          items={historyItems}
+          newChatHref="/design/shell"
+          activeId="h2"
+        />
+      }
       report={
         hasReport ? (
           <div className="flex flex-col gap-3">

@@ -7,6 +7,7 @@ import { refineResumeRun, resumeRunTool } from "./resume-run";
 import { offerConsultationTool } from "./offer-consultation";
 import { saveAnswerTool, showQuestionTool } from "./run-questions";
 import { refineStartRun, startRunTool } from "./start-run";
+import { readReportTool } from "./read-report";
 import { refineStopRun, stopRunTool } from "./stop-run";
 import { askWhenPresent } from "./money";
 import type { ToolEnv } from "./env";
@@ -18,6 +19,7 @@ export const TOOL_ORDER = [
   "stopRun",
   "saveAnswer",
   "showQuestion",
+  "readReport",
   "offerConsultation",
 ] as const;
 
@@ -28,6 +30,7 @@ export const assistantTools = (env: ToolEnv) => ({
   stopRun: stopRunTool(env),
   saveAnswer: saveAnswerTool(env),
   showQuestion: showQuestionTool(env),
+  readReport: readReportTool(env),
   offerConsultation: offerConsultationTool(env),
 });
 

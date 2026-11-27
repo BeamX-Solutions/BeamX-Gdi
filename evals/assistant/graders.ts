@@ -10,6 +10,8 @@ export type ToolCall = { readonly name: string; readonly input: unknown };
 /** What one AI turn did, as read from its stream. */
 export type TurnObservation = {
   readonly toolCalls: readonly ToolCall[];
+  /** Each tool result of the turn, as JSON text (spec 0014: numbers may come from here). */
+  readonly toolResults?: readonly string[];
   readonly approvalRequested: boolean;
   readonly text: string;
   /** The turn ended with an error or refusal card. */
@@ -198,11 +200,23 @@ export const gradeControl = (
 };
 
 /** Grounding (AC-12): the reply states no number of its own. */
-export const gradeGrounding = (obs: TurnObservation): Grade =>
-  grade([
+/**
+ * Grounding: every number the reply states came from a tool result this turn (spec 0014:
+ * `readReport` returns the report's real figures). With no tool result, no number.
+ */
+export const gradeGrounding = (obs: TurnObservation): Grade => {
+  const results = (obs.toolResults ?? []).join("\n");
+  const invented = (obs.text.match(/\d+(?:[.,]\d+)?/g) ?? []).filter(
+    (n) => !results.includes(n),
+  );
+  return grade([
     [!obs.failed, "the turn failed"],
-    [!/\d/.test(obs.text), "the reply states a number"],
+    [
+      invented.length === 0,
+      `the reply states a number no tool gave: ${invented.join(", ")}`,
+    ],
   ]);
+};
 
 /** Extraction (AC-5): exactly the expected answers; anything extra was invented. */
 export const gradeExtraction = (

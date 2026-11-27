@@ -278,6 +278,9 @@ const fakeDeps = (
   },
   oldAnswers: async () => ok([...world.oldAnswers]),
   profileFacts: async () => [...world.profile],
+  getReader: registry.getReader,
+  readRun: async () => err({ code: "not_found" }),
+  recentReports: async () => [],
   newId: (() => {
     const n = { i: 0 };
     return () => `gen-${++n.i}`;
