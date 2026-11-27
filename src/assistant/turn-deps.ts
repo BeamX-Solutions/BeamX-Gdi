@@ -16,7 +16,7 @@ import { turnLock } from "@/lib/turn-lock";
 import { ok } from "@/lib/result";
 import { giveBackRun, takeRun } from "@/lib/limits";
 import { guestSpendCap, withSpend } from "@/lib/spend-cap";
-import { getTool, tools } from "@/tools/registry";
+import { getReader, getTool, tools } from "@/tools/registry";
 import { createAiTurn, type AiTurnDeps } from "./ai-turn";
 import { resolveModel } from "./model-provider";
 import type { SavedMessage } from "./parts";
@@ -117,6 +117,9 @@ const aiTurnDeps: AiTurnDeps = {
   helperModel: () => resolveModel("helper"),
   recordUsage: withSpend(usage.record),
   profileFacts: profile.get,
+  getReader,
+  readRun: runs.get,
+  recentReports: runs.recentReports,
   oldAnswers: async (ownerId, runId) => {
     const read = await runs.get(ownerId, runId);
     return read.ok

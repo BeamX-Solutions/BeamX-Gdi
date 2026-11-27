@@ -14,15 +14,31 @@ import type { CreditSummary } from "@/billing/summary";
 import type { RunLimitError, RunTicket } from "@/lib/limits";
 import type { Result } from "@/lib/result";
 import type { SpendCapError } from "@/lib/spend-cap";
-import type { ToolModule, UnknownTool } from "@/tools/registry";
+import type {
+  ToolModule,
+  ToolReader,
+  UnknownTool,
+  UnsupportedVersion,
+} from "@/tools/registry";
 import type { LogFn, NotFound, StepDeps } from "../card-steps";
 import type { AnswerSource } from "../parts";
 import type { ActiveRead } from "../turn";
+import type { ReportRead } from "./read-report";
 
 export type AssistantToolDeps = Pick<StepDeps, "ownerOf"> & {
   /** Every registered tool, in registry order (the `startRun` enum and description). */
   readonly tools: readonly ToolModule[];
   readonly getTool: (id: string) => Result<ToolModule, UnknownTool>;
+  /** The reader for a stored tool version (old reports read with their own, spec 0005). */
+  readonly getReader: (
+    id: string,
+    version: string,
+  ) => Result<ToolReader, UnknownTool | UnsupportedVersion>;
+  /** `runs.get`: a run with its answers and report, owner scoped (spec 0014). */
+  readonly readRun: (
+    ownerId: string,
+    runId: string,
+  ) => Promise<Result<ReportRead, NotFound>>;
   readonly getActive: (
     ownerId: string,
     conversationId: string,

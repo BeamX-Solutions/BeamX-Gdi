@@ -85,3 +85,35 @@ describe("buildRunState", () => {
     expect(note).toContain("Free messages left today: 3.");
   });
 });
+
+describe("reports elsewhere and the profile (spec 0014, AC-4)", () => {
+  it("lists other chats' reports and the profile facts in plain words", () => {
+    const note = buildRunState({
+      ...base,
+      elsewhere: [
+        {
+          runId: "r9",
+          toolId: "sample",
+          completedAt: "2026-11-24 10:00:00.123+00",
+        },
+      ],
+      profile: [
+        { key: "business_name", value: "Ada Foods" },
+        { key: "industry", value: "restaurants" },
+        { key: "industry_old", value: "x" },
+        { key: "years_in_business", value: "not a range" },
+      ],
+    });
+    expect(note).toContain("Reports in other chats, newest first:");
+    expect(note).toContain("- Sample (run r9), 24 Nov");
+    expect(note).toContain(
+      "Business profile: Business name: Ada Foods; Industry: Restaurants.",
+    );
+  });
+
+  it("adds nothing when both are empty", () => {
+    const note = buildRunState({ ...base, elsewhere: [], profile: [] });
+    expect(note).not.toContain("Reports in other chats");
+    expect(note).not.toContain("Business profile");
+  });
+});

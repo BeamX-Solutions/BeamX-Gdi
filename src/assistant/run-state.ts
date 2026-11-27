@@ -6,6 +6,9 @@
  * AC-12).
  */
 import {
+  factCatalog,
+  formatFact,
+  isFactKey,
   visibleQuestions,
   type Answers,
   type ToolModule,
@@ -39,6 +42,50 @@ export type RunStateInput = {
     readonly reportStatus: string | null;
   }[];
   readonly freeMessagesLeft?: number;
+  /** Ready reports in the owner's other chats, newest first (spec 0014, AC-4). */
+  readonly elsewhere?: readonly {
+    readonly runId: string;
+    readonly toolId: string;
+    readonly completedAt: string;
+  }[];
+  /** The owner's business profile facts, values unparsed (spec 0012, spec 0014). */
+  readonly profile?: readonly {
+    readonly key: string;
+    readonly value: unknown;
+  }[];
+};
+
+/** "24 Nov" from a stored timestamp's date part; the note needs no time zone math. */
+const shortDay = (stored: string): string => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(stored);
+  if (!m) return "";
+  const months = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ];
+  return `${Number(m[3])} ${months[Number(m[2]) - 1] ?? ""}`.trim();
+};
+
+/** Profile facts in plain words, skipping unknown keys and values that do not fit. */
+const profileLine = (
+  facts: NonNullable<RunStateInput["profile"]>,
+): string | null => {
+  const parts = facts.flatMap((f) => {
+    if (!isFactKey(f.key)) return [];
+    const value = formatFact(f.key, f.value);
+    return value === "" ? [] : [`${factCatalog[f.key].label}: ${value}`];
+  });
+  return parts.length === 0 ? null : `Business profile: ${parts.join("; ")}.`;
 };
 
 const toolName = (input: RunStateInput, toolId: string) => {
@@ -121,6 +168,21 @@ export const buildRunState = (input: RunStateInput): string => {
               `- ${toolName(input, r.toolId)} (run ${r.runId}), report ${r.reportStatus ?? "not started"}`,
           ),
         ]),
+    ...(input.elsewhere === undefined || input.elsewhere.length === 0
+      ? []
+      : [
+          "Reports in other chats, newest first:",
+          ...input.elsewhere.map(
+            (r) =>
+              `- ${toolName(input, r.toolId)} (run ${r.runId}), ${shortDay(r.completedAt)}`,
+          ),
+        ]),
+    ...(input.profile === undefined
+      ? []
+      : (() => {
+          const line = profileLine(input.profile);
+          return line === null ? [] : [line];
+        })()),
     ...(input.freeMessagesLeft === undefined
       ? []
       : [`Free messages left today: ${input.freeMessagesLeft}.`]),
