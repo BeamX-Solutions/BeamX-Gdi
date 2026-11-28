@@ -9,6 +9,7 @@ import {
   useState,
   type Ref,
 } from "react";
+import { PolicyNotice } from "@/components/legal/policy-notice";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
@@ -39,7 +40,8 @@ type ComposerProps = {
 /**
  * The message box. Grows with its text up to 6 lines; Enter sends on desktop and adds a
  * line on touch screens; Send is off for empty or over long text (AC-7). Text is 16px so
- * phones do not zoom in. It pads for the phone's safe area.
+ * phones do not zoom in. It pads for the phone's safe area. The small print under it links
+ * the policies (spec 0017, AC-4).
  */
 export function Composer({
   onSend,
@@ -151,6 +153,10 @@ export function Composer({
           {counterText(text, maxLength)}
         </p>
       ) : null}
+      <PolicyNotice
+        lead="By chatting you agree to"
+        className="px-1 pt-1.5 text-center"
+      />
     </form>
   );
 }

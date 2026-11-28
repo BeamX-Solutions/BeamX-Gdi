@@ -11,6 +11,7 @@ import {
   Preview,
   Text,
 } from "@react-email/components";
+import { EmailFooter } from "./footer";
 import {
   consultationEmailCopy,
   type ConsultationEmailInput,
@@ -76,6 +77,7 @@ export function ConsultationEmail(input: ConsultationEmailInput) {
               ))}
             </>
           ) : null}
+          <EmailFooter />
         </Container>
       </Body>
     </Html>

@@ -2,6 +2,8 @@
  * The words of the email BeamX gets for each booking or cancel (spec 0016, AC-6, AC-7),
  * shared by the HTML and the plain text. Pure.
  */
+import { footerText } from "./footer-copy";
+
 export type ConsultationEmailInput = {
   readonly kind: "booked" | "canceled";
   readonly clientName: string | null;
@@ -53,17 +55,19 @@ export const consultationEmailText = (
   input: ConsultationEmailInput,
 ): string => {
   const c = consultationEmailCopy(input);
-  return [
-    c.heading,
-    "",
-    ...c.lines,
-    ...(input.kind === "booked"
-      ? [
-          ...(c.profile.length > 0 ? ["", c.profileTitle, ...c.profile] : []),
-          "",
-          c.reportsTitle,
-          ...c.reports,
-        ]
-      : []),
-  ].join("\n");
+  return (
+    [
+      c.heading,
+      "",
+      ...c.lines,
+      ...(input.kind === "booked"
+        ? [
+            ...(c.profile.length > 0 ? ["", c.profileTitle, ...c.profile] : []),
+            "",
+            c.reportsTitle,
+            ...c.reports,
+          ]
+        : []),
+    ].join("\n") + footerText()
+  );
 };

@@ -13,6 +13,7 @@ import {
   Section,
   Text,
 } from "@react-email/components";
+import { EmailFooter } from "./footer";
 import { codeEmailCopy, type CodePurpose } from "./copy";
 
 const ROYAL_BLUE = "#02428E";
@@ -86,6 +87,7 @@ export function CodeEmail({
           <Text style={{ color: MUTED, fontSize: 14, lineHeight: "20px" }}>
             {copy.expiry} {copy.ignore}
           </Text>
+          <EmailFooter />
         </Container>
       </Body>
     </Html>

@@ -2,6 +2,7 @@
  * The words of the 6 digit code emails (spec 0009, AC-17). Pure, so the template and the
  * plain text version always say the same thing.
  */
+import { footerText } from "./footer-copy";
 
 /** Why a code was sent: creating an account, or resetting a password. */
 export type CodePurpose = "sign-up" | "reset";
@@ -46,16 +47,8 @@ export const codeEmailCopy = (
 /** The plain text version, for mail apps that don't show HTML. */
 export const codeEmailText = (purpose: CodePurpose, code: string): string => {
   const c = codeEmailCopy(purpose, code);
-  return [
-    c.heading,
-    "",
-    c.intro,
-    "",
-    code,
-    "",
-    c.expiry,
-    c.ignore,
-    "",
-    "BeamX",
-  ].join("\n");
+  return (
+    [c.heading, "", c.intro, "", code, "", c.expiry, c.ignore].join("\n") +
+    footerText()
+  );
 };

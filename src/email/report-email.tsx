@@ -14,6 +14,7 @@ import {
   Section,
   Text,
 } from "@react-email/components";
+import { EmailFooter } from "./footer";
 import { reportEmailCopy, type ReportEmailInput } from "./report-copy";
 
 const ROYAL_BLUE = "#02428E";
@@ -69,6 +70,7 @@ export function ReportEmail(input: ReportEmailInput) {
           <Text style={{ color: MUTED, fontSize: 14, lineHeight: "22px" }}>
             {copy.consultation}
           </Text>
+          <EmailFooter />
         </Container>
       </Body>
     </Html>
