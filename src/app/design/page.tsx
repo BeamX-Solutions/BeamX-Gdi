@@ -16,6 +16,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { LegalGallery } from "@/components/legal/legal-gallery";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChatGallery } from "@/components/workspace/chat-gallery";
 import { ReportGallery } from "@/components/workspace/report-gallery";
@@ -267,6 +268,10 @@ export default function DesignPage() {
 
       <Section id="report" title="Report parts and error cards">
         <ReportGallery />
+      </Section>
+
+      <Section id="legal" title="Privacy and your data">
+        <LegalGallery />
       </Section>
 
       <Section id="surfaces" title="Card and skeleton">

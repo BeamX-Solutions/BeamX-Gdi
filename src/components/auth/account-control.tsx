@@ -4,7 +4,11 @@ import { useRouter } from "next/navigation";
 import { useContext, useState } from "react";
 import {
   BriefcaseBusinessIcon,
+  DownloadIcon,
+  EllipsisVerticalIcon,
+  FileTextIcon,
   LogOutIcon,
+  ShieldCheckIcon,
   Trash2Icon,
   UserRoundIcon,
 } from "lucide-react";
@@ -21,15 +25,48 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { LiveCreditSummary } from "@/components/credits/credit-chip";
 import { useNotice } from "@/components/workspace/notice-context";
+import { PRIVACY_PATH, TERMS_PATH } from "@/legal/config";
 import { DELETE_LABEL } from "./auth-copy";
 import { AuthDialog } from "./auth-dialog";
 import { DeleteAccountDialog } from "./delete-account-dialog";
 import { useAuthOpen, type AuthOpenState } from "./auth-open-context";
+import { DOWNLOAD_LABEL, downloadMyData } from "./download-data";
+
+/** The policy links every menu carries (spec 0017, AC-4); they open in a new tab. */
+function PolicyItems() {
+  return (
+    <>
+      <DropdownMenuItem asChild>
+        <a href={PRIVACY_PATH} target="_blank" rel="noopener noreferrer">
+          <ShieldCheckIcon aria-hidden />
+          Privacy notice
+        </a>
+      </DropdownMenuItem>
+      <DropdownMenuItem asChild>
+        <a href={TERMS_PATH} target="_blank" rel="noopener noreferrer">
+          <FileTextIcon aria-hidden />
+          Terms of use
+        </a>
+      </DropdownMenuItem>
+    </>
+  );
+}
+
+/** "Download my data" (spec 0017, AC-8), for guests and accounts alike. */
+function DownloadItem({ show }: { readonly show: (m: string) => void }) {
+  return (
+    <DropdownMenuItem onSelect={() => void downloadMyData().then(show)}>
+      <DownloadIcon aria-hidden />
+      {DOWNLOAD_LABEL}
+    </DropdownMenuItem>
+  );
+}
 
 /**
  * The header's account control (spec 0009, AC-1, AC-12): a Sign in button for guests (and
  * before the first send), an account menu with the first name, email and Sign out once
- * signed in. Nothing while the session loads, so the header never flickers.
+ * signed in. Nothing while the session loads, so the header never flickers. Both carry
+ * Download my data and the policy links (spec 0017, AC-4, AC-8).
  */
 export function AccountControl({
   availableCredits,
@@ -70,6 +107,19 @@ export function AccountControl({
         <Button variant="outline" onClick={openFromHeader}>
           Sign in
         </Button>
+        {/* A guest's own menu: their data and the policies (spec 0017, AC-4, AC-8). */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" aria-label="More options">
+              <EllipsisVerticalIcon aria-hidden />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="min-w-56">
+            {/* Before the first send there is no guest yet, so nothing to download. */}
+            {user === undefined ? null : <DownloadItem show={show} />}
+            <PolicyItems />
+          </DropdownMenuContent>
+        </DropdownMenu>
         <AuthDialog
           // A new screen asked for starts the dialog fresh on it.
           key={screen}
@@ -116,6 +166,9 @@ export function AccountControl({
               Business profile
             </Link>
           </DropdownMenuItem>
+          <DownloadItem show={show} />
+          <PolicyItems />
+          <DropdownMenuSeparator />
           <DropdownMenuItem onSelect={() => void signOut()}>
             <LogOutIcon aria-hidden />
             Sign out

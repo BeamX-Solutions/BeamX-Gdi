@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { authClient } from "@/auth/client";
+import { PolicyNotice } from "@/components/legal/policy-notice";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -378,6 +379,7 @@ export function AuthDialog({
             />
           </Field>
           <ErrorText error={error} />
+          <PolicyNotice lead="By creating an account you agree to" />
           <Button type="submit" disabled={busy}>
             {busy ? "Sending code…" : "Continue"}
           </Button>

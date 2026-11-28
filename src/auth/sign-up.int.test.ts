@@ -38,7 +38,8 @@ vi.mock("@/db/queries/users", async (importOriginal) => {
 const { auth } = await import("./auth");
 const { db } = await import("@/db/client");
 const { newId } = await import("@/db/id");
-const { conversation, user } = await import("@/db/schema");
+const { conversation, policyAcceptance, user } = await import("@/db/schema");
+const { LEGAL } = await import("@/legal/config");
 const conversations = await import("@/db/queries/conversations");
 
 const created: string[] = [];
@@ -110,6 +111,21 @@ describe("sign up by code (spec 0009, AC-2, AC-6)", () => {
     const verified = events.filter((e) => e.event === "account_verified");
     expect(verified.some((e) => e.userId === account.id)).toBe(true);
     expect(verified.some((e) => e.userId === guestId)).toBe(false);
+    // Signing up accepted the current terms and privacy notice (spec 0017, AC-5).
+    const accepted = await db
+      .select({
+        policy: policyAcceptance.policy,
+        version: policyAcceptance.version,
+      })
+      .from(policyAcceptance)
+      .where(eq(policyAcceptance.userId, account.id));
+    expect(accepted).toEqual(
+      expect.arrayContaining([
+        { policy: "terms", version: LEGAL.termsVersion },
+        { policy: "privacy", version: LEGAL.privacyVersion },
+      ]),
+    );
+    expect(accepted).toHaveLength(2);
 
     // The password is then set inside that session (the set-password route's call).
     const session = cookieFrom(result.headers);

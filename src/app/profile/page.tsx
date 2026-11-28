@@ -3,8 +3,9 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { connection } from "next/server";
 import { Suspense } from "react";
-import { sessionUser } from "@/auth/session";
+import { sessionAccount } from "@/auth/session";
 import { billingConfig } from "@/billing/config";
+import { DataControls } from "@/components/profile/data-controls";
 import { ProfileList } from "@/components/profile/profile-list";
 import { profileRows } from "@/components/profile/profile-rows";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -57,29 +58,36 @@ const toolName = (toolId: string): string | null => {
 
 async function ProfileContent() {
   await connection();
-  const user = await sessionUser(await headers());
+  const user = await sessionAccount(await headers());
   if (user === null || user.isAnonymous)
     return (
-      <section className="flex min-w-0 flex-col gap-2 rounded-xl border bg-card p-4 text-card-foreground md:p-5">
-        <p className="font-semibold">Sign in to see your business profile</p>
-        <p className="text-sm text-muted-foreground">
-          Open the chat and sign in to your account. What you tell BeamX tools
-          as a guest is kept and moves to your account when you sign up.
-        </p>
-        <Link
-          href="/"
-          className="inline-flex min-h-11 items-center self-start text-sm font-medium text-primary underline-offset-4 hover:underline"
-        >
-          Go to the chat
-        </Link>
-      </section>
+      <>
+        <section className="flex min-w-0 flex-col gap-2 rounded-xl border bg-card p-4 text-card-foreground md:p-5">
+          <p className="font-semibold">Sign in to see your business profile</p>
+          <p className="text-sm text-muted-foreground">
+            Open the chat and sign in to your account. What you tell BeamX tools
+            as a guest is kept and moves to your account when you sign up.
+          </p>
+          <Link
+            href="/"
+            className="inline-flex min-h-11 items-center self-start text-sm font-medium text-primary underline-offset-4 hover:underline"
+          >
+            Go to the chat
+          </Link>
+        </section>
+        {/* A guest's data can still be downloaded (spec 0017, AC-8). */}
+        {user === null ? null : <DataControls email={null} />}
+      </>
     );
   const facts = await profile.get(user.id);
   return (
-    <ProfileList
-      rows={profileRows(facts, toolName, billingConfig.chat.dayTimeZone)}
-      onSave={updateFactAction}
-      onRemove={removeFactAction}
-    />
+    <>
+      <ProfileList
+        rows={profileRows(facts, toolName, billingConfig.chat.dayTimeZone)}
+        onSave={updateFactAction}
+        onRemove={removeFactAction}
+      />
+      <DataControls email={user.email} />
+    </>
   );
 }

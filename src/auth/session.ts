@@ -2,6 +2,7 @@
  * Server only. The signed in user (guest or account) for a request, or null. Route
  * handlers pass the request headers; Better Auth reads its session cookie from them.
  */
+import { cache } from "react";
 import { auth } from "./auth";
 
 export const sessionUserId = async (
@@ -28,6 +29,18 @@ export const sessionUser = async (
     ? { id: session.user.id, isAnonymous: session.user.isAnonymous === true }
     : null;
 };
+
+/**
+ * `sessionUser` deduplicated per request (React `cache`, keyed by the request's headers
+ * object), so the home page's credit chip and terms card share one session lookup
+ * (AGENTS.md: few, parallel DB calls). Server components only: call `connection()`
+ * first, outside this function, so a prerender stops before the read starts. A cached
+ * `connection()` inside would hang the request.
+ */
+export const pageSessionUser = cache(
+  (requestHeaders: Headers): Promise<SessionUser | null> =>
+    sessionUser(requestHeaders),
+);
 
 export type SessionAccount = SessionUser & { readonly email: string };
 

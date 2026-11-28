@@ -2,6 +2,8 @@
  * The words of the report email (spec 0015, AC-5), shared by the HTML and the plain
  * text so they always match. Pure.
  */
+import { footerText } from "./footer-copy";
+
 export type ReportEmailInput = {
   readonly toolName: string;
   /** "Beacon 62.5 of 100: Building Blocks", or null. */
@@ -24,13 +26,15 @@ export const reportEmailCopy = (input: ReportEmailInput) => ({
 
 export const reportEmailText = (input: ReportEmailInput): string => {
   const c = reportEmailCopy(input);
-  return [
-    c.heading,
-    ...(c.headline ? ["", c.headline] : []),
-    "",
-    c.body,
-    ...(c.chatUrl ? ["", `${c.button}: ${c.chatUrl}`] : []),
-    "",
-    c.consultation,
-  ].join("\n");
+  return (
+    [
+      c.heading,
+      ...(c.headline ? ["", c.headline] : []),
+      "",
+      c.body,
+      ...(c.chatUrl ? ["", `${c.button}: ${c.chatUrl}`] : []),
+      "",
+      c.consultation,
+    ].join("\n") + footerText()
+  );
 };

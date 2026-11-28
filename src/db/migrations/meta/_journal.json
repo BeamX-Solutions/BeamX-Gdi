@@ -57,6 +57,13 @@
       "when": 1795783650964,
       "tag": "0007_consultation",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1795888917767,
+      "tag": "0008_policy_acceptance",
+      "breakpoints": true
     }
   ]
 }
