@@ -6,10 +6,10 @@ The privacy notice and terms of use as typed content, plus the `LEGAL` config (c
 
 ## Key files
 
-| Path         | Owns                                                                                                                                                                       |
-| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `config.ts`  | `LEGAL` (company, address, privacy email, domain, each policy's version and "last updated"), `currentAcceptances()`, `policiesOutdated()`, `assertLegalReady()`, the paths |
-| `content.ts` | `privacyNotice(facts)` and `termsOfUse(facts)`: the policy words as sections and blocks                                                                                    |
+| Path         | Owns                                                                                                                                                                              |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `config.ts`  | `LEGAL` (company, address, privacy email, each policy's version and "last updated"), `currentAcceptances()`, `policiesOutdated()`, `assertLegalReady()`, `appHostOf()`, the paths |
+| `content.ts` | `privacyNotice(facts)` and `termsOfUse(facts)`: the policy words as sections and blocks                                                                                           |
 
 ## Conventions
 
@@ -18,7 +18,7 @@ The privacy notice and terms of use as typed content, plus the `LEGAL` config (c
 - A change to a live value the terms quote (a tool price, a pack price) changes the terms text too. Decide whether it needs a version bump.
 - `[PLACEHOLDER]` marks a value still to supply. `/privacy` and `/terms` call `assertLegalReady(env.VERCEL_ENV)`, so a production build fails while any `LEGAL` field holds one; `legal.test.ts` also fails under `VERCEL_ENV=production`.
 - The policy text is a plain English draft for a lawyer's review, not legal advice. `LEGAL.company` is the brand name from beamxsolutions.com until the registered name is confirmed.
-- `LEGAL.domain` is the public app address used in the policy text and every email footer link (`src/email/footer-copy.ts`).
+- The app's address is never hardcoded: the policy pages pass `appHostOf(env.NEXT_PUBLIC_APP_URL)` into the content, and the email footers link to `NEXT_PUBLIC_APP_URL` (`src/email/footer-copy.ts`). A custom domain needs only that env var. beamxsolutions.com is the company site, not this app's address.
 
 ## Commands
 

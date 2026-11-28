@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { LegalDocumentView } from "@/components/legal/legal-document";
 import { billingConfig } from "@/billing/config";
-import { assertLegalReady, PRIVACY_PATH } from "@/legal/config";
+import { appHostOf, assertLegalReady, PRIVACY_PATH } from "@/legal/config";
 import { termsOfUse } from "@/legal/content";
 import { env } from "@/lib/env";
 import { tools } from "@/tools/registry";
@@ -21,6 +21,7 @@ export default function TermsPage() {
   return (
     <LegalDocumentView
       document={termsOfUse({
+        appHost: appHostOf(env.NEXT_PUBLIC_APP_URL),
         tools: tools.map((t) => ({ name: t.name, credits: t.creditPrice })),
         ngnPerCredit: billingConfig.ngnPerCredit,
         freeChatPerDay: billingConfig.chat.freePerDay,

@@ -19,7 +19,7 @@ The 6 digit code emails for sign up and password reset (spec 0009, AC-17), sent 
 - `RESEND_API_KEY` and `EMAIL_FROM` come from `src/lib/env.ts`; both are required on Production and Preview. Use a sending only key limited to the BeamX domain.
 - Without a key in local dev, the code is printed to the server terminal so you can sign up without email. On any Vercel deploy a missing key is an `email_send_failed` error: a code must never land in deploy logs.
 - Never log the code or the address; log lines carry only the purpose and the failure reason.
-- Every email ends with the policy footer (spec 0017, AC-4): `<EmailFooter />` in the template and `footerText()` appended to the plain text. Its links point at `LEGAL.domain`, not the sending deploy.
+- Every email ends with the policy footer (spec 0017, AC-4): `<EmailFooter />` in the template and `footerText()` appended to the plain text. Its links point at the sending deploy's `NEXT_PUBLIC_APP_URL`, passed to each mailer as `appUrl`.
 - A send failure is a typed `email_send_failed`; `auth.ts` turns it into Better Auth's `EMAIL_SEND_FAILED` so the dialog shows a friendly message.
 - Email clients can't read the app's CSS variables, so `code-email.tsx` writes the DESIGN.md brand colors as hex values. This folder sits outside `pnpm check:colors`, which covers `src/components` and `src/app` only.
 

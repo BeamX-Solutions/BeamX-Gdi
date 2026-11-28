@@ -27,7 +27,13 @@ export type LegalDocument = {
 const p = (text: string): LegalBlock => ({ kind: "p", text });
 const list = (...items: string[]): LegalBlock => ({ kind: "list", items });
 
+/** "BeamX Workspace (beam-x-gdi.vercel.app)", or just the name with no app host. */
+const workspace = (appHost: string | null): string =>
+  appHost === null ? "BeamX Workspace" : `BeamX Workspace (${appHost})`;
+
 export type PrivacyFacts = {
+  /** The deploy's app host (`appHostOf(NEXT_PUBLIC_APP_URL)`), or null. */
+  readonly appHost: string | null;
   /** Days without use before a guest's data is deleted. */
   readonly guestDeleteDays: number;
   /** Months without use before credits expire. */
@@ -48,7 +54,7 @@ export const privacyNotice = (
       heading: "Who we are",
       blocks: [
         p(
-          `BeamX Workspace (${legal.domain}) is run by ${legal.company}, ${legal.address}. We decide how your data is used, so we are its controller under Nigeria's Data Protection Act 2023 and, for clients in Europe and the UK, the GDPR.`,
+          `${workspace(facts.appHost)} is run by ${legal.company}, ${legal.address}. We decide how your data is used, so we are its controller under Nigeria's Data Protection Act 2023 and, for clients in Europe and the UK, the GDPR.`,
         ),
         p(
           `For any question about your data, or to use any right below, email ${legal.privacyEmail}.`,
@@ -152,6 +158,8 @@ export const privacyNotice = (
 });
 
 export type TermsFacts = {
+  /** The deploy's app host (`appHostOf(NEXT_PUBLIC_APP_URL)`), or null. */
+  readonly appHost: string | null;
   /** Each tool's name and credit price, from the tool modules. */
   readonly tools: readonly {
     readonly name: string;
@@ -169,7 +177,7 @@ export const termsOfUse = (
   legal: LegalConfig = LEGAL,
 ): LegalDocument => ({
   title: "Terms of use",
-  intro: `These terms are an agreement between you and ${legal.company} for your use of BeamX Workspace (${legal.domain}). By chatting with BeamX or creating an account, you agree to them.`,
+  intro: `These terms are an agreement between you and ${legal.company} for your use of ${workspace(facts.appHost)}. By chatting with BeamX or creating an account, you agree to them.`,
   version: legal.termsVersion,
   updated: legal.termsUpdated,
   sections: [

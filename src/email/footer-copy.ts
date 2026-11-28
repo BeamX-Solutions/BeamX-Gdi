@@ -1,25 +1,29 @@
 /**
- * The policy footer every email carries (spec 0017, AC-4). The links point at the live
- * policies on the app's public domain (`LEGAL.domain`), whichever deploy sent the email.
- * Pure, shared by the HTML footer and the plain text versions.
+ * The policy footer every email carries (spec 0017, AC-4). The links point at the
+ * policies on the app URL of the deploy that sent the email (`NEXT_PUBLIC_APP_URL`, passed
+ * in by `send.ts`), so they follow the production address with no code change. Pure,
+ * shared by the HTML footer and the plain text versions.
  */
-import { LEGAL, PRIVACY_PATH, TERMS_PATH } from "@/legal/config";
+import { PRIVACY_PATH, TERMS_PATH } from "@/legal/config";
 
-const base = `https://${LEGAL.domain}`;
-
-export const policyUrls = {
-  privacy: `${base}${PRIVACY_PATH}`,
-  terms: `${base}${TERMS_PATH}`,
-} as const;
+export const policyUrls = (appUrl: string) => {
+  const base = appUrl.replace(/\/+$/, "");
+  return {
+    privacy: `${base}${PRIVACY_PATH}`,
+    terms: `${base}${TERMS_PATH}`,
+  } as const;
+};
 
 export const FOOTER_LEAD = "BeamX Workspace";
 
 /** The plain text footer, appended after a blank line. */
-export const footerText = (): string =>
-  [
+export const footerText = (appUrl: string): string => {
+  const urls = policyUrls(appUrl);
+  return [
     "",
     "--",
     FOOTER_LEAD,
-    `Privacy notice: ${policyUrls.privacy}`,
-    `Terms of use: ${policyUrls.terms}`,
+    `Privacy notice: ${urls.privacy}`,
+    `Terms of use: ${urls.terms}`,
   ].join("\n");
+};

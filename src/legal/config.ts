@@ -17,8 +17,6 @@ export type LegalConfig = {
   readonly address: string;
   /** Where privacy requests and questions go. */
   readonly privacyEmail: string;
-  /** The app's public address, shown in the policies. */
-  readonly domain: string;
   readonly termsVersion: string;
   readonly privacyVersion: string;
   /** "Last updated" on each page, as `YYYY-MM-DD`. */
@@ -33,7 +31,6 @@ export const LEGAL: LegalConfig = {
   address:
     "97 Adeola Odeku Street, 2nd Floor, Union Bank Building, Victoria Island, Lagos, Nigeria",
   privacyEmail: "info@beamxsolutions.com",
-  domain: "app.beamxsolutions.com",
   termsVersion: "2026-11-28",
   privacyVersion: "2026-11-28",
   termsUpdated: "2026-11-28",
@@ -106,6 +103,18 @@ export type NewestVersions = Readonly<Record<PolicyKind, string | null>>;
  */
 export const policiesOutdated = (newest: NewestVersions): boolean =>
   POLICY_KINDS.some((policy) => newest[policy] !== currentVersion(policy));
+
+/**
+ * The host of an app URL (`beam-x-gdi.vercel.app`), or null when it isn't a URL (a CI
+ * build with `SKIP_ENV_VALIDATION` and no app URL). Pure.
+ */
+export const appHostOf = (appUrl: string): string | null => {
+  try {
+    return new URL(appUrl).host || null;
+  } catch {
+    return null;
+  }
+};
 
 export const PRIVACY_PATH = "/privacy";
 export const TERMS_PATH = "/terms";

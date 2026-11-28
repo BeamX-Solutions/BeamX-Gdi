@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  appHostOf,
   assertLegalReady,
   currentAcceptances,
   currentVersion,
@@ -60,6 +61,20 @@ describe("currentVersion (AC-5)", () => {
   });
 });
 
+describe("appHostOf", () => {
+  it("reads the host of an app URL", () => {
+    expect(appHostOf("https://beam-x-gdi.vercel.app")).toBe(
+      "beam-x-gdi.vercel.app",
+    );
+    expect(appHostOf("http://localhost:3000/")).toBe("localhost:3000");
+  });
+
+  it("is null for an empty or broken URL", () => {
+    expect(appHostOf("")).toBeNull();
+    expect(appHostOf("not a url")).toBeNull();
+  });
+});
+
 describe("currentAcceptances (AC-5, AC-6)", () => {
   it("accepts the current version of both policies", () => {
     expect(currentAcceptances()).toEqual([
@@ -96,8 +111,19 @@ describe("policiesOutdated (AC-6)", () => {
 
 describe("privacy notice content (AC-2)", () => {
   const text = allText(
-    privacyNotice({ guestDeleteDays: 30, creditExpiryMonths: 12 }, filled),
+    privacyNotice(
+      {
+        appHost: "beam-x-gdi.vercel.app",
+        guestDeleteDays: 30,
+        creditExpiryMonths: 12,
+      },
+      filled,
+    ),
   );
+
+  it("names the app by the deploy's host", () => {
+    expect(text).toContain("BeamX Workspace (beam-x-gdi.vercel.app) is run by");
+  });
 
   it("names the company, its address and the privacy email", () => {
     expect(text).toContain("BeamX Solutions Ltd");
@@ -129,17 +155,20 @@ describe("privacy notice content (AC-2)", () => {
 
   it("carries the privacy version and date", () => {
     const doc = privacyNotice(
-      { guestDeleteDays: 30, creditExpiryMonths: 12 },
+      { appHost: null, guestDeleteDays: 30, creditExpiryMonths: 12 },
       filled,
     );
     expect(doc.version).toBe(filled.privacyVersion);
     expect(doc.updated).toBe(filled.privacyUpdated);
+    // With no app URL (a CI build), the name stands alone.
+    expect(allText(doc)).toContain("BeamX Workspace is run by");
   });
 });
 
 describe("terms content (AC-3)", () => {
   const doc = termsOfUse(
     {
+      appHost: "beam-x-gdi.vercel.app",
       tools: [
         { name: "Stellar", credits: 30 },
         { name: "Luna", credits: 500 },
