@@ -292,7 +292,7 @@ spec [0017](../specs/0017-privacy-terms-consent/index.md) (engineer picks 2026-1
   - [x] Typed policy content and `LEGAL` config, `/privacy` and `/terms`, links in the composer, sign up, account menus and emails (AC-1 to AC-4, AC-9); the landing page footer link comes with spec 0018
   - [x] `policy_acceptance` schema, migration `0008_policy_acceptance`, record at sign up, the updated terms card (AC-5, AC-6)
   - [x] Export query and route with its hourly limit, Download my data in the menus and `/profile`, tests (AC-7, AC-8)
-- [ ] Verify it: `/check verify privacy, terms & consent`
+- [x] Verify it: `/check verify privacy, terms & consent`
 - [ ] Test it: `/test privacy, terms & consent`
 
 ### 19. Public landing page & SEO · needs a decision
