@@ -61,6 +61,9 @@ export const limitKeys = {
   /** Report emails per account per UTC hour (spec 0015, AC-5); `hour` is `YYYY-MM-DDTHH`. */
   reportEmail: (userId: string, hour: string) =>
     `limit:report_email:${userId}:${hour}`,
+  /** Data exports per user per UTC hour (spec 0017, AC-7); `hour` is `YYYY-MM-DDTHH`. */
+  dataExport: (userId: string, hour: string) =>
+    `limit:data_export:${userId}:${hour}`,
 } as const;
 
 /**
@@ -83,7 +86,9 @@ export type LimitName =
   | "free_chat"
   | "guest_grant"
   // Spec 0015's report emails.
-  | "report_email";
+  | "report_email"
+  // Spec 0017's data exports.
+  | "data_export";
 
 /** The per minute windows: AI turns per user, card taps per user, every POST per IP. */
 export type BurstWindow = "user" | "cards" | "ip";

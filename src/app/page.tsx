@@ -1,4 +1,5 @@
 import { headers } from "next/headers";
+import { connection } from "next/server";
 import { Suspense } from "react";
 import { toolNames } from "@/assistant/chat-page";
 import { startCheckoutAction } from "./credits/actions";
@@ -56,6 +57,9 @@ async function ChipSeed() {
 
 /** The updated terms card for an account behind on the terms (spec 0017, AC-6). */
 async function TermsSeed() {
+  // Per request: stop a prerender here, before the session read starts (an aborted read
+  // logs a Better Auth error).
+  await connection();
   const user = await sessionUser(await headers());
   return (await needsTermsCard(user)) ? <TermsNotice /> : null;
 }
