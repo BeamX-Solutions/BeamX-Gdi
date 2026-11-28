@@ -1,10 +1,25 @@
 import { readFile } from "node:fs/promises";
+import { neon } from "@neondatabase/serverless";
 import { expect, test, type Page } from "@playwright/test";
 import { scan, signUp, TURN_MS } from "./flow-helpers";
 
-// Spec 0017: the policy pages, the links to them (AC-1, AC-4), and Download my data for
-// a guest and an account (AC-7, AC-8). Runs against a production build with the
-// scripted fake model (`E2E_FAKE_AI=true`).
+// Spec 0017: the policy pages, the links to them (AC-1, AC-4), the updated terms card
+// (AC-6), and Download my data for a guest and an account (AC-7, AC-8). Runs against a
+// production build with the scripted fake model (`E2E_FAKE_AI=true`).
+
+/**
+ * Puts the account one terms version behind, the way a `LEGAL.termsVersion` bump would
+ * (AC-6), without rebuilding: its newest terms row becomes an old version.
+ */
+const makeTermsOutdated = async (email: string) => {
+  const url = process.env.DATABASE_URL;
+  if (!url) throw new Error("DATABASE_URL is needed to age the terms row");
+  const sql = neon(url);
+  await sql`
+    update policy_acceptance set version = '2000-01-01'
+    where policy = 'terms'
+      and user_id = (select id from "user" where email = ${email})`;
+};
 
 const send = async (page: Page, text: string) => {
   const box = page.getByRole("textbox", { name: "Message", disabled: false });
@@ -134,5 +149,61 @@ test.describe("policy links and Download my data (AC-4, AC-7, AC-8)", () => {
       "privacy",
       "terms",
     ]);
+
+    // AC-8: the profile page offers both Download my data and Delete account.
+    await page.goto("/profile");
+    const yourData = page
+      .getByRole("heading", { name: "Your data" })
+      .locator("xpath=ancestor::section[1]");
+    await expect(
+      yourData.getByRole("button", { name: "Download my data" }),
+    ).toBeVisible({ timeout: TURN_MS });
+    await expect(
+      yourData.getByRole("button", { name: "Delete account" }),
+    ).toBeVisible();
+    await scan(page);
+  });
+
+  test("an account behind on the terms sees the card once, can still chat, and OK clears it", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const email = await signUp(
+      page,
+      page.getByRole("button", { name: "Sign in" }),
+    );
+    await makeTermsOutdated(email);
+
+    // covers: AC-6, the card shows above the composer and never blocks the chat.
+    await page.reload();
+    const card = page.getByTestId("terms-update-card");
+    await expect(card).toBeVisible({ timeout: TURN_MS });
+    await expect(
+      card.getByRole("heading", { name: "We've updated our terms" }),
+    ).toBeVisible();
+    await expect(card.getByRole("link", { name: "Terms" })).toHaveAttribute(
+      "href",
+      "/terms",
+    );
+    await scan(page);
+    await send(page, "Hello");
+    await expect(page).toHaveURL(/\/c\/[0-9a-f-]{36}$/, { timeout: TURN_MS });
+    await expect(card).toBeVisible();
+
+    // OK records the current version: the card hides now and stays gone on reload.
+    await card.getByRole("button", { name: "OK" }).click();
+    await expect(card).toHaveCount(0);
+    await expect
+      .poll(
+        async () => {
+          await page.reload();
+          await expect(
+            page.getByRole("button", { name: "Account menu" }),
+          ).toBeVisible({ timeout: TURN_MS });
+          return page.getByTestId("terms-update-card").count();
+        },
+        { timeout: TURN_MS },
+      )
+      .toBe(0);
   });
 });

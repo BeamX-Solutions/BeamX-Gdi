@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   assertLegalReady,
+  currentVersion,
   LEGAL,
   PLACEHOLDER,
   placeholderFields,
@@ -48,6 +49,13 @@ describe("LEGAL placeholders (AC-9)", () => {
     expect(() => assertLegalReady("production", filled)).not.toThrow();
     expect(() => assertLegalReady("preview", unnamed)).not.toThrow();
     expect(() => assertLegalReady(undefined, unnamed)).not.toThrow();
+  });
+});
+
+describe("currentVersion (AC-5)", () => {
+  it("reads each policy's version from LEGAL", () => {
+    expect(currentVersion("terms")).toBe(LEGAL.termsVersion);
+    expect(currentVersion("privacy")).toBe(LEGAL.privacyVersion);
   });
 });
 
