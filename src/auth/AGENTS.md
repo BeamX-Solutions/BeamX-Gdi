@@ -13,12 +13,16 @@ Better Auth server and client config, with tables in Neon via the Drizzle adapte
 - `POST /api/auth/sign-in/anonymous` is BotID checked first (`isBot()` from `src/lib/bot-check.ts`), so a bot can't mint guests; a bot gets `403 {"code":"bot"}`.
 - Then `guest-limit.ts` caps new guests per IP a Lagos day (`LIMIT_GUESTS_PER_IP`, spec 0008): over the cap gets `429 {"code":"guest_limit"}`. Only a `200` sign in counts, with no IP the cap is skipped, and a Redis error allows.
 - A guest is signed in on the first send, never on page load: the resume route answers `204`, not `401`, with no session, because the chat client's `401` handling signs a guest in.
-- The guest session cookie is strictly necessary (no consent needed); tracking cookies wait for feature #18.
+- The guest session cookie is strictly necessary (no consent needed). Spec 0017 adds no cookie banner while nothing non essential is stored; the first analytics tool needs a consent banner first.
 - Accounts are created only by the email code sign in (`emailOTP`, `/sign-in/email-otp`), so every email is verified; the password is set right after through `/api/account/set-password`, which runs the breach check itself. `/sign-up/email` answers `404` in the route: never re enable it.
 - `/delete-user` answers `404` too: only `/api/account/delete` deletes (BotID, `typedEmailMatches`, and Better Auth's one day `freshAge`, answering `SESSION_EXPIRED` for an older session).
 - The BotID protected auth paths live once in `paths.ts`; the route's `isBot()` check and BotID's `protect` list in `src/instrumentation-client.ts` both read it. A path on only one side blocks every real user or lets bots through.
 - The auth POSTs are rate limited by Better Auth's `rateLimit` with the Upstash storage and rules in `rate-limit.ts` (shared by every function instance, fails open); the email check also limits per email under a sha256 key. The guest sign in keeps spec 0008's daily cap instead.
 - `account-verified.ts` (`afterUserWrite`, from the user create and update database hooks) is the hook seam for a verified, non guest user. It calls `claimGrants` (`grants.ts`, spec 0004: starter, sign up and Luna grants), is idempotent, and never throws (a failure logs `grant_claim_failed`).
+- `policy-acceptance.ts` (`afterAccountCreated`) runs from the user **create** hook only, recording the current terms and privacy versions (spec 0017, AC-5). Never wire it to update: a name or password change must not accept a newer version. It never throws.
+- `terms-card.ts` (`needsTermsCard`) decides the updated terms card: an account behind on either policy, never a guest. A failed lookup returns false and logs `terms_check_failed`, so the card never fails a page.
+- `export-data.ts` holds the "Download my data" rules (spec 0017, AC-7): any session, 3 an hour per user, the count given back on a refused or failed read.
+- Server components that need the session on a page with more than one reader use `pageSessionUser(await headers())` (React `cache`, one read per request), calling `connection()` first, outside it. A `connection()` inside the cached function hangs the request. Route handlers keep `sessionUser(request.headers)`.
 - On sign up from a guest, Better Auth creates the account (the hook grants 30 + 50) before `onLinkAccount` runs, so the guest link takes the "target already has credits" path: held credits move, spare free credits are forfeited.
 
 ## Gotchas

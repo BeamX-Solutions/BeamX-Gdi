@@ -29,6 +29,7 @@ Shared server helpers every feature leans on: the Zod checked env module, rate l
 - `utils.ts` holds `cn()` (clsx plus tailwind-merge) for class names; shadcn components import it.
 - Abuse limits come from env (`LIMIT_*`, `MAX_MESSAGE_CHARS`, `RATE_LIMIT_MESSAGES_PER_RUN`, all listed in `.env.example`) with these defaults: 3 tool runs a day per guest, 20 per IP (loose, Nigerian carriers share IPs), 30 typed guest messages and 20 new chats a day, 30 new guests a day per IP, a burst of 10 chat requests a minute per user and 60 per IP, 40 messages per run, 4,000 characters per message, and a `maxOutputTokens` ceiling on every AI call. Hitting a limit shows a friendly message, never an error.
 - Daily limit counters and the spend total reset at midnight Lagos time (`lagosDate`), not UTC. Build key names only through `limitKeys`.
+- The hourly counters (`reportEmail`, `dataExport`) bucket by UTC clock hour (`YYYY-MM-DDTHH`), so a burst can straddle an hour boundary.
 - Every limit goes through `LimitStore`, which fails open: a Redis error (or no Upstash vars) allows the request and logs `limit_check_failed`. This is the opposite of the turn lock, which fails closed.
 - With no client IP, the IP limits are skipped, never pooled into one shared bucket.
 - Spend cap: `withSpend` adds each call's `ai_usage` cost into `spend:<lagosDate>` only once the row is saved (a duplicate `callKey` adds nothing). Over `AI_DAILY_SPEND_CAP_USD`, guests get a come back tomorrow notice at chat and at Approve; signed in users continue, and a report already claimed always finishes.

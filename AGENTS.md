@@ -103,6 +103,7 @@ MCP servers: Neon (connected), Vercel (connected)
 - [src/billing/AGENTS.md](src/billing/AGENTS.md): credits and billing config, pure pricing math, money write rules
 - [src/email/AGENTS.md](src/email/AGENTS.md): the 6 digit code emails and the report email through Resend and React Email
 - [src/pdf/AGENTS.md](src/pdf/AGENTS.md): report PDFs with `@react-pdf/renderer`, Luna's ported plan layout and the shared block layout
+- [src/legal/AGENTS.md](src/legal/AGENTS.md): the privacy notice and terms as typed content, `LEGAL` company details and policy versions, the production placeholder guard
 - [evals/assistant/AGENTS.md](evals/assistant/AGENTS.md): the real model eval of the assistant, its graders, and the results file a prompt change owes
 
 _Drafted by /audit from the repo, worth a quick human pass. Edit freely: once a line stops matching this draft, later runs treat it as curated and will flag rather than overwrite it._
