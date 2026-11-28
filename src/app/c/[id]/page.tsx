@@ -4,7 +4,7 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { z } from "zod";
 import { loadChat, toolNames } from "@/assistant/chat-page";
-import { sessionUserId } from "@/auth/session";
+import { sessionUser } from "@/auth/session";
 import { billingConfig } from "@/billing/config";
 import { expiryWarning, toCreditSummary } from "@/billing/summary";
 import { AccountControl } from "@/components/auth/account-control";
@@ -13,6 +13,7 @@ import * as conversations from "@/db/queries/conversations";
 import * as credits from "@/db/queries/credits";
 import { Chat } from "@/components/workspace/chat";
 import { startCheckoutAction } from "@/app/credits/actions";
+import { needsTermsCard, TermsNotice } from "@/app/terms/notice";
 
 /**
  * A saved chat (spec 0007, AC-5, AC-7). The shell is static; the id, the session and the
@@ -33,15 +34,18 @@ async function SavedChat({ params }: Pick<PageProps<"/c/[id]">, "params">) {
   // The thread is per request: stop any prerender or runtime prefetch here, before the
   // session and DB reads start (an aborted read logs a Better Auth error).
   await connection();
-  const userId = await sessionUserId(await headers());
-  // The thread and the chip's credits in parallel: Frankfurt is far from Nigeria.
-  const [page, summary] = await Promise.all([
+  const user = await sessionUser(await headers());
+  const userId = user?.id ?? null;
+  // The thread, the chip's credits and the terms check in parallel: Frankfurt is far
+  // from Nigeria.
+  const [page, summary, termsCard] = await Promise.all([
     loadChat(
       { open: conversations.open, ownerOf: conversations.ownerOf },
       userId,
       id,
     ),
     userId === null ? null : credits.getSummary(userId),
+    needsTermsCard(user),
   ]);
   if (page.kind === "not_found") notFound();
   const credit = toCreditSummary(summary);
@@ -51,6 +55,7 @@ async function SavedChat({ params }: Pick<PageProps<"/c/[id]">, "params">) {
       initialMessages={page.messages}
       toolNames={toolNames()}
       buy={startCheckoutAction}
+      notice={termsCard ? <TermsNotice /> : null}
       chip={
         <>
           <CreditChip

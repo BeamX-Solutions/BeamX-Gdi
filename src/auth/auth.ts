@@ -3,18 +3,22 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { APIError } from "better-auth/api";
 import { anonymous, emailOTP, haveIBeenPwned } from "better-auth/plugins";
 import { db } from "@/db/client";
+import * as policies from "@/db/queries/policies";
 import * as schema from "@/db/schema";
 import type { CodePurpose } from "@/email/copy";
 import { sendCodeEmail } from "@/email/send";
 import { env } from "@/lib/env";
 import { afterUserWrite } from "./account-verified";
 import { linkGuestAccount } from "./link";
+import { afterAccountCreated } from "./policy-acceptance";
 import { AUTH_RATE_RULES, authRateLimiter } from "./rate-limit";
 import { dropStaleSessionCookie } from "./stale-session";
 
 const DAY_S = 60 * 60 * 24;
 
 const verifiedHook = afterUserWrite();
+// Signing up accepts the current policies (spec 0017, AC-5); create only, never update.
+const acceptedHook = afterAccountCreated(policies.record);
 
 /** Better Auth's code types mapped to the email we send (spec 0009). */
 const PURPOSE: Readonly<
@@ -69,7 +73,11 @@ export const auth = betterAuth({
   hooks: { before: dropStaleSessionCookie },
   databaseHooks: {
     user: {
-      create: { after: verifiedHook },
+      create: {
+        after: async (user) => {
+          await Promise.all([verifiedHook(user), acceptedHook(user)]);
+        },
+      },
       update: { after: verifiedHook },
     },
   },

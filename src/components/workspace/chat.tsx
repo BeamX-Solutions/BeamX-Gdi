@@ -88,6 +88,8 @@ type ChatProps = {
   readonly toolNames?: Readonly<Record<string, string>>;
   /** Starts a credit checkout (the route's Server Action); Buy on the short balance card. */
   readonly buy?: BuyCredits;
+  /** A server seeded card above the composer, like the updated terms card (spec 0017). */
+  readonly notice?: ReactNode;
 };
 
 /** The history rail over `/api/chats` (feature #14), read again on each finished turn. */
@@ -117,9 +119,12 @@ function ChatFrame({
   reportName,
   activeId,
   refreshKey = "",
+  notice: aboveComposer = null,
 }: {
   readonly thread: ReactNode;
   readonly composer: ReactNode;
+  /** Shown between the thread and the composer; it never blocks the chat. */
+  readonly notice?: ReactNode;
   /** The open chat, for the history rail. */
   readonly activeId?: string;
   /** Changes when a turn finishes, so the rail reads again. */
@@ -161,6 +166,7 @@ function ChatFrame({
           reportTitle={reportName}
         >
           {thread}
+          {aboveComposer}
           {composer}
         </WorkspaceShell>
         <Toast message={notice} onDone={clearNotice} />
@@ -210,6 +216,7 @@ export function Chat({
   chip,
   toolNames = {},
   buy,
+  notice,
 }: ChatProps) {
   const freshId = useBrowserId();
   const id = conversationId ?? freshId;
@@ -222,6 +229,7 @@ export function Chat({
       chip={chip}
       toolNames={toolNames}
       buy={buy}
+      notice={notice}
     />
   );
 }
@@ -258,12 +266,14 @@ function LiveChat({
   chip,
   toolNames,
   buy,
+  notice,
 }: {
   readonly id: string;
   readonly initialMessages: readonly ChatUIMessage[];
   readonly chip?: ReactNode;
   readonly toolNames: Readonly<Record<string, string>>;
   readonly buy?: BuyCredits;
+  readonly notice?: ReactNode;
 }) {
   const session = authClient.useSession();
   const [failure, setFailure] = useState<ChatFailure | null>(null);
@@ -540,6 +550,7 @@ function LiveChat({
     <LiveCreditSummary.Provider value={live.summary}>
       <ChatFrame
         chip={chip}
+        notice={notice}
         // The rail reads again when a turn ends or a report turns ready (feature #14).
         activeId={messages.length > 0 ? id : undefined}
         refreshKey={`${busy ? "busy" : messages.length}:${reportReady ? "ready" : ""}`}

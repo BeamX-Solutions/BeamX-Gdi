@@ -9,6 +9,7 @@ import {
   user,
 } from "../schema";
 import { linkGuestCreditStatements } from "./credits";
+import { linkGuestPolicyStatement } from "./policies";
 import { linkGuestProfileStatements } from "./profile";
 import { runInBatches } from "@/lib/batches";
 import { logEvent } from "@/lib/log";
@@ -29,6 +30,8 @@ export const LINKED_TABLES = [
   // Merged, not moved (spec 0012, AC-10): see `linkGuestProfileStatements`.
   "business_profile",
   "consultation",
+  // Spec 0017: a guest never has rows, but a row the guest holds moves with them.
+  "policy_acceptance",
 ] as const;
 /**
  * Left alone on purpose: Better Auth owns `session` and `account` (its own link flow
@@ -85,6 +88,7 @@ export const linkGuest = async (
       .update(consultation)
       .set({ userId: newUserId })
       .where(eq(consultation.userId, guestUserId)),
+    linkGuestPolicyStatement(guestUserId, newUserId),
   ]);
   const counts = {
     conversation: conversations.length,
