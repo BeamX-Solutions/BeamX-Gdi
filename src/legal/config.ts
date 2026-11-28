@@ -78,13 +78,31 @@ export const currentVersion = (policy: PolicyKind): string => {
   }
 };
 
+export const POLICY_KINDS: readonly PolicyKind[] = ["terms", "privacy"];
+
+export type Acceptance = {
+  readonly policy: PolicyKind;
+  readonly version: string;
+};
+
 /**
- * True when an account should see the updated terms card: its newest accepted terms
- * version is not the current one, or it has none (an account from before this feature,
- * or a sign up whose record failed). Versions are compared for equality, not order.
+ * What accepting means, at sign up (AC-5) and on the updated terms card's OK (AC-6): the
+ * current version of both policies. One list, so the two can never drift apart.
  */
-export const termsOutdated = (newestAccepted: string | null): boolean =>
-  newestAccepted !== LEGAL.termsVersion;
+export const currentAcceptances = (): readonly Acceptance[] =>
+  POLICY_KINDS.map((policy) => ({ policy, version: currentVersion(policy) }));
+
+/** The newest version of each policy an account accepted, null for none. */
+export type NewestVersions = Readonly<Record<PolicyKind, string | null>>;
+
+/**
+ * True when an account should see the updated terms card (AC-6): its newest accepted
+ * version of either policy is not the current one, or it has none (an account from
+ * before this feature, or a sign up whose record failed). Versions are compared for
+ * equality, not order. Pure.
+ */
+export const policiesOutdated = (newest: NewestVersions): boolean =>
+  POLICY_KINDS.some((policy) => newest[policy] !== currentVersion(policy));
 
 export const PRIVACY_PATH = "/privacy";
 export const TERMS_PATH = "/terms";

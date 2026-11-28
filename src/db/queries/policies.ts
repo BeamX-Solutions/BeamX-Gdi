@@ -4,15 +4,12 @@
  * user, policy and version), so the sign up hook and the updated terms card can both run
  * more than once.
  */
-import { and, desc, eq, sql } from "drizzle-orm";
-import type { PolicyKind } from "@/legal/config";
+import { asc, desc, eq, sql } from "drizzle-orm";
+import type { Acceptance, NewestVersions } from "@/legal/config";
 import { db } from "../client";
 import { policyAcceptance } from "../schema";
 
-export type Acceptance = {
-  readonly policy: PolicyKind;
-  readonly version: string;
-};
+export type { Acceptance };
 
 /** Records each acceptance once; a version already recorded is left alone. */
 export const record = async (
@@ -26,23 +23,24 @@ export const record = async (
     .onConflictDoNothing();
 };
 
-/** The version of `policy` the user accepted most recently, or null for none. */
-export const newestVersion = async (
+/**
+ * The version of each policy the user accepted most recently, null for none, in one
+ * round trip (the updated terms card's check, AC-6).
+ */
+export const newestVersions = async (
   userId: string,
-  policy: PolicyKind,
-): Promise<string | null> => {
-  const [row] = await db
-    .select({ version: policyAcceptance.version })
+): Promise<NewestVersions> => {
+  const rows = await db
+    .selectDistinctOn([policyAcceptance.policy], {
+      policy: policyAcceptance.policy,
+      version: policyAcceptance.version,
+    })
     .from(policyAcceptance)
-    .where(
-      and(
-        eq(policyAcceptance.userId, userId),
-        eq(policyAcceptance.policy, policy),
-      ),
-    )
-    .orderBy(desc(policyAcceptance.acceptedAt))
-    .limit(1);
-  return row?.version ?? null;
+    .where(eq(policyAcceptance.userId, userId))
+    .orderBy(asc(policyAcceptance.policy), desc(policyAcceptance.acceptedAt));
+  const newest = (policy: Acceptance["policy"]) =>
+    rows.find((r) => r.policy === policy)?.version ?? null;
+  return { terms: newest("terms"), privacy: newest("privacy") };
 };
 
 /**

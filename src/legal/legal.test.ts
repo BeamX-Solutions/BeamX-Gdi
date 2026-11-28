@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   assertLegalReady,
+  currentAcceptances,
   currentVersion,
   LEGAL,
   PLACEHOLDER,
   placeholderFields,
-  termsOutdated,
+  policiesOutdated,
   type LegalConfig,
 } from "./config";
 import { privacyNotice, termsOfUse } from "./content";
@@ -59,11 +60,37 @@ describe("currentVersion (AC-5)", () => {
   });
 });
 
-describe("termsOutdated (AC-6)", () => {
-  it("shows the card for no accepted version or an old one", () => {
-    expect(termsOutdated(null)).toBe(true);
-    expect(termsOutdated("2000-01-01")).toBe(true);
-    expect(termsOutdated(LEGAL.termsVersion)).toBe(false);
+describe("currentAcceptances (AC-5, AC-6)", () => {
+  it("accepts the current version of both policies", () => {
+    expect(currentAcceptances()).toEqual([
+      { policy: "terms", version: LEGAL.termsVersion },
+      { policy: "privacy", version: LEGAL.privacyVersion },
+    ]);
+  });
+});
+
+describe("policiesOutdated (AC-6)", () => {
+  const current = {
+    terms: LEGAL.termsVersion,
+    privacy: LEGAL.privacyVersion,
+  };
+
+  it("is false when both current versions are accepted", () => {
+    expect(policiesOutdated(current)).toBe(false);
+  });
+
+  it("is true when the terms are behind or missing", () => {
+    expect(policiesOutdated({ ...current, terms: "2000-01-01" })).toBe(true);
+    expect(policiesOutdated({ ...current, terms: null })).toBe(true);
+  });
+
+  it("is true when only the privacy notice is behind or missing", () => {
+    expect(policiesOutdated({ ...current, privacy: "2000-01-01" })).toBe(true);
+    expect(policiesOutdated({ ...current, privacy: null })).toBe(true);
+  });
+
+  it("is true for an account with no acceptances at all", () => {
+    expect(policiesOutdated({ terms: null, privacy: null })).toBe(true);
   });
 });
 

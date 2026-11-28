@@ -33,21 +33,33 @@ describe("policies", () => {
     expect(await rowsOf(id)).toHaveLength(2);
   });
 
-  it("reads the newest accepted terms version, or null", async () => {
+  it("reads the newest accepted version of each policy, or null", async () => {
     const id = await users.guest();
-    expect(await policies.newestVersion(id, "terms")).toBeNull();
+    expect(await policies.newestVersions(id)).toEqual({
+      terms: null,
+      privacy: null,
+    });
     await policies.record(id, [{ policy: "terms", version: "v1" }]);
     await policies.record(id, [{ policy: "terms", version: "v2" }]);
+    expect(await policies.newestVersions(id)).toEqual({
+      terms: "v2",
+      privacy: null,
+    });
     await policies.record(id, [{ policy: "privacy", version: "v9" }]);
-    expect(await policies.newestVersion(id, "terms")).toBe("v2");
-    expect(await policies.newestVersion(id, "privacy")).toBe("v9");
+    expect(await policies.newestVersions(id)).toEqual({
+      terms: "v2",
+      privacy: "v9",
+    });
   });
 
   it("never reads another user's acceptances", async () => {
     const mine = await users.guest();
     const theirs = await users.guest();
     await policies.record(theirs, [{ policy: "terms", version: "v1" }]);
-    expect(await policies.newestVersion(mine, "terms")).toBeNull();
+    expect(await policies.newestVersions(mine)).toEqual({
+      terms: null,
+      privacy: null,
+    });
   });
 
   it("moves a guest's rows on link without clashing with the account's", async () => {

@@ -7,16 +7,9 @@
  * A failure is logged and swallowed, never blocking sign up. The account then has no
  * terms row, so the updated terms card asks once (AC-6), which records it.
  */
-import type { Acceptance } from "@/db/queries/policies";
-import { LEGAL } from "@/legal/config";
+import { currentAcceptances, LEGAL, type Acceptance } from "@/legal/config";
 import { logEvent } from "@/lib/log";
 import { isVerifiedAccount, type UserWrite } from "./account-verified";
-
-/** What signing up accepts: the current version of both policies. Pure. */
-export const signUpAcceptances = (): readonly Acceptance[] => [
-  { policy: "terms", version: LEGAL.termsVersion },
-  { policy: "privacy", version: LEGAL.privacyVersion },
-];
 
 type Record = (
   userId: string,
@@ -28,7 +21,7 @@ export const afterAccountCreated =
   async (user: UserWrite): Promise<void> => {
     if (!isVerifiedAccount(user)) return;
     try {
-      await record(user.id, signUpAcceptances());
+      await record(user.id, currentAcceptances());
       log("policies_accepted", {
         userId: user.id,
         terms: LEGAL.termsVersion,

@@ -4,8 +4,7 @@ import { LEGAL } from "@/legal/config";
 vi.mock("./grants", () => ({ claimGrants: vi.fn() }));
 vi.mock("@/lib/log", () => ({ logEvent: vi.fn() }));
 
-const { afterAccountCreated, signUpAcceptances } =
-  await import("./policy-acceptance");
+const { afterAccountCreated } = await import("./policy-acceptance");
 
 describe("afterAccountCreated (spec 0017, AC-5)", () => {
   const account = { id: "u1", emailVerified: true, isAnonymous: false };
@@ -34,12 +33,5 @@ describe("afterAccountCreated (spec 0017, AC-5)", () => {
     }, log);
     await expect(hook(account)).resolves.toBeUndefined();
     expect(log).toHaveBeenCalledWith("policy_record_failed", { userId: "u1" });
-  });
-
-  it("accepts both policies", () => {
-    expect(signUpAcceptances().map((a) => a.policy)).toEqual([
-      "terms",
-      "privacy",
-    ]);
   });
 });
