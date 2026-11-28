@@ -3,14 +3,15 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { toolNames } from "@/assistant/chat-page";
 import { startCheckoutAction } from "./credits/actions";
-import { sessionUser, sessionUserId } from "@/auth/session";
+import { pageSessionUser } from "@/auth/session";
+import { needsTermsCard } from "@/auth/terms-card";
 import { billingConfig } from "@/billing/config";
 import { expiryWarning, toCreditSummary } from "@/billing/summary";
 import { AccountControl } from "@/components/auth/account-control";
 import { CreditChip } from "@/components/credits/credit-chip";
 import { Chat } from "@/components/workspace/chat";
 import * as credits from "@/db/queries/credits";
-import { needsTermsCard, TermsNotice } from "./terms/notice";
+import { TermsNotice } from "./terms/notice";
 
 /**
  * A new chat (spec 0007, AC-1). The shell is static: the client reads the session
@@ -41,7 +42,9 @@ export default function Home() {
  * account control beside the chip uses the same read for its forfeit note (spec 0009).
  */
 async function ChipSeed() {
-  const userId = await sessionUserId(await headers());
+  // Per request; the session read is shared with `TermsSeed`.
+  await connection();
+  const userId = (await pageSessionUser(await headers()))?.id ?? null;
   const account = userId === null ? null : await credits.getSummary(userId);
   const summary = toCreditSummary(account);
   return (
@@ -57,9 +60,7 @@ async function ChipSeed() {
 
 /** The updated terms card for an account behind on the terms (spec 0017, AC-6). */
 async function TermsSeed() {
-  // Per request: stop a prerender here, before the session read starts (an aborted read
-  // logs a Better Auth error).
   await connection();
-  const user = await sessionUser(await headers());
+  const user = await pageSessionUser(await headers());
   return (await needsTermsCard(user)) ? <TermsNotice /> : null;
 }

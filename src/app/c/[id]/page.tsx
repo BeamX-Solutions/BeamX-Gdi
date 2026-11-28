@@ -5,6 +5,7 @@ import { Suspense } from "react";
 import { z } from "zod";
 import { loadChat, toolNames } from "@/assistant/chat-page";
 import { sessionUser } from "@/auth/session";
+import { needsTermsCard } from "@/auth/terms-card";
 import { billingConfig } from "@/billing/config";
 import { expiryWarning, toCreditSummary } from "@/billing/summary";
 import { AccountControl } from "@/components/auth/account-control";
@@ -13,7 +14,7 @@ import * as conversations from "@/db/queries/conversations";
 import * as credits from "@/db/queries/credits";
 import { Chat } from "@/components/workspace/chat";
 import { startCheckoutAction } from "@/app/credits/actions";
-import { needsTermsCard, TermsNotice } from "@/app/terms/notice";
+import { TermsNotice } from "@/app/terms/notice";
 
 /**
  * A saved chat (spec 0007, AC-5, AC-7). The shell is static; the id, the session and the
