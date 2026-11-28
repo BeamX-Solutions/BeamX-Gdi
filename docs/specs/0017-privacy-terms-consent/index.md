@@ -1,7 +1,7 @@
 # 0017. Privacy, terms and consent
 
 **Date**: 2026-11-28
-**Status**: Proposed
+**Status**: In Progress
 
 ## Summary
 
