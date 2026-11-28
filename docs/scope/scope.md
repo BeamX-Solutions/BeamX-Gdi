@@ -32,7 +32,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 15 | Report PDF & email | Slice 5 | in-progress |
 | 16 | Book a consultation | Slice 5 | in-progress |
 | 17 | File upload | Slice 6 | planned |
-| 18 | Privacy, terms & consent | Launch | in-progress |
+| 18 | Privacy, terms & consent | Launch | done |
 | 19 | Public landing page & SEO | Launch | planned |
 
 ## Foundations
@@ -283,7 +283,7 @@ Clients attach files (financials, a pitch deck, a sales export) that the assista
 
 ## Launch
 
-### 18. Privacy, terms & consent · in-progress · Beta
+### 18. Privacy, terms & consent · done · Beta
 A privacy notice, terms, cookie consent, and a way for clients to export or delete their data. Required because the workspace stores business data (Nigeria's data protection law, and GDPR for clients abroad).
 **Done when:** consent is captured before tracking, the policies are linked everywhere, and a client can delete their account and all their data.
 spec [0017](../specs/0017-privacy-terms-consent/index.md) (engineer picks 2026-11-28; policy text needs a lawyer's review)
@@ -293,7 +293,7 @@ spec [0017](../specs/0017-privacy-terms-consent/index.md) (engineer picks 2026-1
   - [x] `policy_acceptance` schema, migration `0008_policy_acceptance`, record at sign up, the updated terms card (AC-5, AC-6)
   - [x] Export query and route with its hourly limit, Download my data in the menus and `/profile`, tests (AC-7, AC-8)
 - [x] Verify it: `/check verify privacy, terms & consent`
-- [ ] Test it: `/test privacy, terms & consent`
+- [x] Test it: `/test privacy, terms & consent` · merged in #37, CI integration tests green
 
 ### 19. Public landing page & SEO · needs a decision
 A public page that explains the workspace and starts a guest chat. It has proper metadata, a sitemap, and social cards so it can be found and shared.
