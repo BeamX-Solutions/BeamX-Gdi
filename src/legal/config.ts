@@ -26,10 +26,13 @@ export type LegalConfig = {
   readonly privacyUpdated: string;
 };
 
+// From beamxsolutions.com (2026-11-28): the site gives the brand name and the office
+// address only. Swap in the registered name (and RC number) once the lawyer confirms it.
 export const LEGAL: LegalConfig = {
-  company: `${PLACEHOLDER} BeamX Solutions registered company name`,
-  address: `${PLACEHOLDER} Registered office address`,
-  privacyEmail: `${PLACEHOLDER} privacy@beamxsolutions.com`,
+  company: "BeamX Solutions",
+  address:
+    "97 Adeola Odeku Street, 2nd Floor, Union Bank Building, Victoria Island, Lagos, Nigeria",
+  privacyEmail: "info@beamxsolutions.com",
   domain: "app.beamxsolutions.com",
   termsVersion: "2026-11-28",
   privacyVersion: "2026-11-28",
