@@ -24,7 +24,10 @@ export const reportEmailCopy = (input: ReportEmailInput) => ({
     "Want help putting it into action? Book a free 30 minute strategy call with a BeamX adviser from the chat.",
 });
 
-export const reportEmailText = (input: ReportEmailInput): string => {
+export const reportEmailText = (
+  input: ReportEmailInput,
+  appUrl: string,
+): string => {
   const c = reportEmailCopy(input);
   return (
     [
@@ -35,6 +38,6 @@ export const reportEmailText = (input: ReportEmailInput): string => {
       ...(c.chatUrl ? ["", `${c.button}: ${c.chatUrl}`] : []),
       "",
       c.consultation,
-    ].join("\n") + footerText()
+    ].join("\n") + footerText(appUrl)
   );
 };

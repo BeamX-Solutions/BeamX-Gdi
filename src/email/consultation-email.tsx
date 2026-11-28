@@ -31,7 +31,9 @@ const title = {
   margin: "20px 0 4px",
 };
 
-export function ConsultationEmail(input: ConsultationEmailInput) {
+export function ConsultationEmail(
+  input: ConsultationEmailInput & { readonly appUrl: string },
+) {
   const copy = consultationEmailCopy(input);
   return (
     <Html lang="en">
@@ -77,7 +79,7 @@ export function ConsultationEmail(input: ConsultationEmailInput) {
               ))}
             </>
           ) : null}
-          <EmailFooter />
+          <EmailFooter appUrl={input.appUrl} />
         </Container>
       </Body>
     </Html>

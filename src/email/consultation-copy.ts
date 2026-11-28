@@ -53,6 +53,7 @@ export const consultationEmailCopy = (input: ConsultationEmailInput) => ({
 
 export const consultationEmailText = (
   input: ConsultationEmailInput,
+  appUrl: string,
 ): string => {
   const c = consultationEmailCopy(input);
   return (
@@ -68,6 +69,6 @@ export const consultationEmailText = (
             ...c.reports,
           ]
         : []),
-    ].join("\n") + footerText()
+    ].join("\n") + footerText(appUrl)
   );
 };

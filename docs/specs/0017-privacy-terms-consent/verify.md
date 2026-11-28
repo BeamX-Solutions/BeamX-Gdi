@@ -20,7 +20,7 @@ _Steps derived from spec 0017 acceptance criteria. `/check verify` runs these; `
 - [x] `curl -i <app>/api/account/export` with no cookie → `401 {"code":"unauthenticated"}`, `Cache-Control: no-store` → AC-7
 - [x] With a session cookie → `200`, `Content-Disposition: attachment; filename="beamx-data-….json"`, `Cache-Control: no-store`; logs show `data_exported` with ids and counts only → AC-7
 - [x] `pnpm vitest run --project unit src/legal src/auth/export-data.test.ts src/db/queries/export-shape.test.ts src/auth/policy-acceptance.test.ts src/email/footer.test.ts` → all pass → AC-2, AC-3, AC-5, AC-7, AC-9
-- [ ] `pnpm test:integration` on a throwaway Neon branch → `policies.int.test.ts`, `export.int.test.ts` (owner only, completeness), `link.int.test.ts` and `sign-up.int.test.ts` pass → AC-5, AC-7
+- [x] `pnpm test:integration` on a throwaway Neon branch (CI, PR #37) → `policies.int.test.ts`, `export.int.test.ts` (owner only, completeness), `link.int.test.ts` and `sign-up.int.test.ts` pass → AC-5, AC-7
 - [x] `VERCEL_ENV=production pnpm vitest run --project unit src/legal` while `LEGAL` holds `[PLACEHOLDER]` → fails; and a production build on Vercel fails in `/privacy` → AC-9
 - [x] `pnpm exec playwright test e2e/legal.spec.ts` → 16 pass (4 projects) → AC-1, AC-4, AC-7, AC-8
 

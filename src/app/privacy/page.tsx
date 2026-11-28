@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { LegalDocumentView } from "@/components/legal/legal-document";
 import { billingConfig } from "@/billing/config";
 import { PURGE } from "@/db/queries/users";
-import { assertLegalReady, TERMS_PATH } from "@/legal/config";
+import { appHostOf, assertLegalReady, TERMS_PATH } from "@/legal/config";
 import { privacyNotice } from "@/legal/content";
 import { env } from "@/lib/env";
 
@@ -21,6 +21,7 @@ export default function PrivacyPage() {
   return (
     <LegalDocumentView
       document={privacyNotice({
+        appHost: appHostOf(env.NEXT_PUBLIC_APP_URL),
         guestDeleteDays: PURGE.staleDays,
         creditExpiryMonths: billingConfig.expiry.inactiveMonths,
       })}

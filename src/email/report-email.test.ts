@@ -35,6 +35,7 @@ const deps = (over: Partial<Deps> = {}) => {
     from: "BeamX <no-reply@beamx.test>",
     deployed: true,
     render: async () => "<p>report</p>",
+    appUrl: "https://app.beamx.test",
     log,
     devPrint,
     ...over,
@@ -52,7 +53,7 @@ describe("reportMailer", () => {
     expect(sent[0]).toMatchObject({
       to: "ada@gmail.com",
       subject: "Your BeamX Beacon report",
-      text: reportEmailText(input),
+      text: reportEmailText(input, "https://app.beamx.test"),
       attachments: [pdf],
     });
     // Ids and purpose only, never the address.
@@ -84,17 +85,25 @@ describe("reportMailer", () => {
 
 describe("ReportEmail", () => {
   it("carries the headline, the chat link and the consultation line", async () => {
-    const html = await render(ReportEmail(input));
+    const html = await render(
+      ReportEmail({ ...input, appUrl: "https://app.beamx.test" }),
+    );
     expect(html).toContain("Building Blocks");
     expect(html).toContain("https://app.beamx.test/c/abc");
     expect(html).toContain("strategy call");
   });
 
   it("leaves out the button when there is no chat", async () => {
-    const html = await render(ReportEmail({ ...input, chatUrl: null }));
-    expect(html).not.toContain("Open the chat");
-    expect(reportEmailText({ ...input, chatUrl: null })).not.toContain(
-      "Open the chat",
+    const html = await render(
+      ReportEmail({
+        ...input,
+        chatUrl: null,
+        appUrl: "https://app.beamx.test",
+      }),
     );
+    expect(html).not.toContain("Open the chat");
+    expect(
+      reportEmailText({ ...input, chatUrl: null }, "https://app.beamx.test"),
+    ).not.toContain("Open the chat");
   });
 });

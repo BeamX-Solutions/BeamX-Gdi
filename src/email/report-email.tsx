@@ -23,7 +23,9 @@ const MUTED = "#5B6472";
 const SURFACE = "#F5F6F8";
 const FONT = "Montserrat, 'Segoe UI', Helvetica, Arial, sans-serif";
 
-export function ReportEmail(input: ReportEmailInput) {
+export function ReportEmail(
+  input: ReportEmailInput & { readonly appUrl: string },
+) {
   const copy = reportEmailCopy(input);
   return (
     <Html lang="en">
@@ -70,7 +72,7 @@ export function ReportEmail(input: ReportEmailInput) {
           <Text style={{ color: MUTED, fontSize: 14, lineHeight: "22px" }}>
             {copy.consultation}
           </Text>
-          <EmailFooter />
+          <EmailFooter appUrl={input.appUrl} />
         </Container>
       </Body>
     </Html>

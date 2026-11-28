@@ -45,10 +45,14 @@ export const codeEmailCopy = (
 });
 
 /** The plain text version, for mail apps that don't show HTML. */
-export const codeEmailText = (purpose: CodePurpose, code: string): string => {
+export const codeEmailText = (
+  purpose: CodePurpose,
+  code: string,
+  appUrl: string,
+): string => {
   const c = codeEmailCopy(purpose, code);
   return (
     [c.heading, "", c.intro, "", code, "", c.expiry, c.ignore].join("\n") +
-    footerText()
+    footerText(appUrl)
   );
 };

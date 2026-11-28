@@ -27,6 +27,7 @@ const deps = (over: Partial<Parameters<typeof codeMailer>[0]> = {}) => {
       from: "BeamX <no-reply@beamx.test>",
       deployed: true,
       render: async (purpose, code) => `<p>${purpose} ${code}</p>`,
+      appUrl: "https://app.beamx.test",
       log,
       devPrint,
       ...over,
@@ -36,7 +37,7 @@ const deps = (over: Partial<Parameters<typeof codeMailer>[0]> = {}) => {
 
 describe("codeEmailCopy", () => {
   it("names the purpose, the expiry and the ignore line", () => {
-    const signUp = codeEmailText("sign-up", "123456");
+    const signUp = codeEmailText("sign-up", "123456", "https://app.beamx.test");
     expect(signUp).toContain("123456");
     expect(signUp).toContain("finish creating your account");
     expect(signUp).toContain("expires in 10 minutes");
@@ -49,7 +50,13 @@ describe("codeEmailCopy", () => {
 
 describe("CodeEmail", () => {
   it("renders the code and the copy into HTML", async () => {
-    const html = await render(CodeEmail({ purpose: "reset", code: "654321" }));
+    const html = await render(
+      CodeEmail({
+        purpose: "reset",
+        code: "654321",
+        appUrl: "https://app.beamx.test",
+      }),
+    );
     expect(html).toContain("654321");
     expect(html).toContain("Reset your password");
     expect(html).toContain('lang="en"');
@@ -69,7 +76,7 @@ describe("codeMailer", () => {
         to: "a@b.test",
         subject: "Your BeamX sign up code",
         html: "<p>sign-up 123456</p>",
-        text: codeEmailText("sign-up", "123456"),
+        text: codeEmailText("sign-up", "123456", "https://app.beamx.test"),
       },
     ]);
     // Logs carry no address and no code.

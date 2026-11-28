@@ -25,9 +25,12 @@ const FONT = "Montserrat, 'Segoe UI', Helvetica, Arial, sans-serif";
 export function CodeEmail({
   purpose,
   code,
+  appUrl,
 }: {
   readonly purpose: CodePurpose;
   readonly code: string;
+  /** The app URL the policy footer links to. */
+  readonly appUrl: string;
 }) {
   const copy = codeEmailCopy(purpose, code);
   return (
@@ -87,7 +90,7 @@ export function CodeEmail({
           <Text style={{ color: MUTED, fontSize: 14, lineHeight: "20px" }}>
             {copy.expiry} {copy.ignore}
           </Text>
-          <EmailFooter />
+          <EmailFooter appUrl={appUrl} />
         </Container>
       </Body>
     </Html>

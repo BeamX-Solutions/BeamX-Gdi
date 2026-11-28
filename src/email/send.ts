@@ -44,6 +44,8 @@ export type MailerDeps = {
   /** True on a Vercel deploy (preview or production). */
   readonly deployed: boolean;
   readonly render: (purpose: CodePurpose, code: string) => Promise<string>;
+  /** The app URL the policy footer links to (spec 0017, AC-4). */
+  readonly appUrl: string;
   readonly log: typeof logEvent;
   /** Where the dev fallback prints the code. */
   readonly devPrint: (line: string) => void;
@@ -70,7 +72,7 @@ export const codeMailer =
         to,
         subject: codeEmailCopy(purpose, code).subject,
         html: await deps.render(purpose, code),
-        text: codeEmailText(purpose, code),
+        text: codeEmailText(purpose, code, deps.appUrl),
       });
       if (error) {
         deps.log("email_send_failed", { reason: "provider", purpose });
@@ -85,12 +87,16 @@ export const codeMailer =
   };
 
 const resend = env.RESEND_API_KEY ? new Resend(env.RESEND_API_KEY) : null;
+/** This deploy's app URL: the email footers link to its policy pages. */
+const APP_URL = env.NEXT_PUBLIC_APP_URL;
 
 export const sendCodeEmail = codeMailer({
   send: resend ? (email) => resend.emails.send(email) : null,
   from: env.EMAIL_FROM,
   deployed: env.VERCEL_ENV !== undefined,
-  render: (purpose, code) => render(CodeEmail({ purpose, code })),
+  render: (purpose, code) =>
+    render(CodeEmail({ purpose, code, appUrl: APP_URL })),
+  appUrl: APP_URL,
   log: logEvent,
   devPrint: (line) => {
     console.info(line);
@@ -112,6 +118,8 @@ export type ReportEmailDeps = {
   readonly from: string | undefined;
   readonly deployed: boolean;
   readonly render: (input: ReportEmailInput) => Promise<string>;
+  /** The app URL the policy footer links to (spec 0017, AC-4). */
+  readonly appUrl: string;
   readonly log: typeof logEvent;
   readonly devPrint: (line: string) => void;
 };
@@ -142,7 +150,7 @@ export const reportMailer =
         to,
         subject: reportEmailCopy(input).subject,
         html: await deps.render(input),
-        text: reportEmailText(input),
+        text: reportEmailText(input, deps.appUrl),
         attachments: [pdf],
       });
       if (error) {
@@ -167,7 +175,8 @@ export const sendReportEmail = reportMailer({
     : null,
   from: env.EMAIL_FROM,
   deployed: env.VERCEL_ENV !== undefined,
-  render: (input) => render(ReportEmail(input)),
+  render: (input) => render(ReportEmail({ ...input, appUrl: APP_URL })),
+  appUrl: APP_URL,
   log: logEvent,
   devPrint: (line) => {
     console.info(line);
@@ -206,7 +215,7 @@ export const consultationMailer =
         to,
         subject: consultationEmailCopy(input).subject,
         html: await deps.render(input),
-        text: consultationEmailText(input),
+        text: consultationEmailText(input, deps.appUrl),
         attachments,
       });
       if (error) {
@@ -228,7 +237,8 @@ export const sendConsultationEmail = consultationMailer({
     : null,
   from: env.EMAIL_FROM,
   deployed: env.VERCEL_ENV !== undefined,
-  render: (input) => render(ConsultationEmail(input)),
+  render: (input) => render(ConsultationEmail({ ...input, appUrl: APP_URL })),
+  appUrl: APP_URL,
   log: logEvent,
   devPrint: (line) => {
     console.info(line);
