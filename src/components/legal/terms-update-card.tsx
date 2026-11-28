@@ -51,7 +51,7 @@ export function TermsUpdateCard({
           >
             Privacy notice
           </a>
-          . By continuing to use BeamX you accept them.
+          . Select OK to accept them.
         </p>
       </div>
       <Button

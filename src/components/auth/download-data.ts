@@ -6,6 +6,8 @@
 export const EXPORT_PATH = "/api/account/export";
 export const DOWNLOAD_LABEL = "Download my data";
 export const DOWNLOAD_STARTED = "Your data is downloading.";
+/** How long the downloaded file's blob URL stays alive. */
+export const REVOKE_AFTER_MS = 30_000;
 
 /** The toast for a failed export, by HTTP status. Pure. */
 export const downloadErrorMessage = (status: number): string => {
@@ -42,7 +44,9 @@ export const downloadMyData = async (): Promise<string> => {
     document.body.append(link);
     link.click();
     link.remove();
-    URL.revokeObjectURL(url);
+    // Some browsers start the save after `click()` returns; freeing the file at once
+    // can cancel it, so the blob URL is released later.
+    setTimeout(() => URL.revokeObjectURL(url), REVOKE_AFTER_MS);
     return DOWNLOAD_STARTED;
   } catch {
     return downloadErrorMessage(0);

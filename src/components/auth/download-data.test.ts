@@ -5,6 +5,7 @@ import {
   downloadMyData,
   EXPORT_PATH,
   fileNameFrom,
+  REVOKE_AFTER_MS,
 } from "./download-data";
 
 describe("downloadErrorMessage", () => {
@@ -59,6 +60,7 @@ describe("downloadMyData (spec 0017, AC-7, AC-8)", () => {
   });
 
   it("fetches the export uncached and saves it under the server's file name", async () => {
+    vi.useFakeTimers();
     stubBrowser(
       async () =>
         new Response("{}", {
@@ -74,7 +76,11 @@ describe("downloadMyData (spec 0017, AC-7, AC-8)", () => {
     expect(link.download).toBe("beamx-data-2026-11-28.json");
     expect(link.href).toBe("blob:beamx");
     expect(link.click).toHaveBeenCalledOnce();
+    // The file stays alive while the browser starts saving it, then is freed.
+    expect(URL.revokeObjectURL).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(REVOKE_AFTER_MS);
     expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:beamx");
+    vi.useRealTimers();
   });
 
   it("shows the limit message on a 429 and saves nothing", async () => {
